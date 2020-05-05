@@ -11,7 +11,7 @@ function init_remote_s3(){
     type=S3 \
     encryption=none \
     exporttree=no \autoenable=true \
-    host=$remote_dn
+    host=$remote_dn \
     port=443 protocol=https \
     chunk=1GiB \
     bucket=${bucket_name} \
