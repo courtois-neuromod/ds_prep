@@ -22,7 +22,7 @@ if [ -z "$remote" ] ; then
 
   # configure s3 bucket
   pushd $derivative_path
-  bucket_name="cneuromod."${ds_name}.$derivative
+  bucket_name="cneuromod."${ds_name}".derivatives."$derivative
   init_remote_s3 $bucket_name
   git annex wanted $bucket_name "not metadata=distribution-restrictions=*"
   popd
