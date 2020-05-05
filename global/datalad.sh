@@ -2,9 +2,11 @@
 
 remote_name='s3unf'
 remote_dn='s3.unf-montreal.ca'
+local_ip='10.10.10.20'
 
 function init_remote_s3(){
   bucket_name=$1
+  git annex config --set annex.security.allowed-ip-addresses $local_ip
   git-annex initremote \
     -d s3unf.${bucket_name} \
     type=S3 \
