@@ -11,6 +11,7 @@ fi
 
 ds_name='cneuromod.'$ds_name
 
+pushd $bids_path
 # init the dataset remotes/buckets
 init_remote_s3 ${ds_name}.mri
 init_remote_s3 ${ds_name}.mri.sensitive
@@ -20,3 +21,4 @@ init_remote_s3 ${ds_name}.stimuli
 git annex wanted ${ds_name}.mri "exclude=derivatives/* and exclude=stimuli/* and not metadata=distribution-restrictions=*"
 git annex wanted ${ds_name}.mri.sensitive "exclude=derivatives/* and exclude=stimuli/* and metadata=distribution-restrictions=*"
 git annex wanted ${ds_name}.stimuli "include=stimuli/*"
+popd
