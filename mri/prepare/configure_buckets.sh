@@ -5,7 +5,11 @@ source ${BASH_SOURCE%/*}/../../global/datalad.sh
 
 bids_path=$1
 ds_name=$(basename $bids_path)
+if [ -n $2 ] ; then
+  ds_name=$2
+fi
 
+ds_name='cneuromod.'$ds_name
 
 # init the dataset remotes/buckets
 init_remote_s3 ${ds_name}.mri

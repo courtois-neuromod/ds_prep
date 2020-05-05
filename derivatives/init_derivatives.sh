@@ -12,6 +12,8 @@ derivative=$2
 remote=$3
 
 derivative_path=$bids_path/derivatives/$derivative
+ds_name=$(basename $bids_path)
+
 
 datalad create -d $bids_path $derivative_path
 if [ -z "$remote" ] ; then
@@ -20,7 +22,7 @@ if [ -z "$remote" ] ; then
 
   # configure s3 bucket
   pushd $derivative_path
-  bucket_name=${ds_name}.$derivative
+  bucket_name="cneuromod."${ds_name}.$derivative
   init_remote_s3 $bucket_name
   git annex wanted $bucket_name "not metadata=distribution-restrictions=*"
   popd
