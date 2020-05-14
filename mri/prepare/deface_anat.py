@@ -1,7 +1,8 @@
 import os
+import json
 import bids
 import argparse
-import tempfile
+from pathlib import Path
 import subprocess
 import logging
 import nibabel as nb
@@ -20,20 +21,9 @@ from nipype.interfaces import fsl
 
 
 PYBIDS_CACHE_PATH = '.pybids_cache'
-MNI_PATH = '/home/basile/data/src/HCPpipelines/global/templates/MNI152_T1_1mm.nii.gz'
-DEFACE_MASK_PATH = '/home/basile/data/tests/cneuromod/code/ds_prep/global/templates/deface_ear_mask.nii.gz'
+MNI_PATH = '../../global/templates/MNI152_T1_1mm.nii.gz'
+DEFACE_MASK_PATH = '../../global/templates/deface_ear_mask.nii.gz'
 
-deface_ref_image = {
-    'scope':'raw',
-    'datatype':'anat',
-    'suffix':'T1w',
-    'reconstruction': None,
-    'acquisition': None}
-
-series_to_deface_filters = [
- {'datatype':'anat', 'acquisition':None, 'suffix': ['T1w', 'T2w', 'MP2RAGE', 'UNIT1']},
-]
-#series_to_deface_filters = [deface_ref_image]
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -46,10 +36,29 @@ def parse_args():
         '--participant-label', action='store', nargs='+',
         help='a space delimited list of participant identifiers or a single '
              'identifier (the sub- prefix can be removed)')
-    parser.add_argument('--force-reindex', action='store_true',
-                   help='Force pyBIDS reset_database and reindexing')
+    parser.add_argument(
+        '--force-reindex', action='store_true',
+        help='Force pyBIDS reset_database and reindexing')
+    parser.add_argument(
+        '--debug-images', action='store_true',
+        help='Output debug images in the current directory')
+    parser.add_argument(
+        '--ref-bids-filters', dest='ref_bids_filters', action='store',
+        type=_bids_filter,
+        help="path to or inline json with pybids filters to select session reference to register defacemask")
+    parser.add_argument(
+        '--other-bids-filters', dest='other_bids_filters', action='store',
+        type=_bids_filter,
+        help="path to or inline json with pybids filters to select all images to deface")
     return parser.parse_args()
 
+def _filter_pybids_any(dct):
+    return {k: bids.layout.Query.ANY if v == "*" else v for k, v in dct.items()}
+
+def _bids_filter(json_str):
+    if os.path.exists(os.path.abspath(json_str)):
+        json_str = Path(json_str).read_text()
+    return json.loads(json_str, object_hook=_filter_pybids_any)
 
 def registration(ref, moving):
     ref_data = ref.get_fdata()
@@ -101,6 +110,7 @@ def warp_mask(tpl_mask, target, affine):
     return nb.Nifti1Image(warped_mask, target.affine)
 
 def main():
+
     args = parse_args()
 
     pybids_cache_path = os.path.join(args.bids_path, PYBIDS_CACHE_PATH)
@@ -111,41 +121,38 @@ def main():
         reset_database=args.force_reindex,
         index_metadata=False,
         validate=False)
-    repo = AnnexRepo(args.bids_path)
+
+    annex_repo = AnnexRepo(args.bids_path)
 
     subject_list = args.participant_label if args.participant_label else bids.layout.Query.ANY
-    deface_ref_images = layout.get(subject=subject_list, **deface_ref_image, extension='nii.gz')
+    deface_ref_images = layout.get(
+        subject=subject_list,
+        **args.ref_bids_filters,
+        extension='nii.gz')
 
     modified_files = []
 
-    tmpl_image = nb.load(MNI_PATH)
-    tmpl_defacemask = nb.load(DEFACE_MASK_PATH)
+    script_dir = os.path.dirname(__file__)
+    tmpl_image = nb.load(os.path.join(script_dir, MNI_PATH))
+    tmpl_defacemask = nb.load(os.path.join(script_dir, DEFACE_MASK_PATH))
 
     for ref_image in deface_ref_images:
-        # defaced file already exists
-        target_defacemask_path = ref_image.path.replace('_T1w','_mod-T1w_defacemask')
-        target_template_reg_mat = ref_image.path.replace('_T1w.nii.gz','_mod-T1w_deface.mat')
-
         subject = ref_image.entities['subject']
         session = ref_image.entities['session']
 
         ref_image_nb = nb.load(ref_image)
         ref2tpl_affine = registration(tmpl_image, ref_image_nb)
-        print('registration complete')
         output_debug_images(tmpl_image, ref_image_nb, ref2tpl_affine)
 
         series_to_deface = []
-        for filters in series_to_deface_filters:
+        for filters in args.other_bids_filters:
             series_to_deface.extend(layout.get(
                 extension='nii.gz',
                 subject=subject, session=session, **filters))
 
-        print(series_to_deface)
-
         for serie in series_to_deface:
-            #if next(repo.get_metadata(serie.path))[1].get('distribution-restrictions') is None:
+            #if next(annex_repo.get_metadata(serie.path))[1].get('distribution-restrictions') is None:
             #    continue
-            print(serie)
 
             datalad.api.unlock(serie.path)
             warped_mask_path = serie.path.replace(
@@ -165,59 +172,42 @@ def main():
 
     #datalad.api.add(modified_files)
     if len(modified_files):
-        print(modified_files)
-        #repo.set_metadata(modified_files, remove={'distribution-restrictions': 'sensitive'})
+        #annex_repo.set_metadata(modified_files, remove={'distribution-restrictions': 'sensitive'})
 
 
 if __name__ == "__main__":
     main()
 
-
-
 def generate_deface_ear_mask():
 
-    for z,x in zip(range(jaw_marker[1],above_eye_marker[1]),x_coords):
-        deface_ear_mask[:x,:,z]=0
-        mask[-x:,:,z]=0
-    deface_mask=np.ones(np.asarray(mni_data.shape)*(1,1,2),dtype=np.int8)
-    mni=nb.load('/home/basile/data/src/HCPpipelines/global/templates/MNI152_T1_1mm.nii.gz')
-    deface_mask=np.ones(np.asarray(mni.shape)*(1,1,2),dtype=np.int8)
-    above_eye_marker=[218,245]
-    jaw_marker=[126,182]
-    ear_marker=[20,185]
-    ear_marker2=[0,250]
-    y_coords=np.round(np.linspace(jaw_marker[0],above_eye_marker[0],above_eye_marker[1]-jaw_marker[1])).astype(np.int)
+    mni = nb.load(MNI_PATH)
+    deface_ear_mask = np.ones(np.asarray(mni.shape)*(1,1,2),dtype=np.int8)
+    affine_ext=mni.affine.copy()
+    affine_ext[2,-1]-=mni.shape[-1]
+
+    above_eye_marker = [218,245]
+    jaw_marker = [126,182]
+    ear_marker = [30,170]
+    ear_marker2 = [5,300]
+
+    # remove face
+    deface_ear_mask[:,jaw_marker[0]:,:jaw_marker[1]] = 0
+    y_coords = np.round(np.linspace(jaw_marker[0],above_eye_marker[0],above_eye_marker[1]-jaw_marker[1])).astype(np.int)
     for z,y in zip(range(jaw_marker[1],above_eye_marker[1]),y_coords):
-        deface_mask[:,y:,z]=0
+        deface_ear_mask[:,y:,z]=0
+
+    # remove ears
+    deface_ear_mask[:ear_marker[0],:,:ear_marker[1]]=0
+    deface_ear_mask[-ear_marker[0]:,:,:ear_marker[1]]=0
     x_coords=np.round(np.linspace(ear_marker[0],ear_marker2[0],ear_marker2[1]-ear_marker[1])).astype(np.int)
-    ear_marker=[20,185]
-    ear_marker2=[5,300]
-    ear_marker=[30,170]
-    x_coords=np.round(np.linspace(ear_marker[0],ear_marker2[0],ear_marker2[1]-ear_marker[1])).astype(np.int)
-    for z,x in zip(range(jaw_marker[1],above_eye_marker[1]),x_coords):
+    for z,x in zip(range(ear_marker[1],ear_marker2[1]),x_coords):
         deface_ear_mask[:x,:,z]=0
         deface_ear_mask[-x:,:,z]=0
-    deface_ear_mask=deface_mask.copy()
-    for z,x in zip(range(jaw_marker[1],above_eye_marker[1]),x_coords):
-        deface_ear_mask[:x,:,z]=0
-        deface_ear_mask[-x:,:,z]=0
+
+    # remove data on the image size where the body doesn't extend
     deface_ear_mask[-1]=0
     deface_ear_mask[0]=0
     deface_ear_mask[:,-1,:]=0
     deface_ear_mask[:,:,-1]=0
-    affine_ext=mni.affine.copy()
-    affine_ext
-    mni.shape
-    affine_ext[2,-1]-=mni.shape[-1]
-    nb.Nifti1Image(deface_ear_mask, affine_ext).to_filename('deface_ear_mask.nii.gz')
-    deface_mask[:,126:,:182]=0
-    deface_ear_mask[:ear_marker[0],:,:ear_marker[1]]=0
-    deface_ear_mask[-ear_marker[0]:,:,:ear_marker[1]]=0
-    nb.Nifti1Image(deface_ear_mask, affine_ext).to_filename('deface_ear_mask.nii.gz')
-    deface_ear_mask[:,126:,:182]=0
-    nb.Nifti1Image(deface_ear_mask, affine_ext).to_filename('deface_ear_mask.nii.gz')
-    ear_marker
-    for z,x in zip(range(ear_marker[1],ear_marker2[1]),x_coords):
-        deface_ear_mask[:x,:,z]=0
-        deface_ear_mask[-x:,:,z]=0
+
     nb.Nifti1Image(deface_ear_mask, affine_ext).to_filename('deface_ear_mask.nii.gz')
