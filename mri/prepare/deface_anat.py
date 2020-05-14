@@ -28,7 +28,7 @@ DEFACE_MASK_PATH = '../../global/templates/deface_ear_mask.nii.gz'
 def parse_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,
-        description=__doc__)
+        description='deface anatomical series by performing an affine registration to a template and warping mask to native space')
 
     parser.add_argument('bids_path',
                    help='BIDS folder to convert.')
@@ -39,6 +39,12 @@ def parse_args():
     parser.add_argument(
         '--force-reindex', action='store_true',
         help='Force pyBIDS reset_database and reindexing')
+    parser.add_argument(
+        '--datalad', action='store_true',
+        help='Update distribution-restrictions metadata and commit changes')
+    parser.add_argument(
+        '--save-all-masks', action='store_true',
+        help='Save mask for all defaced series, default is only saving mask for reference serie.')
     parser.add_argument(
         '--debug-images', action='store_true',
         help='Output debug images in the current directory')
@@ -68,9 +74,9 @@ def registration(ref, moving):
     nbins = 32
     sampling_prop = None
     metric = MutualInformationMetric(nbins, sampling_prop)
-    sigmas = [5.0, 3.0, 1.0]
-    factors = [8, 4, 2]
-    level_iters = [10000, 1000, 100]
+    sigmas = [5.0, 3.0, 1.0, 0]
+    factors = [8, 4, 2, 1]
+    level_iters = [10000, 1000, 100, 1]
     transform = RigidTransform3D()
     affreg = AffineRegistration(metric=metric,
                                 level_iters=level_iters,
@@ -122,15 +128,16 @@ def main():
         index_metadata=False,
         validate=False)
 
-    annex_repo = AnnexRepo(args.bids_path)
+    if args.datalad:
+        annex_repo = AnnexRepo(args.bids_path)
 
     subject_list = args.participant_label if args.participant_label else bids.layout.Query.ANY
     deface_ref_images = layout.get(
         subject=subject_list,
         **args.ref_bids_filters,
-        extension='nii.gz')
+        extension=['nii','nii.gz'])
 
-    modified_files = []
+    new_files, modified_files = [], []
 
     script_dir = os.path.dirname(__file__)
     tmpl_image = nb.load(os.path.join(script_dir, MNI_PATH))
@@ -140,28 +147,37 @@ def main():
         subject = ref_image.entities['subject']
         session = ref_image.entities['session']
 
-        ref_image_nb = nb.load(ref_image)
+        ref_image_nb = ref_image.get_image()
         ref2tpl_affine = registration(tmpl_image, ref_image_nb)
-        output_debug_images(tmpl_image, ref_image_nb, ref2tpl_affine)
+        matrix_path = ref_image.path.replace(
+            '_%s.%s'%(ref_image.entities['suffix'],ref_image.entities['extension']),
+            '_mod-%s_defacemaskreg.mat'%ref_image.entities['suffix'])
+        np.savetxt(matrix_path, ref2tpl_affine.affine)
+        new_files.append(matrix_path)
+
+        if args.debug_images:
+            output_debug_images(tmpl_image, ref_image_nb, ref2tpl_affine)
 
         series_to_deface = []
         for filters in args.other_bids_filters:
             series_to_deface.extend(layout.get(
-                extension='nii.gz',
+                extension=['nii','nii.gz'],
                 subject=subject, session=session, **filters))
 
         for serie in series_to_deface:
-            #if next(annex_repo.get_metadata(serie.path))[1].get('distribution-restrictions') is None:
-            #    continue
-
-            datalad.api.unlock(serie.path)
-            warped_mask_path = serie.path.replace(
-                '_%s'%serie.entities['suffix'],
-                '_mod-%s_defacemask'%serie.entities['suffix'])
+            if args.datalad:
+                if next(annex_repo.get_metadata(serie.path))[1].get('distribution-restrictions') is None:
+                    continue
+                datalad.api.unlock(serie.path)
 
             serie_nb = serie.get_image()
             warped_mask = warp_mask(tmpl_defacemask, serie_nb, ref2tpl_affine)
-            warped_mask.to_filename(warped_mask_path)
+            if args.save_all_masks or serie == ref_image:
+                warped_mask_path = serie.path.replace(
+                    '_%s'%serie.entities['suffix'],
+                    '_mod-%s_defacemask'%serie.entities['suffix'])
+                warped_mask.to_filename(warped_mask_path)
+                new_files.append(warped_mask)
 
             masked_serie = nb.Nifti1Image(
                 np.asanyarray(serie_nb.dataobj) * np.asanyarray(warped_mask.dataobj),
@@ -170,9 +186,10 @@ def main():
             masked_serie.to_filename(serie.path)
             modified_files.append(serie.path)
 
-    #datalad.api.add(modified_files)
-    if len(modified_files):
-        #annex_repo.set_metadata(modified_files, remove={'distribution-restrictions': 'sensitive'})
+
+    if args.datalad and len(modified_files):
+        annex_repo.set_metadata(modified_files, remove={'distribution-restrictions': 'sensitive'})
+        datalad.api.save(modified_files + new_files, message='deface %d series/images and update distribution-restrictions'%len(modified_files))
 
 
 if __name__ == "__main__":
