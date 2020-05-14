@@ -12,11 +12,11 @@ def infotoids(seqinfos, outdir):
     pi = str(seqinfo.referring_physician_name)
     #study_name = str(ex_dcm.dcm_data.StudyDescription)
     study_name = str(seqinfo.study_description)
-    
+
     patient_name = str(ex_dcm.dcm_data.PatientName)
 
     study_path = study_name.split('^')
-    
+
     rema = re.match('(([^_]*)_)?(([^_]*)_)?p([0-9]*)_([a-z]*)([0-9]*)', patient_name)
 
     locator = os.path.join(pi,*study_path)
@@ -82,10 +82,10 @@ def get_seq_bids_info(s, ex_dcm):
 
     scan_options = ex_dcm.dcm_data.get('ScanOptions', None)
     image_comments = ex_dcm.dcm_data.get('ImageComments', [])
-    
+
     # CMRR bold and dwi
     is_sbref = 'Single-band reference' in image_comments
-    
+
     # Anats
     if 'localizer' in s.protocol_name.lower():
         seq['label'] = 'localizer'
@@ -110,29 +110,26 @@ def get_seq_bids_info(s, ex_dcm):
         elif 'UNI' in s.image_type:
             #seq['acq'] = 'UNI'
             seq['label'] = 'UNIT1' #TODO: validate
-            
-    elif (s.dim4 == 1) and ('MTw' in s.protocol_name):
-        seq['label'] = 'MTw'
-        seq['acq'] = 'off'
-        if 'On' in s.protocol_name:
-            seq['acq'] = 'on'
+
+#    elif (s.dim4 == 1) and ('MTw' in s.protocol_name):
+#        seq['label'] = 'MTw'
+#        seq['acq'] = 'off'
+#        if 'On' in s.protocol_name:
+#            seq['acq'] = 'on'
 
     # GRE acquisition
-    elif ('*fl3d1' in s.sequence_name):
-        seq['acq'] = 'gre'
-        if 'PD' in s.protocol_name:
-            seq['label'] = 'PDw'
-        elif 'T1w' in s.protocol_name:
-            seq['label'] = 'T1w'
+    elif ('_fl3d1' in s.sequence_name):
+        seq['label'] = 'MTS'
+        if 'T1w' in s.protocol_name:
+            seq['acq'] = 'T1w'
         else:
-            seq['label'] = 'MTR'
             seq['acq'] = 'MTon' if scan_options=='MT' else 'MToff'
 
     elif 'tfl2d1' in s.sequence_name:
         seq['type'] = 'fmap'
         seq['label'] = 'B1plusmap'
         seq['acq'] = 'flipangle' if 'flip angle map' in image_comments else 'anat'
-        
+
     # SWI
     elif (s.dim4 == 1) and ('swi3d1r' in s.sequence_name):
         seq['type'] = 'swi'
@@ -140,16 +137,16 @@ def get_seq_bids_info(s, ex_dcm):
             seq['label'] = 'swi'
         else:
             seq['label'] = 'minIP'
-            
+
     # Siemens or CMRR diffusion sequence, exclude DERIVED (processing at the console)
-    elif (('ep_b' in s.sequence_name) or 
-          ('ez_b' in s.sequence_name) or 
+    elif (('ep_b' in s.sequence_name) or
+          ('ez_b' in s.sequence_name) or
           ('epse2d1_110' in s.sequence_name)) and \
         not any(it in s.image_type for it in ['DERIVED', 'PHYSIO']):
         seq['type'] = 'dwi'
         seq['label'] = 'sbref' if is_sbref else 'dwi'
 
-        
+
     # CMRR or Siemens functional sequences
     elif ('epfid2d1' in s.sequence_name):
         seq['task'] = get_task(s)
@@ -165,16 +162,16 @@ def get_seq_bids_info(s, ex_dcm):
         seq['run'] = get_run(s)
         if s.is_motion_corrected:
             seq['rec'] = 'moco'
-            
+
     ################## SPINAL CORD PROTOCOL #####################
     elif ('spcR_100'  in s.sequence_name):
         seq['label'] = 'T2w'
 #        seq['bp'] = 'spine'
     elif '*me2d1r3' in s.sequence_name:
         seq['label'] = 'MEGRE'
-        
+
     return seq
-    
+
 
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
@@ -187,7 +184,7 @@ def infotodict(seqinfo):
     subindex: sub index within group
     session: scan index for longitudinal acq
     """
-    
+
     lgr.info("Processing %d seqinfo entries", len(seqinfo))
 
     #for s in seqinfo:
@@ -225,7 +222,7 @@ def infotodict(seqinfo):
         seq_type = bids_info['type']
         seq_label = bids_info['label']
 
-        
+
         if (seq_type=='fmap' and seq_label=='epi') or (sbref_as_fieldmap and seq_label == 'sbref'):
             pe_dir = bids_info.get('dir', None)
             if not pe_dir in fieldmap_runs:
@@ -249,7 +246,7 @@ def infotodict(seqinfo):
                     info[template] = []
                 info[template].append(s.series_id)
 
-        
+
         show_dir = seq_type in ['fmap', 'dwi']
 
         #print(bids_info)
@@ -284,7 +281,7 @@ def infotodict(seqinfo):
         else:
             # maybe images are exported with different reconstruction parameters.
             if bids_info.get('rec') and not any([]):
-                # insert the rec- 
+                # insert the rec-
                 suffix_parts.insert(7, "rec-%s" % bids_info['rec'])
                 # filter those which are None, and join with _
                 suffix = '_'.join(filter(bool, suffix_parts))
@@ -293,7 +290,7 @@ def infotodict(seqinfo):
 
         info[template].append(s.series_id)
 
-            
+
     if skipped:
         lgr.info("Skipped %d sequences: %s" % (len(skipped), skipped))
     if skipped_unknown:
