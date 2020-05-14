@@ -168,7 +168,7 @@ def get_seq_bids_info(s, ex_dcm):
         seq['label'] = 'T2w'
 #        seq['bp'] = 'spine'
     elif '*me2d1r3' in s.sequence_name:
-        seq['label'] = 'MEGRE'
+        seq['label'] = 'T2starmap'
 
     return seq
 
