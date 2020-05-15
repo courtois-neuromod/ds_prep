@@ -1,0 +1,7 @@
+{
+    "scope":"raw",
+    "datatype":"anat",
+    "suffix":"T1w",
+    "reconstruction": null,
+    "acquisition": null
+}
