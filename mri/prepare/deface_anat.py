@@ -115,6 +115,43 @@ def warp_mask(tpl_mask, target, affine):
         mode='nearest')
     return nb.Nifti1Image(warped_mask, target.affine)
 
+# generates the mask on the fly from the template image, using hard-coded markers
+# the mask image is larger that the template to include the full face and allow processing
+# of images with larger FoV (eg. cspine acquisitions)
+def generate_deface_ear_mask():
+
+    mni = nb.load(MNI_PATH)
+    deface_ear_mask = np.ones(np.asarray(mni.shape)*(1,1,2), dtype=np.int8)
+    affine_ext = mni.affine.copy()
+    affine_ext[2,-1] -= mni.shape[-1]
+
+    above_eye_marker = [218,245]
+    jaw_marker = [126,182]
+    ear_marker = [30,170]
+    ear_marker2 = [5,300]
+
+    # remove face
+    deface_ear_mask[:,jaw_marker[0]:,:jaw_marker[1]] = 0
+    y_coords = np.round(np.linspace(jaw_marker[0],above_eye_marker[0],above_eye_marker[1]-jaw_marker[1])).astype(np.int)
+    for z,y in zip(range(jaw_marker[1], above_eye_marker[1]), y_coords):
+        deface_ear_mask[:,y:,z]=0
+
+    # remove ears
+    deface_ear_mask[:ear_marker[0],:,:ear_marker[1]] = 0
+    deface_ear_mask[-ear_marker[0]:,:,:ear_marker[1]] = 0
+    x_coords=np.round(np.linspace(ear_marker[0],ear_marker2[0],ear_marker2[1]-ear_marker[1])).astype(np.int)
+    for z,x in zip(range(ear_marker[1],ear_marker2[1]),x_coords):
+        deface_ear_mask[:x,:,z] = 0
+        deface_ear_mask[-x:,:,z] = 0
+
+    # remove data on the image size where the body doesn't extend
+    deface_ear_mask[-1] = 0
+    deface_ear_mask[0] = 0
+    deface_ear_mask[:,-1,:] = 0
+    deface_ear_mask[:,:,-1] = 0
+
+    return nb.Nifti1Image(deface_ear_mask, affine_ext)
+
 def main():
 
     args = parse_args()
@@ -199,40 +236,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# generates the mask on the fly from the template image, using hard-coded markers
-# the mask image is larger that the template to include the full face and allow processing
-# of images with larger FoV (eg. cspine acquisitions)
-def generate_deface_ear_mask():
-
-    mni = nb.load(MNI_PATH)
-    deface_ear_mask = np.ones(np.asarray(mni.shape)*(1,1,2), dtype=np.int8)
-    affine_ext = mni.affine.copy()
-    affine_ext[2,-1] -= mni.shape[-1]
-
-    above_eye_marker = [218,245]
-    jaw_marker = [126,182]
-    ear_marker = [30,170]
-    ear_marker2 = [5,300]
-
-    # remove face
-    deface_ear_mask[:,jaw_marker[0]:,:jaw_marker[1]] = 0
-    y_coords = np.round(np.linspace(jaw_marker[0],above_eye_marker[0],above_eye_marker[1]-jaw_marker[1])).astype(np.int)
-    for z,y in zip(range(jaw_marker[1], above_eye_marker[1]), y_coords):
-        deface_ear_mask[:,y:,z]=0
-
-    # remove ears
-    deface_ear_mask[:ear_marker[0],:,:ear_marker[1]] = 0
-    deface_ear_mask[-ear_marker[0]:,:,:ear_marker[1]] = 0
-    x_coords=np.round(np.linspace(ear_marker[0],ear_marker2[0],ear_marker2[1]-ear_marker[1])).astype(np.int)
-    for z,x in zip(range(ear_marker[1],ear_marker2[1]),x_coords):
-        deface_ear_mask[:x,:,z] = 0
-        deface_ear_mask[-x:,:,z] = 0
-
-    # remove data on the image size where the body doesn't extend
-    deface_ear_mask[-1] = 0
-    deface_ear_mask[0] = 0
-    deface_ear_mask[:,-1,:] = 0
-    deface_ear_mask[:,:,-1] = 0
-
-    return nb.Nifti1Image(deface_ear_mask, affine_ext)
