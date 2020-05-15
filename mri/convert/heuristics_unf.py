@@ -118,7 +118,7 @@ def get_seq_bids_info(s, ex_dcm):
 #            seq['acq'] = 'on'
 
     # GRE acquisition
-    elif ('_fl3d1' in s.sequence_name):
+    elif ('*fl3d1' in s.sequence_name):
         seq['label'] = 'MTS'
         if 'T1w' in s.protocol_name:
             seq['acq'] = 'T1w'
