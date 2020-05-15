@@ -214,7 +214,10 @@ def infotodict(seqinfo):
         # XXX: skip derived sequences, we don't store them to avoid polluting
         # the directory, unless it is the motion corrected ones
         # (will get _rec-moco suffix)
-        if skip_derived and (s.is_derived or ('MPR' in s.image_type)) and not s.is_motion_corrected:
+        if skip_derived \
+            and (s.is_derived or ('MPR' in s.image_type)) \
+            and not s.is_motion_corrected \
+            and not 'UNI' in s.image_type:
             skipped.append(s.series_id)
             lgr.debug("Ignoring derived data %s", s.series_id)
             continue
