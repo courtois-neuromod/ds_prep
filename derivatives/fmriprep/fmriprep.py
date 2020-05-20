@@ -16,7 +16,11 @@ FMRIPREP_REQ = {'cpus': 4, 'mem_per_cpu': 4096, 'time':'36:00:00'}
 FMRIPREP_VERSION = "fmriprep-20.0.1-lts"
 FMRIPREP_SINGULARITY_PATH = os.path.abspath(os.path.join(script_dir, f"../../containers/{FMRIPREP_VERSION}.simg"))
 BIDS_FILTERS_FILE = os.path.join(script_dir, 'bids_filters.json')
-TEMPLATEFLOW_HOME = os.path.join(os.environ['SCRATCH'], 'templateflow')
+TEMPLATEFLOW_HOME = os.path.join(
+    os.environ.get(
+        'SCRATCH',
+        os.path.join(os.environ['HOME'],'.cache')),
+    'templateflow')
 OUTPUT_TEMPLATES = ['MNI152NLin2009cAsym', 'fsLR']
 SINGULARITY_CMD_BASE = " ".join([
     "singularity run",
