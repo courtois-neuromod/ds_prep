@@ -204,10 +204,10 @@ def generate_deface_ear_mask(mni):
     affine_ext = mni.affine.copy()
     affine_ext[2,-1] -= mni.shape[-1]
 
-    above_eye_marker = [218,245]
-    jaw_marker = [126,182]
-    ear_marker = [30,170]
-    ear_marker2 = [5,300]
+    above_eye_marker = [218,240]
+    jaw_marker = [130,182]
+    ear_marker = [25,160]
+    ear_marker2 = [5,260]
 
     # remove face
     deface_ear_mask[:,jaw_marker[0]:,:jaw_marker[1]] = 0
