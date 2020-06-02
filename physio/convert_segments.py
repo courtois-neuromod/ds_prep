@@ -5,6 +5,7 @@
 import os
 # from pandas import DataFrame.to_csv - .to_csv is an attribute of dataframe
 from neurokit2 import read_acqknowledge
+import h5py
 
 
 def batch_parse(root, subject, ses=None, save_path=None):
@@ -106,9 +107,10 @@ def batch_parse(root, subject, ses=None, save_path=None):
                 sep = '_'
                 name = sep.join(subject, exp, f'Run{idx+1:02}')
                 # saving the dataframe under specified dir and file name
-                run.to_csv(os.path.join(save_path, subject, exp,
-                                        name, ".tsv.gz"),
-                           sep='t', compression='gz')
+                hf = h5py.File(os.path.join(save_path, subject, exp, name),
+                               'w')  # write HDF5
+                hf.create_dataset(name, data=run)
+                hf.close()
                 # notify user
                 print('run', f'Run{idx+1:02}', 'in file ', file,
                       '\n in experiment:', exp, 'is parsed.',
