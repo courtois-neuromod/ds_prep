@@ -3,9 +3,9 @@
 """Utilities for biosignal data structure."""
 
 import os
+from pathlib import Path
 # from pandas import DataFrame.to_csv - .to_csv is an attribute of dataframe
 from neurokit2 import read_acqknowledge
-import h5py
 
 
 def batch_parse(root, subject, ses=None, save_path=None):
@@ -40,45 +40,42 @@ def batch_parse(root, subject, ses=None, save_path=None):
 
     # Main loop iterating through files in each dict key returned by list_sub
     for exp in files:
-        for file in exp:
+        for file in files[exp]:
             # reading acq, resampling at 1000Hz
             bio_df, fs = read_acqknowledge(os.path.join(
-                                       root, subject, exp, file),
-                                           sampling_rate=1000)  # resampling
-
-            # initialize a df with TTL values over 1 (switch either ~0 or ~5)
-            query_df = bio_df.query('TTL > 1')
+                                       root, subject, exp, file))  # resampling
+            # initialize a df with TTL values over 4 (switch either ~0 or ~5)
+            query_df = bio_df.query('TTL > 4')
 
             # Define session length - this list will be less
             # memory expensive to play with than dataframe
-            session = query_df.index[0:-1]
+            session = list(query_df.index)
 
-            # a priori known minimal length of a single block
-            block_len = fs * 180
             # maximal TR - the time distance between two adjacent TTL
             tr_period = fs * 2
 
             # Define session length and adjust with padding
             padding = fs * 9
-            start = session[0]-padding
-            end = session[-1]+padding
+            start = int(session[0]-padding)
+            end = int(session[-1]+padding)
 
             parse_list = []
 
             # ascertain that session is longer than 3 min
-            if len(session) > block_len:
-                for time in range(len(session)-1):
-                    time_delta = session[time+1] - session[time]
 
-                    # if the time diff between two TTL values over 1
-                    # is larger than TR, keep both indexes
-                    if time_delta > tr_period:
-                        parse_start = session[time]
-                        parse_end = session[time+1]
-                        # adjust the segmentation with padding
-                        # parse start is end of run
-                        parse_list += [(parse_start + padding,
-                                        parse_end - padding)]
+            for idx in range(1, len(session)):
+                # define time diff between current successive trigger
+                time_delta = session[idx] - session[idx-1]
+
+                # if the time diff between two trigger values over 4
+                # is larger than TR, keep both indexes
+                if time_delta > tr_period:
+                    parse_start = int(session[idx-1] + padding)
+                    parse_end = int(session[idx] - padding)
+                    # adjust the segmentation with padding
+                    # parse start is end of run
+                    parse_list += [(parse_start, parse_end)]
+            print(parse_list)
 
             # Parse  with the given indexes
             # Keep the first segment before scanner is turned on
@@ -89,7 +86,7 @@ def batch_parse(root, subject, ses=None, save_path=None):
             runs = []
             # push the resulting parsed dataframes in a list
             runs += [block1]
-            for i in range(len(parse_list)):
+            for i in range(0, len(parse_list)-1):
                 if i == len(parse_list):
                     runs += ([bio_df[parse_list[i][1]:end]])
                     break
@@ -98,23 +95,26 @@ def batch_parse(root, subject, ses=None, save_path=None):
 
             # changing channel names
             for idx, run in enumerate(runs):
-                run.rename(columns={"PPG100C": 'PPG',
-                                    "Custom, HLT100C - A 6": 'RSP',
-                                    "GSR-EDA100C-MRI": 'EDA',
-                                    "ECG100C": 'ECG'})
+                run = run.rename(columns={"PPG100C": 'PPG',
+                                          "Custom, HLT100C - A 6": 'RSP',
+                                          "GSR-EDA100C-MRI": 'EDA',
+                                          "ECG100C": 'ECG'})
 
                 # joining path and file name with readable Run index(01 to 0n)
                 sep = '_'
-                name = sep.join(subject, exp, f'Run{idx+1:02}')
+                name = sep.join([subject, exp, f'Run{idx+1:02}'])
                 # saving the dataframe under specified dir and file name
-                hf = h5py.File(os.path.join(save_path, subject, exp, name),
-                               'w')  # write HDF5
-                hf.create_dataset(name, data=run)
-                hf.close()
+                if os.path.exists(f"{save_path}{subject}/") is False:
+                    os.mkdir(Path(f"{save_path}{subject}"))
+                run.to_csv(f"{save_path}{subject}/{name}.tsv.gz",
+                           sep='t', compression='gzip')
+                fig = run.plot(title=name)
+                fig.savefig(f"{save_path}{subject}")
                 # notify user
-                print('run', f'Run{idx+1:02}', 'in file ', file,
-                      '\n in experiment:', exp, 'is parsed.',
-                      '\n and saved at', save_path, '| sampling rate is :', fs)
+                print(name, 'in file ', file,
+                      '\nin experiment:', exp, 'is parsed.',
+                      '\nand saved at', save_path, '| sampling rate is :', fs,
+                      '\n', '~'*30)
 
     return files
 
