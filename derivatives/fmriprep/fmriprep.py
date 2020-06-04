@@ -31,8 +31,8 @@ SINGULARITY_CMD_BASE = " ".join([
 slurm_preamble = """#!/bin/bash
 #SBATCH --account=rrg-pbellec
 #SBATCH --job-name={jobname}.job
-#SBATCH --output=.out/{jobname}.out
-#SBATCH --error=.out/{jobname}.err
+#SBATCH --output=.slurm/{jobname}.out
+#SBATCH --error=.slurm/{jobname}.err
 #SBATCH --time={time}
 #SBATCH --cpus-per-task={cpus}
 #SBATCH --mem-per-cpu={mem_per_cpu}M
@@ -51,7 +51,6 @@ def write_anat_job(layout, subject, args):
         jobname = f"smriprep_sub-{subject}",
         email=args.email)
     job_specs.update(SMRIPREP_REQ)
-    preamble = slurm_preamble % job_specs
     job_path = os.path.join(
         layout.root,
         SLURM_JOB_DIR,
@@ -69,7 +68,7 @@ def write_anat_job(layout, subject, args):
         json.dump(bids_filters, f)
 
     with open(job_path, 'w') as f:
-        f.write(preamble.format(**job_specs))
+        f.write(slurm_preamble.format(**job_specs))
         f.write(" ".join([
             SINGULARITY_CMD_BASE,
             f"-B {layout.root}:/data",
@@ -97,12 +96,18 @@ def write_func_job(layout, subject, session, args):
         FMRIPREP_VERSION)
     derivatives_path = os.path.join(layout.root, 'derivatives', FMRIPREP_VERSION)
 
+    bold_runs = layout.get(
+        subject=subject,
+        session=session,
+        extension=['.nii', '.nii.gz'],
+        suffix='bold')
+    n_runs = len(bold_runs)
+    run_lengths = [run.get_image().shape[-1] for run in bold_runs]
+
     job_specs = dict(
         jobname = f"fmriprep_study-{study}_sub-{subject}_ses-{session}",
         email = args.email)
     job_specs.update(FMRIPREP_REQ)
-
-    preamble = slurm_preamble % job_specs
 
     job_path = os.path.join(
         layout.root,
@@ -119,7 +124,7 @@ def write_func_job(layout, subject, session, args):
         json.dump(bids_filters, f)
 
     with open(job_path, 'w') as f:
-        f.write(preamble)
+        f.write(slurm_preamble.format(**job_specs))
         f.write(" ".join([
             SINGULARITY_CMD_BASE,
             f"-B {layout.root}:/data",
