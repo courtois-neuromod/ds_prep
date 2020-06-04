@@ -106,8 +106,11 @@ def batch_parse(root, subject, ses=None, save_path=None):
                 # saving the dataframe under specified dir and file name
                 if os.path.exists(f"{save_path}{subject}/") is False:
                     os.mkdir(Path(f"{save_path}{subject}"))
-                run.to_csv(f"{save_path}{subject}/{name}.tsv.gz",
-                           sep='t', compression='gzip')
+                # write HDF5
+                hf = h5py.File(f"{save_path}{subject}/{name}.hdf5", 'w')
+                hf.create_dataset(name, data=run)
+                hf.close()
+                # plot the run and save it
                 fig = run.plot(title=name)
                 fig.savefig(f"{save_path}{subject}")
                 # notify user
