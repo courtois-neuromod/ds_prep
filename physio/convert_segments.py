@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 # from pandas import DataFrame.to_csv - .to_csv is an attribute of dataframe
 from neurokit2 import read_acqknowledge
+from hdf5 import File
 
 
 def batch_parse(root, subject, ses=None, save_path=None):
@@ -107,7 +108,7 @@ def batch_parse(root, subject, ses=None, save_path=None):
                 if os.path.exists(f"{save_path}{subject}/") is False:
                     os.mkdir(Path(f"{save_path}{subject}"))
                 # write HDF5
-                hf = h5py.File(f"{save_path}{subject}/{name}.hdf5", 'w')
+                hf = File(f"{save_path}{subject}/{name}.hdf5", 'w')
                 hf.create_dataset(name, data=run)
                 hf.close()
                 # plot the run and save it
