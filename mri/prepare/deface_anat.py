@@ -10,6 +10,7 @@ import scipy.ndimage
 import datalad.api
 from datalad.support.annexrepo import AnnexRepo
 from deepbrain import Extractor
+import scipy.ndimage.morphology
 
 from dipy.align.imaffine import (transform_centers_of_mass,
                                   AffineMap,
@@ -183,10 +184,10 @@ def main():
             ref2tpl_affine = AffineMap(np.loadtxt(matrix_path))
         else:
             logging.info(f"running registration of reference serie: {ref_image.path}")
-            brain_mask = nb.Nifti1Image(
-                (brain_xtractor.run(ref_image_nb.get_fdata())>.99).astype(np.uint8),
-                ref_image_nb.affine)
-            ref2tpl_affine = registration(tmpl_image, ref_image_nb, tmpl_image_mask, brain_mask)
+            brain_mask = (brain_xtractor.run(ref_image_nb.get_fdata())>.99).astype(np.uint8)
+            brain_mask[:] = scipy.ndimage.morphology.binary_dilation(brain_mask, iterations=4)
+            brain_mask_nb = nb.Nifti1Image(brain_mask, ref_image_nb.affine)
+            ref2tpl_affine = registration(tmpl_image, ref_image_nb, tmpl_image_mask, brain_mask_nb)
             np.savetxt(matrix_path, ref2tpl_affine.affine)
             new_files.append(matrix_path)
 
