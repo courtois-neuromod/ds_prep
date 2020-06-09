@@ -1,8 +1,13 @@
 {
-  "T1w": {
+  "t1w": {
     "reconstruction": null,
     "acquisition": null
   },
-  "bold" : {  
+  "t2w": {
+    "reconstruction": null,
+    "acquisition": null,
+    "bp": null
+  },
+  "bold" : {
   }
 }
