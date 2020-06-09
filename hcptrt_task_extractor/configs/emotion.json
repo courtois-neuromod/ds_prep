@@ -1,0 +1,121 @@
+{
+  "TTL": "SyncSlide.OnsetTime",
+  "events":[
+    {
+      "name": "new_bloc_shape",
+      "ioi": {
+        "column": "Procedure",
+        "value": "ShapePromptPROC"
+      },
+      "onset": {
+        "column": "shape.OnsetTime"
+      },
+      "duration": {
+        "column": "StimSlide.OnsetTime",
+        "formula": [-1, "subtract", "onset"]
+      },
+      "nbloc": {
+        "column": "HRun1",
+        "type": "bloc"
+      }
+    },
+    {
+      "name": "new_bloc_face",
+      "ioi": {
+        "column": "Procedure",
+        "value": "FacePromptPROC"
+      },
+      "onset": {
+        "column": "face.OnsetTime"
+      },
+      "duration": {
+        "column": "StimSlide.OnsetTime",
+        "formula": [-1, "subtract", "onset"]
+      },
+      "nbloc": {
+        "column": "HRun1",
+        "type": "bloc"
+      }
+    },
+    {
+      "name": "response_shape",
+      "ioi": {
+        "column": ["ShapeBlock1", "ShapeBlock2", "ShapeBlock3"]
+      },
+      "onset": {
+        "column": "StimSlide.OnsetTime"
+      },
+      "duration": {
+        "column": "StimSlide.RT"
+      },
+      "nbloc": {
+        "column": "HRun1",
+        "type": "bloc"
+      },
+      "ntrial": {
+        "column": ["ShapeBlock1", "ShapeBlock2", "ShapeBlock3"]
+      },
+      "stim_top": {
+        "column": "Top",
+        "type": "stim"
+      },
+      "stim_left": {
+        "column": "Left",
+        "type": "stim"
+      },
+      "stim_right": {
+        "column": "Right",
+        "type": "stim"
+      }
+    },
+    {
+      "name": "response_face",
+      "ioi": {
+        "column": ["FaceBlock1", "FaceBlock2", "FaceBlock3"]
+      },
+      "onset": {
+        "column": "StimSlide.OnsetTime"
+      },
+      "duration": {
+        "column": "StimSlide.RT"
+      },
+      "nbloc": {
+        "column": "HRun1",
+        "type": "bloc"
+      },
+      "ntrial": {
+        "column": ["FaceBlock1", "FaceBlock2", "FaceBlock3"]
+      },
+      "stim_top": {
+        "column": "Top",
+        "type": "stim"
+      },
+      "stim_left": {
+        "column": "Left",
+        "type": "stim"
+      },
+      "stim_right": {
+        "column": "Right",
+        "type": "stim"
+      }
+    },
+    {
+      "name": "cross_fixation",
+      "ioi": {
+        "column": "Fixation.OnsetTime"
+      },
+      "onset": {
+        "column": "Fixation.OnsetTime"
+      },
+      "duration":{
+        "column": "StimSlide.OnsetTime",
+        "formula": [-1, "subtract", "onset"],
+        "when_no_value": "median"
+      },
+      "nbloc": {
+        "column": "HRun1",
+        "type": "bloc"
+      }
+    }
+  ]
+}

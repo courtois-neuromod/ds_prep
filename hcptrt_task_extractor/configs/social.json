@@ -1,0 +1,48 @@
+{
+  "TTL": "CountDownSlide.OnsetTime",
+  "events":[
+    {
+      "name": "show_movie",
+      "ioi": {
+        "column": "Procedure",
+        "value": "SOCIALrunPROC"
+      },
+      "onset": {
+        "column": "MovieSlide.OnsetTime"
+      },
+      "duration": {
+        "column": "MovieSlide.OnsetToOnsetTime"
+      },
+      "stimuli": {
+        "column": "Movie",
+        "type": "stim"
+      },
+      "stim_type": {
+        "column": "Type"
+      }
+    },
+    {
+      "name": "response",
+      "ioi": {
+        "column": "Procedure",
+        "value": "SOCIALrunPROC"
+      },
+      "onset": {
+        "column": "ResponseSlide.OnsetTime"
+      },
+      "duration": {
+        "column": "ResponseSlide.RT"
+      },
+      "stimuli": {
+        "column": "Movie",
+        "type": "stim"
+      },
+      "stim_type": {
+        "column": "Type"
+      },
+      "response": {
+        "column": "ResponseSlide.RESP"
+      }
+    }
+  ]
+}

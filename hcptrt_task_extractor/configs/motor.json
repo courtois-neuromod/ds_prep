@@ -1,0 +1,200 @@
+{
+  "TTL": "CountDownSlide.OnsetTime",
+  "events":[
+    {
+      "name": "new_bloc_left_hand",
+      "ioi": {
+        "column": "Procedure",
+        "value": "LeftHandCueProcedure"
+      },
+      "onset": {
+        "column": "LeftHandCue.OnsetTime"
+      },
+      "duration": {
+        "column": "CrossLeft.OnsetTime",
+        "type": "rt",
+        "formula": [-1, "subtract", "onset"]
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
+      }
+    },
+    {
+      "name": "new_bloc_right_hand",
+      "ioi": {
+        "column": "Procedure",
+        "value": "RightHandCuePROC"
+      },
+      "onset": {
+        "column": "RightHandCue.OnsetTime"
+      },
+      "duration": {
+        "column": "CrossRight.OnsetTime",
+        "formula": [-1, "subtract", "onset"]
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
+      }
+    },
+    {
+      "name": "new_bloc_right_foot",
+      "ioi": {
+        "column": "Procedure",
+        "value": "RightFoottCuePROC"
+      },
+      "onset": {
+        "column": "RightFootCue.OnsetTime",
+        "type": "time"
+      },
+      "duration": {
+        "column": "CrossRight.OnsetTime",
+        "type": "rt",
+        "formula": [-1, "subtract", "onset"]
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
+      }
+    },
+    {
+      "name": "new_bloc_left_foot",
+      "ioi": {
+        "column": "Procedure",
+        "value": "LeftFootCuePROC"
+      },
+      "onset": {
+        "column": "LeftFootCue.OnsetTime"
+      },
+      "duration": {
+        "column": "CrossLeft.OnsetTime",
+        "formula": [-1, "subtract", "onset"]
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
+      }
+    },
+    {
+      "name": "new_bloc_tongue",
+      "ioi": {
+        "column": "Procedure",
+        "value": "TongueCuePROC"
+      },
+      "onset": {
+        "column": "TongueCue.OnsetTime"
+      },
+      "duration": {
+        "column": "CrossCenter.OnsetTime",
+        "formula": [-1, "subtract", "onset"]
+      },
+      "nbloc": {
+        "column": "MotorRun1List"
+      }
+    },
+    {
+      "name": "response_left_hand",
+      "ioi": {
+        "column": ["Procedure", "BlockType"],
+        "value": ["CrossLeftPROC", "Left Hand"],
+        "formula": "intersection"
+      },
+      "onset": {
+        "column": "CrossLeft.OnsetTime"
+      },
+      "duration": {
+        "column": "CrossLeft.OnsetToOnsetTime"
+      },
+      "nbloc": {
+        "column": "MotorRun1List"
+      },
+      "trial":{
+        "column": "MotorRun1List.Sample"
+      }
+    },
+    {
+        "name": "response_right_hand",
+        "ioi": {
+          "column": ["Procedure", "BlockType"],
+          "value": ["CrossRightPROC", "Right Hand"],
+          "formula": "intersection"
+        },
+        "onset": {
+          "column": "CrossRight.OnsetTime"
+        },
+        "duration": {
+          "column": "CrossRight.OnsetToOnsetTime"
+        },
+        "nbloc": {
+          "column": "MotorRun1List"
+        },
+        "trial":{
+          "column": "MotorRun1List.Sample"
+        }
+    },
+    {
+      "name": "response_left_foot",
+      "ioi": {
+        "column": ["Procedure", "BlockType"],
+        "value": ["CrossLeftPROC", "Left Foot"],
+        "formula": "intersection"
+      },
+      "onset": {
+        "column": "CrossLeft.OnsetTime"
+      },
+      "duration": {
+        "column": "CrossLeft.OnsetToOnsetTime"
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
+      },
+      "trial":{
+        "column": "MotorRun1List.Sample"
+      }
+    },
+    {
+      "name": "response_right_foot",
+      "ioi": {
+        "column": ["Procedure", "BlockType"],
+        "value": ["CrossRightPROC", "Right Foot"],
+        "formula": "intersection"
+      },
+      "onset": {
+        "column": "CrossRight.OnsetTime"
+      },
+      "duration": {
+        "column": "CrossRight.OnsetToOnsetTime"
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
+      },
+      "trial":{
+        "column": "MotorRun1List.Sample"
+      }
+    },
+    {
+      "name": "response_tongue",
+      "ioi": {
+        "column": ["Procedure", "BlockType"],
+        "value": ["CrossCenterPROC", "Tongue"],
+        "formula": "intersection"
+      },
+      "onset": {
+        "column": "CrossCenter.OnsetTime"
+      },
+      "duration": {
+        "column": "CrossCenter.OnsetToOnsetTime"
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
+      },
+      "trial":{
+        "column": "MotorRun1List.Sample"
+      }
+    }
+  ]
+}
