@@ -76,7 +76,6 @@ def batch_parse(root, subject, ses=None, save_path=None):
                     # adjust the segmentation with padding
                     # parse start is end of run
                     parse_list += [(parse_start, parse_end)]
-            print(parse_list)
 
             # Parse  with the given indexes
             # Keep the first segment before scanner is turned on
@@ -110,6 +109,7 @@ def batch_parse(root, subject, ses=None, save_path=None):
                 # write HDF5
                 hf = File(f"{save_path}{subject}/{name}.hdf5", 'w')
                 hf.create_dataset(name, data=run)
+                hf.create_dataset(f'{name}-sampling_rate', data=fs)
                 hf.close()
                 # plot the run and save it
                 fig = run.plot(title=name)
