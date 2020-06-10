@@ -413,19 +413,38 @@ def _subTTL(val, var):
     return (val - var) / 1000
 
 
-def main():
-    parser = _build_args_parser()
-    args = parser.parse_args()
+def convert_event_file(in_file, in_task, out_file,
+                       extract_eprime=False,
+                       overwrite=False,
+                       verbose=False):
+    """
+    Convert txt data from eprime to tsv.
 
-    if args.verbose:
+    Parameters
+    ----------
+    in_file : str
+        Task output (.txt) to convert.
+    in_task: str
+        Config JSON file defining the task you want to convert.
+    out_file: str
+        output tsv file.
+
+    extract_eprime: bool
+        Extract eprime file into raw tsv file. It helps to create a
+        config file.
+    overwrite: bool
+        Force overwriting of the output files.
+    verbose: bool
+        If set, produces verbose output.
+
+    Returns
+    -------
+    """
+    if verbose:
         logging.basicConfig(level=logging.INFO)
 
-    in_file = args.in_file
-    in_task = args.in_task
-    out_file = args.out_file
-
     if os.path.exists(out_file):
-        if not args.overwrite:
+        if not overwrite:
             raise IOError('Output file: {} already exists'.format(out_file))
 
     # Get json file from task name
@@ -434,7 +453,7 @@ def main():
     #  Convert eprime txt file to data frame
     df = _text_to_df(in_file)
 
-    if args.extract_eprime:
+    if extract_eprime:
         df.to_csv(out_file, index=False, sep='\t')
         return
 
@@ -456,6 +475,22 @@ def main():
     logging.info(new_df)
     # Extract new_df into tsv file
     new_df.to_csv(out_file, index=False, sep='\t')
+
+
+def main():
+    parser = _build_args_parser()
+    args = parser.parse_args()
+
+    in_file = args.in_file
+    in_task = args.in_task
+    out_file = args.out_file
+    verbose = args.verbose
+    extract_eprime = args.extract_eprime
+    overwrite = args.overwrite
+    convert_event_file(in_file, in_task, out_file,
+                       extract_eprime=extract_eprime,
+                       overwrite=overwrite,
+                       verbose=verbose)
 
 
 if __name__ == "__main__":
