@@ -27,7 +27,7 @@ SINGULARITY_CMD_BASE = " ".join([
     "--cleanenv",
     "--notrack",
     f"-B {TEMPLATEFLOW_HOME}:/templateflow",
-    f"-B /etc/ssl/certs/:/etc/ssl/certs/",
+    f"-B /etc/pki:/etc/pki/",
     ])
 
 slurm_preamble = """#!/bin/bash
@@ -43,7 +43,6 @@ slurm_preamble = """#!/bin/bash
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user={email}
 
-export SINGULARITYENV_REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-bundle.crt
 export SINGULARITYENV_FS_LICENSE=$HOME/.freesurfer.txt
 export SINGULARITYENV_TEMPLATEFLOW_HOME=/templateflow
 
@@ -161,6 +160,9 @@ def parse_args():
     parser.add_argument(
         '--email', action='store',
         help='email for SLURM notifications')
+    parser.add_argument(
+        '--container', action='store',
+        help='fmriprep singularity container')
     parser.add_argument(
         '--participant-label', action='store', nargs='+',
         help='a space delimisted list of participant identifiers or a single '
