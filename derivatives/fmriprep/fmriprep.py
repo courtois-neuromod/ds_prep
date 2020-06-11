@@ -25,7 +25,9 @@ OUTPUT_TEMPLATES = ['MNI152NLin2009cAsym', 'fsLR']
 SINGULARITY_CMD_BASE = " ".join([
     "singularity run",
     "--cleanenv",
+    "--notrack",
     f"-B {TEMPLATEFLOW_HOME}:/templateflow",
+    f"-B /etc/ssl/certs/:/etc/ssl/certs/",
     ])
 
 slurm_preamble = """#!/bin/bash
@@ -41,6 +43,7 @@ slurm_preamble = """#!/bin/bash
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user={email}
 
+export SINGULARITYENV_REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-bundle.crt
 export SINGULARITYENV_FS_LICENSE=$HOME/.freesurfer.txt
 export SINGULARITYENV_TEMPLATEFLOW_HOME=/templateflow
 
