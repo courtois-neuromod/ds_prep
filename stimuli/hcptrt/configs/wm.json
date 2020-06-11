@@ -1,0 +1,40 @@
+{
+  "TTL": "SyncSlide.OnsetTime",
+  "events":[
+    {
+      "name": "response",
+      "ioi": {
+        "column": "Procedure",
+        "value": "TrialsPROC"
+      },
+      "onset": {
+        "column": "Stim.OnsetTime"
+      },
+      "trial": {
+        "column": ["Run2Block1", "Run2Block2", "Run2Block3", "Run2Block4", "Run2Block5", "Run2Block6", "Run2Block7", "Run2Block8"]
+      },
+      "duration": {
+        "column": "Stim.RT"
+      },
+      "answer":{
+        "column": "Stim.RESP"
+      },
+      "correct_answer":{
+        "column": "Stim.CRESP"
+      },
+      "stimuli": {
+        "column": "Stimulus",
+        "type": "stim"
+      },
+      "target_type": {
+        "column": "TargetType"
+      },
+      "stim_type": {
+        "column": "StimType"
+      },
+      "block_type": {
+        "column": "BlockType"
+      }
+    }
+  ]
+}

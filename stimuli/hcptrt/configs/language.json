@@ -1,0 +1,97 @@
+{
+  "TTL": "GetReady.FinishTime",
+  "events":[
+    {
+      "name": "presentation_story",
+      "ioi": {
+        "column": "Procedure",
+        "value": "StoryTrialPROC"
+      },
+      "onset": {
+        "column": "PresentStoryFile.OnsetTime"
+      },
+      "duration": {
+        "column": "PresentStoryFile.OffsetTime",
+        "formula": [0, "subtract", "onset"]
+      },
+      "stimuli": {
+        "column": "StoryFile",
+        "type": "stim"
+      }
+    },
+    {
+      "name": "question_story",
+      "ioi": {
+        "column": "Procedure",
+        "value": "StoryTrialPROC"
+      },
+      "onset": {
+        "column": "ThatWasAbout.OnsetTime"
+      },
+      "duration": {
+        "column": "ThatWasAbout.OffsetTime",
+        "formula": [0, "subtract", "onset"]
+      }
+    },
+    {
+      "name": "response_story",
+      "ioi": {
+        "column": "Procedure",
+        "value": "StoryTrialPROC"
+      },
+      "onset": {
+        "column": "ResponsePeriod.OnsetTime"
+      },
+      "duration": {
+        "column": "ResponsePeriod.OffsetTime",
+        "formula" : [0, "subtract", "onset"]
+      }
+    },
+    {
+      "name": "presentation_math",
+      "ioi": {
+        "column": "Procedure",
+        "value": "PresentMath"
+      },
+      "onset": {
+        "column": "PresentMathFile.OnsetTime"
+      },
+      "duration": {
+        "column": "PresentMathFile.OffsetTime",
+        "formula": [0, "subtract", "onset"]
+      },
+      "stimuli": {
+        "column": "MathFile",
+        "type": "stim"
+      }
+    },
+    {
+      "name": "question_math",
+      "ioi": {
+        "column": "Procedure",
+        "value": "PresentMath"
+      },
+      "onset": {
+        "column": "PresentMathOptions.OnsetTime"
+      },
+      "duration": {
+        "column": "PresentMathOptions.OffsetTime",
+        "formula": [0, "subtract", "onset"]
+      }
+    },
+    {
+      "name": "response_math",
+      "ioi": {
+        "column": "Procedure",
+        "value": "PresentMath"
+      },
+      "onset": {
+        "column": "ResponsePeriod.OnsetTime"
+      },
+      "duration": {
+        "column": "ResponsePeriod.OffsetTime",
+        "formula" : [0, "subtract", "onset"]
+      }
+    }
+  ]
+}

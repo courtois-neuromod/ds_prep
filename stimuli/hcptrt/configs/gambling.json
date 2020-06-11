@@ -1,0 +1,24 @@
+{
+  "TTL": "SyncSlide.OnsetTime",
+  "events":[
+    {
+      "name": "response",
+      "ioi": {
+        "column": "Procedure",
+        "value": "GamblingTrialPROC"
+      },
+      "onset": {
+        "column": "QuestionMark.OnsetTime"
+      },
+      "duration": {
+        "column": "QuestionMark.RT"
+      },
+      "answer": {
+        "column": "QuestionMark.RESP"
+      },
+      "trial_type": {
+        "column": "TrialType"
+      }
+    }
+  ]
+}

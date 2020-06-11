@@ -1,0 +1,65 @@
+{
+  "TTL": "SyncSlide.OnsetTime",
+  "events":[
+    {
+      "name": "new_bloc_relational",
+      "ioi": {
+        "column": "Procedure",
+        "value": "RelationalPromptPROC"
+      },
+      "onset": {
+        "column": "RelationalPrompt.OnsetTime"
+      },
+      "duration": {
+        "column": "RelationalPrompt.Duration"
+      }
+    },
+    {
+      "name": "new_bloc_control",
+      "ioi": {
+        "column": "Procedure",
+        "value": "ControlPromptPROC"
+      },
+      "onset": {
+        "column": "ControlPrompt.OnsetTime"
+      },
+      "duration": {
+        "column": "ControlPrompt.Duration"
+      }
+    },
+    {
+      "name": "response",
+      "ioi": {
+        "column": "BlockType"
+      },
+      "onset": {
+        "column": ["RelationalSlide.OnsetTime", "ControlSlide.OnsetTime"]
+      },
+      "duration": {
+        "column": ["RelationalSlide.RT", "ControlSlide.RT"]
+      },
+      "stimulus": {
+        "column": "Stimulus",
+        "type": "stim"
+      },
+      "instruction": {
+        "column": "Instruction"
+      },
+      "bloc_type" : {
+        "column": "BlockType"
+      },
+      "nbloc": {
+        "column": "BlockNumber"
+      },
+      "trial": {
+        "column" : "RunTrialNumber"
+      },
+      "answer": {
+        "column": ["RelationalSlide.RESP", "ControlSlide.RESP"]
+      },
+      "correct_answer": {
+        "column": ["RelationalSlide.CRESP", "ControlSlide.CRESP"]
+      }
+    }
+  ]
+}
