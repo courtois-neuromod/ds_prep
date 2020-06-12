@@ -32,8 +32,8 @@ SINGULARITY_CMD_BASE = " ".join([
 slurm_preamble = """#!/bin/bash
 #SBATCH --account=rrg-pbellec
 #SBATCH --job-name={jobname}.job
-#SBATCH --output=.slurm/{jobname}.out
-#SBATCH --error=.slurm/{jobname}.err
+#SBATCH --output={bids_root}/.slurm/{jobname}.out
+#SBATCH --error={bids_root}/.slurm/{jobname}.err
 #SBATCH --time={time}
 #SBATCH --cpus-per-task={cpus}
 #SBATCH --mem-per-cpu={mem_per_cpu}M
@@ -50,7 +50,8 @@ export SINGULARITYENV_TEMPLATEFLOW_HOME=/templateflow
 def write_anat_job(layout, subject, args):
     job_specs = dict(
         jobname = f"smriprep_sub-{subject}",
-        email=args.email)
+        email=args.email,
+        bids_root=layout.root)
     job_specs.update(SMRIPREP_REQ)
     job_path = os.path.join(
         layout.root,
@@ -106,7 +107,8 @@ def write_func_job(layout, subject, session, args):
 
     job_specs = dict(
         jobname = f"fmriprep_study-{study}_sub-{subject}_ses-{session}",
-        email = args.email)
+        email = args.email,
+        bids_root=layout.root)
     job_specs.update(FMRIPREP_REQ)
 
     job_path = os.path.join(
