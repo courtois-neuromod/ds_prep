@@ -44,7 +44,6 @@ slurm_preamble = """#!/bin/bash
 
 export SINGULARITYENV_FS_LICENSE=$HOME/.freesurfer.txt
 export SINGULARITYENV_TEMPLATEFLOW_HOME=/templateflow
-
 """
 
 def write_anat_job(layout, subject, args):
@@ -229,7 +228,7 @@ def main():
     # prefectch templateflow templates
     os.environ['TEMPLATEFLOW_HOME'] = TEMPLATEFLOW_HOME
     import templateflow.api as tf_api
-    tf_api.get(OUTPUT_TEMPLATES)
+    tf_api.get(OUTPUT_TEMPLATES + ['tpl-OASIS30ANTs'])
 
     if args.preproc == 'anat':
         run_smriprep(layout, args)
