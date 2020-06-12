@@ -25,7 +25,6 @@ OUTPUT_TEMPLATES = ['MNI152NLin2009cAsym', 'fsLR']
 SINGULARITY_CMD_BASE = " ".join([
     "singularity run",
     "--cleanenv",
-    "--notrack",
     f"-B {TEMPLATEFLOW_HOME}:/templateflow",
     f"-B /etc/pki:/etc/pki/",
     ])
@@ -79,7 +78,6 @@ def write_anat_job(layout, subject, args):
             "--anat-only",
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
             "--cifti-output 91k",
-            "--notrack",
             "--skip_bids_validation",
             f"--mem_mb {job_specs['mem_per_cpu']*job_specs['cpus']}",
             "/data",
