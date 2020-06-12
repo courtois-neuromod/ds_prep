@@ -175,7 +175,9 @@ def parse_args():
 
 def run_smriprep(layout, args):
 
-    subjects = layout.get_subjects()
+    subjects = args.participant_label
+    if not subjects:
+        subjects = layout.get_subjects()
 
     for subject in subjects:
         #if TODO: check if derivative already exists for that subject
@@ -185,7 +187,9 @@ def run_smriprep(layout, args):
 
 def run_fmriprep(layout, args):
 
-    subjects = layout.get_subjects()
+    subjects = args.participant_label
+    if not subjects:
+        subjects = layout.get_subjects()
 
     for subject in subjects:
         #if TODO: check if derivative already exists for that subject
