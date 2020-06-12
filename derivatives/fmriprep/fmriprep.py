@@ -145,7 +145,7 @@ def write_func_job(layout, subject, session, args):
     return job_path
 
 def submit_slurm_job(job_path):
-    return subprocess.run(f"sbatch {job_path}")
+    return subprocess.run(["sbatch", job_path])
 
 def parse_args():
     parser = argparse.ArgumentParser(
