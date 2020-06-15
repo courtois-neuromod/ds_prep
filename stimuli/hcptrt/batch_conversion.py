@@ -15,10 +15,10 @@ def main():
     for task_bold in task_bolds:
         scan_time = task_bold.get_metadata()['AcquisitionTime']
         ents = task_bold.entities
-        task_file_path = eprime_path / \
-            'sub-%s'%ents['subject'] / \
-            'ses-%s'%ents['session'] / \
-            'p%02d_%s.txt'%(ents['subject'], ents['task'].upper())
+        task_file_path = (eprime_path /
+            'sub-%s'%ents['subject'] /
+            'ses-%s'%ents['session']).glob(
+            'p%02d_%s_*.txt'%(ents['subject'], ents['task'].upper()))
         with open(task_file_path) as f:
             line = ''
             while 'SessionStartDateTimeUtc' not in line:
