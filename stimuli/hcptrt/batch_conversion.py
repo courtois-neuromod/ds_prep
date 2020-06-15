@@ -14,6 +14,16 @@ def main():
 
     for task_bold in task_bolds:
         scan_time = task_bold.get_metadata()['AcquisitionTime']
-        eprime_path /
-        # SessionStartDateTimeUtc
+        ents = task_bold.entities
+        task_file_path = eprime_path / \
+            'sub-%s'%ents['subject'] / \
+            'ses-%s'%ents['session'] / \
+            'p%02d_%s.txt'%(ents['subject'], ents['task'].upper())
+        with open(task_file_path) as f:
+            line = ''
+            while 'SessionStartDateTimeUtc' not in line:
+                line = f.read()
+        time_utc = line.split(' ')[-1]
+        assert...
+
         layout.convert_event_file()
