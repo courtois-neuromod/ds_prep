@@ -16,7 +16,7 @@ ds_name=$(basename $bids_path)
 
 
 datalad create -d $bids_path $derivative_path
-if [ -z "$remote" ] ; then
+if [ -n "$remote" ] ; then
   # configure git remote
   datalad siblings -s origin -d $derivative_path --url $remote add
 
