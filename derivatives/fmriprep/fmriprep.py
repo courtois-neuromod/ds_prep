@@ -13,7 +13,7 @@ SLURM_JOB_DIR = '.slurm'
 SMRIPREP_REQ = {'cpus': 4, 'mem_per_cpu': 4096, 'time':'8:00:00'}
 FMRIPREP_REQ = {'cpus': 4, 'mem_per_cpu': 4096, 'time':'36:00:00'}
 
-FMRIPREP_VERSION = "fmriprep-20.0.1-lts"
+FMRIPREP_VERSION = "fmriprep-20.1.0"
 FMRIPREP_SINGULARITY_PATH = os.path.abspath(os.path.join(script_dir, f"../../containers/{FMRIPREP_VERSION}.simg"))
 BIDS_FILTERS_FILE = os.path.join(script_dir, 'bids_filters.json')
 TEMPLATEFLOW_HOME = os.path.join(
@@ -25,6 +25,7 @@ OUTPUT_TEMPLATES = ['MNI152NLin2009cAsym', 'fsLR']
 SINGULARITY_CMD_BASE = " ".join([
     "singularity run",
     "--cleanenv",
+    f"-B /scratch/{os.environ['USER']}:/work"
     f"-B {TEMPLATEFLOW_HOME}:/templateflow",
     f"-B /etc/pki:/etc/pki/",
     ])
@@ -74,6 +75,7 @@ def write_anat_job(layout, subject, args):
             SINGULARITY_CMD_BASE,
             f"-B {layout.root}:/data",
             FMRIPREP_SINGULARITY_PATH,
+            "-w /work",
             f"--participant-label {subject}",
             "--anat-only",
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
@@ -131,6 +133,7 @@ def write_func_job(layout, subject, session, args):
             f"-B {layout.root}:/data",
             f"-B {anat_path}:/anat",
             FMRIPREP_SINGULARITY_PATH,
+            "-w /work",
             f"--participant-label {subject}",
             f"--anat-derivatives /anat",
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
