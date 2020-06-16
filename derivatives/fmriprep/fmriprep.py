@@ -25,6 +25,7 @@ OUTPUT_TEMPLATES = ['MNI152NLin2009cAsym', 'fsLR']
 SINGULARITY_CMD_BASE = " ".join([
     "singularity run",
     "--cleanenv",
+    f"-B /scratch/{os.environ['USER']}:/work"
     f"-B {TEMPLATEFLOW_HOME}:/templateflow",
     f"-B /etc/pki:/etc/pki/",
     ])
@@ -44,7 +45,6 @@ slurm_preamble = """#!/bin/bash
 
 export SINGULARITYENV_FS_LICENSE=$HOME/.freesurfer.txt
 export SINGULARITYENV_TEMPLATEFLOW_HOME=/templateflow
-
 """
 
 def write_anat_job(layout, subject, args):
@@ -75,6 +75,7 @@ def write_anat_job(layout, subject, args):
             SINGULARITY_CMD_BASE,
             f"-B {layout.root}:/data",
             FMRIPREP_SINGULARITY_PATH,
+            "-w /work",
             f"--participant-label {subject}",
             "--anat-only",
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
@@ -132,6 +133,7 @@ def write_func_job(layout, subject, session, args):
             f"-B {layout.root}:/data",
             f"-B {anat_path}:/anat",
             FMRIPREP_SINGULARITY_PATH,
+            "-w /work",
             f"--participant-label {subject}",
             f"--anat-derivatives /anat",
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
@@ -229,7 +231,7 @@ def main():
     # prefectch templateflow templates
     os.environ['TEMPLATEFLOW_HOME'] = TEMPLATEFLOW_HOME
     import templateflow.api as tf_api
-    tf_api.get(OUTPUT_TEMPLATES)
+    tf_api.get(OUTPUT_TEMPLATES + ['tpl-OASIS30ANTs'])
 
     if args.preproc == 'anat':
         run_smriprep(layout, args)

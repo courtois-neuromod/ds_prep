@@ -1,0 +1,2 @@
+-e git+https://github.com/rockstreamguy/deepbrain.git
+-e git+git@github.com:bpinsard/dipy.git@testing
