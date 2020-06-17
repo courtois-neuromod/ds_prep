@@ -81,6 +81,7 @@ def write_anat_job(layout, subject, args):
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
             "--cifti-output 91k",
             "--skip_bids_validation",
+            "--write-graph",
             f"--mem_mb {job_specs['mem_per_cpu']*job_specs['cpus']}",
             "/data",
             derivatives_path,
@@ -104,8 +105,9 @@ def write_func_job(layout, subject, session, args):
         extension=['.nii', '.nii.gz'],
         suffix='bold')
     n_runs = len(bold_runs)
-    run_lengths = [run.get_image().shape[-1] for run in bold_runs]
-
+    run_shapes = [run.get_image().shape for run in bold_runs]
+    run_lengths = [rs[-1] for rs in run_shapes]
+s
     job_specs = dict(
         jobname = f"fmriprep_study-{study}_sub-{subject}_ses-{session}",
         email = args.email,
@@ -139,6 +141,7 @@ def write_func_job(layout, subject, session, args):
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
             "--cifti-output 91k",
             "--notrack",
+            "--write-graph",
             "--skip_bids_validation",
             f"--mem_mb {job_specs['mem_per_cpu'] * job_specs['cpus']}",
             "/data",
