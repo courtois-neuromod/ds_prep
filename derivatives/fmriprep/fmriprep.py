@@ -79,6 +79,7 @@ def write_anat_job(layout, subject, args):
             f"--participant-label {subject}",
             "--anat-only",
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
+            "--output-spaces", " ".join(OUTPUT_TEMPLATES),
             "--cifti-output 91k",
             "--skip_bids_validation",
             f"--mem_mb {job_specs['mem_per_cpu']*job_specs['cpus']}",
@@ -138,6 +139,7 @@ def write_func_job(layout, subject, session, args):
             f"--anat-derivatives /anat",
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
             "--ignore slicetiming",
+            "--output-spaces", " ".join(OUTPUT_TEMPLATES),
             "--cifti-output 91k",
             "--notrack",
             "--skip_bids_validation",
@@ -232,7 +234,7 @@ def main():
     # prefectch templateflow templates
     os.environ['TEMPLATEFLOW_HOME'] = TEMPLATEFLOW_HOME
     import templateflow.api as tf_api
-    tf_api.get(OUTPUT_TEMPLATES + ['tpl-OASIS30ANTs'])
+    tf_api.get(OUTPUT_TEMPLATES)
 
     if args.preproc == 'anat':
         run_smriprep(layout, args)
