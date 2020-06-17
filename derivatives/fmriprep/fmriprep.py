@@ -10,7 +10,7 @@ script_dir = os.path.dirname(__file__)
 PYBIDS_CACHE_PATH = '.pybids_cache'
 SLURM_JOB_DIR = '.slurm'
 
-SMRIPREP_REQ = {'cpus': 4, 'mem_per_cpu': 4096, 'time':'8:00:00'}
+SMRIPREP_REQ = {'cpus': 4, 'mem_per_cpu': 4096, 'time':'24:00:00'}
 FMRIPREP_REQ = {'cpus': 4, 'mem_per_cpu': 4096, 'time':'36:00:00'}
 
 FMRIPREP_VERSION = "fmriprep-20.1.0"
@@ -25,7 +25,7 @@ OUTPUT_TEMPLATES = ['MNI152NLin2009cAsym', 'fsLR']
 SINGULARITY_CMD_BASE = " ".join([
     "singularity run",
     "--cleanenv",
-    f"-B /scratch/{os.environ['USER']}:/work"
+    f"-B /scratch/{os.environ['USER']}:/work",
     f"-B {TEMPLATEFLOW_HOME}:/templateflow",
     f"-B /etc/pki:/etc/pki/",
     ])
@@ -137,6 +137,7 @@ def write_func_job(layout, subject, session, args):
             f"--participant-label {subject}",
             f"--anat-derivatives /anat",
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
+            "--ignore slicetiming",
             "--cifti-output 91k",
             "--notrack",
             "--skip_bids_validation",
