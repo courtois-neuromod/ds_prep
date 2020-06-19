@@ -108,7 +108,8 @@ def write_func_job(layout, subject, session, args):
     n_runs = len(bold_runs)
     run_shapes = [run.get_image().shape for run in bold_runs]
     run_lengths = [rs[-1] for rs in run_shapes]
-s
+
+
     job_specs = dict(
         jobname = f"fmriprep_study-{study}_sub-{subject}_ses-{session}",
         email = args.email,
@@ -147,6 +148,8 @@ s
             "--write-graph",
             "--skip_bids_validation",
             f"--mem_mb {job_specs['mem_per_cpu'] * job_specs['cpus']}",
+             # monitor resources to design a heuristic for runtime/cpu/ram of func data
+            "--resource-monitor",
             "/data",
             derivatives_path,
             "participant",
