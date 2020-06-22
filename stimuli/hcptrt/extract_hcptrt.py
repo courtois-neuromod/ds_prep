@@ -66,9 +66,15 @@ def assert_task_exists(in_task):
 
     if in_task_extension == ".json":
         fullpath = in_task
+    elif in_task_extension == "":
+        script_dir = os.path.dirname(__file__)
+        config_dir = os.path.join(script_dir, "configs")
+        fullpath = os.path.join(config_dir, in_task + '.json')
+        if not os.path.exists(fullpath):
+            raise IOError('Task {} doesnt not exists'.format(fullpath))
     else:
         raise IOError('Task has to be a json file or choose one from config'
-                      ' folder.')
+                      ' folder. Wrong task {}'.format(in_task))
 
     if os.path.exists(fullpath):
         with open(fullpath, 'r') as json_file:
@@ -117,9 +123,10 @@ def assert_task_df(df_columns, json_dict):
     allColumns = list(dict.fromkeys(allColumns))
 
     for curr_column in allColumns:
-        if not set([curr_column]).issubset(df_columns):
-            raise IOError("Column: \"{}\" does not exist "
-                          "into df".format(curr_column))
+        if not "run" in curr_column.lower():
+            if not set([curr_column]).issubset(df_columns):
+                raise IOError("Column: \"{}\" does not exist "
+                              "into df".format(curr_column))
 
 
 def get_ioi(df, ioi_dict):
@@ -294,6 +301,12 @@ def merge_columns(df, curr_dict):
                 new_serie = new_serie.combine_first(new_serie)
 
     else:  # Value does not exist
+
+        # Ugly hardcode because random name of columns
+        if '*' in curr_dict[column][0]:
+            runNum = df['RunNumber'][0]
+            curr_dict[column] = [subColumn.replace('*', runNum) for subColumn in curr_dict[column]]
+
         listColumns = curr_dict[column][1::]
         new_serie = df[curr_dict[column][0]]
         index_wo_nan = new_serie.astype(str) != "nan"

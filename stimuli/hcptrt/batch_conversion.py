@@ -2,11 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
-    Check txt data eprime with json file (BIDS)
-    THEN
     Convert txt data from eprime to tsv extract_hcptrt
 """
 
+import argparse
 import datetime
 import glob
 import logging
@@ -14,21 +13,31 @@ import numpy as np
 import os
 
 import bids
-from convert_eprime.utils import remove_unicode
+
+from extract_hcptrt import convert_event_file
 
 # tolerance for the match of scan_time to eprime file
 TIME_CHECK_DELTA_TOL = 240
 
 
+def _build_args_parser():
+    p = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
+                                description=__doc__)
+
+    p.add_argument('in_BIDS',
+                   help='BIDS structure with HCPTRT tasks.')
+    p.add_argument('-f', dest='overwrite', action='store_true',
+                   help='Force overwriting of the output files.')
+    p.add_argument('-v', action='store_true', dest='verbose',
+                   help='If set, produces verbose output.')
+    return p
+
+
 def get_diff_time(scan_time, eprime_time):
-    scan_time_local = datetime.datetime.strptime(scan_time, '%H:%M:%S.%f')
-    scan_time_local = scan_time_local.replace(microsecond=0)
-    eprime_time_local = datetime.datetime.strptime(eprime_time[0],
-                                                   '%H:%M:%S') + datetime.timedelta(milliseconds=eprime_time[1])
+    scan_time = datetime.datetime.strptime(scan_time, '%H:%M:%S.%f')
+    diff_time = scan_time - eprime_time
 
-    diff_time = scan_time_local - eprime_time_local
-
-    return int(diff_time.total_seconds()), eprime_time_local
+    return int(diff_time.total_seconds()), eprime_time
 
 
 def get_closest_eprime(eprime_files, scan_time):
@@ -37,26 +46,30 @@ def get_closest_eprime(eprime_files, scan_time):
     eprime_choosen = ''
     all_vals = []
     for eprime_file in eprime_files:
+
+        # Dummy values to make it crash if
+        session_time = 0
+        onset_time = '0'
+
         # Read task_file_path
-        with open(eprime_file, 'rb') as fo:
-            text_data = list(fo)
+        with open(eprime_file, 'r', encoding='utf-16-le') as fo:
+            initial_tr_marker_found = False
 
-        # Remove unicode characters.
-        filtered_data = [remove_unicode(row.decode('utf-8', 'ignore')) for row in text_data]
-        res = [i for i in filtered_data if 'SessionTime' in i]
-        start_scan = [i for i in filtered_data if "SyncSlide.OnsetTime" in i or
-                                                  "GetReady.FinishTime" in i or
-                                                  "CountDownSlide" in i]
+            for line in fo:
+                if 'SessionTime' in line:
+                    session_time = line.split(' ')[1].strip()
+                    session_time = datetime.datetime.strptime(session_time, '%H:%M:%S')
+                if 'InitialTR' in line or 'CountDownPROC' in line:
+                    initial_tr_marker_found = True
+                if ('OnsetTime' in line and initial_tr_marker_found) or ('GetReady.FinishTime' in line):
+                    onset_time = int(line.split(' ')[1].strip())
+                    onset_time = datetime.timedelta(seconds=onset_time/1000.)
+                    break
 
-        if len(start_scan) == 0:
-            start_scan = 0
-            logging.debug('File with  {}'.format(eprime_file))
-        else:
-            start_scan = int(start_scan[0].split()[-1])
+        # first ttl
+        eprime_time = session_time + onset_time
 
-        eprime_time = res[0].split()[-1]
-
-        diff_scan_eprime, eprime_time_local = get_diff_time(scan_time, (eprime_time, start_scan))
+        diff_scan_eprime, eprime_time_local = get_diff_time(scan_time, eprime_time)
         all_vals.append((eprime_file, diff_scan_eprime))
 
         if np.abs(diff_scan_eprime) < min_diff:
@@ -67,8 +80,18 @@ def get_closest_eprime(eprime_files, scan_time):
 
 
 def main():
-    logging.basicConfig(level=logging.DEBUG)
-    layout = bids.BIDSLayout('/home/bore/p/neuromod/data/hcptrt/')
+
+    parser = _build_args_parser()
+    args = parser.parse_args()
+
+    verbose = args.verbose
+    overwrite = args.overwrite
+    in_BIDS = args.in_BIDS
+
+    if verbose:
+        logging.basicConfig(level=logging.DEBUG)
+
+    layout = bids.BIDSLayout(in_BIDS)
     non_rest_tasks = [t for t in layout.get_tasks() if t != 'restingstate']
     task_bolds = layout.get(suffix='bold', extension='.nii.gz', task=non_rest_tasks)
 
@@ -80,11 +103,11 @@ def main():
         ents = task_bold.entities
 
         eprime_files_research = os.path.join(eprime_path,
-                                              'sub-%s'%ents['subject'],
-                                              'ses-%s'%ents['session'],
-                                              'func',
-                                              'p%02d_%s*.txt'%(int(ents['subject']),
-                                                               ents['task'].upper()))
+                                             'sub-%s'%ents['subject'],
+                                             'ses-%s'%ents['session'],
+                                             'func',
+                                             'p%02d_%s*.txt'%(int(ents['subject']),
+                                                              ents['task'].upper()))
         eprime_files = glob.glob(eprime_files_research)
 
         eprime_files = [i for i in eprime_files if 'runp' not in i and
@@ -97,25 +120,28 @@ def main():
                                                                   eprime_file,
                                                                   min_diff))
             out_tsv_path = task_bold.path.replace('_bold.nii.gz', '_event.tsv')
-
+            convert_event_file(eprime_file,
+                               ents['task'],
+                               out_tsv_path,
+                               verbose=verbose,
+                               overwrite=overwrite)
         elif min_diff == np.Inf:
-            print('ERROR')
-            print('Candidates: {}'.format(all_vals))
-            print(eprime_files)
-            print(eprime_files_research)
-        elif min_diff>0:
+            logging.debug('ERROR')
+            logging.debug('Candidates: {}'.format(all_vals))
+            logging.debug(eprime_files)
+            logging.debug(eprime_files_research)
+        elif min_diff > 0:
             logging.debug('Eprime was started before MRI')
             logging.debug('Found {} with {} with diff {}s'.format(task_bold.filename,
                                                                   eprime_file,
                                                                   min_diff))
-        elif min_diff<0:
+        elif min_diff < 0:
             logging.debug('Eprime was started AFTER MRI')
             logging.debug('ERRROR -> No eprime were found with {} {}'.format(task_bold.filename, scan_time))
             logging.debug('ERRROR -> Candidates: {}'.format(all_vals))
             logging.debug('min_diff choosen: {}'.format(min_diff))
 
         logging.debug('---------------------------------------------------')
-        # convert_event_file(eprime_file, ents['task'], out_tsv_path)
 
 
 if __name__ == "__main__":
