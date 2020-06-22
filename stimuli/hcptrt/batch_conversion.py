@@ -89,7 +89,7 @@ def main():
     in_BIDS = args.in_BIDS
 
     if verbose:
-        logging.basicConfig(level=logging.DEBUG)
+        logging.basicConfig(level=logging.INFO)
 
     layout = bids.BIDSLayout(in_BIDS)
     non_rest_tasks = [t for t in layout.get_tasks() if t != 'restingstate']
@@ -98,7 +98,7 @@ def main():
     eprime_path = os.path.join(layout.root, 'sourcedata')
 
     for task_bold in task_bolds:
-        logging.debug(task_bold.filename)
+        logging.info('Input: {}'.format(task_bold.filename))
         scan_time = task_bold.get_metadata()['AcquisitionTime']
         ents = task_bold.entities
 
@@ -116,7 +116,7 @@ def main():
         min_diff, eprime_file, all_vals = get_closest_eprime(eprime_files, scan_time)
 
         if np.abs(min_diff) < TIME_CHECK_DELTA_TOL:
-            logging.debug('Found {} with {} with diff {}s'.format(task_bold.filename,
+            logging.info('Found {} with {} with diff {}s'.format(task_bold.filename,
                                                                   eprime_file,
                                                                   min_diff))
             out_tsv_path = task_bold.path.replace('_bold.nii.gz', '_event.tsv')
@@ -125,23 +125,23 @@ def main():
                                out_tsv_path,
                                verbose=verbose,
                                overwrite=overwrite)
-        elif min_diff == np.Inf:
-            logging.debug('ERROR')
-            logging.debug('Candidates: {}'.format(all_vals))
-            logging.debug(eprime_files)
-            logging.debug(eprime_files_research)
-        elif min_diff > 0:
-            logging.debug('Eprime was started before MRI')
-            logging.debug('Found {} with {} with diff {}s'.format(task_bold.filename,
+        if min_diff == np.Inf:
+            logging.info('ERROR')
+            logging.info('Candidates: {}'.format(all_vals))
+            logging.info(eprime_files)
+            logging.info(eprime_files_research)
+        elif min_diff > 0 and np.abs(min_diff) >= TIME_CHECK_DELTA_TOL:
+            logging.info('WARNING - Eprime was started before MRI')
+            logging.info('Found {} with {} with diff {}s'.format(task_bold.filename,
                                                                   eprime_file,
                                                                   min_diff))
         elif min_diff < 0:
-            logging.debug('Eprime was started AFTER MRI')
-            logging.debug('ERRROR -> No eprime were found with {} {}'.format(task_bold.filename, scan_time))
-            logging.debug('ERRROR -> Candidates: {}'.format(all_vals))
-            logging.debug('min_diff choosen: {}'.format(min_diff))
+            logging.info('Eprime was started AFTER MRI')
+            logging.info('ERRROR -> No eprime were found with {} {}'.format(task_bold.filename, scan_time))
+            logging.info('ERRROR -> Candidates: {}'.format(all_vals))
+            logging.info('min_diff choosen: {}'.format(min_diff))
 
-        logging.debug('---------------------------------------------------')
+        logging.info('---------------------------------------------------')
 
 
 if __name__ == "__main__":

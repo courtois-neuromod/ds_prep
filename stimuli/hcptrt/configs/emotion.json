@@ -15,7 +15,7 @@
         "formula": [-1, "subtract", "onset"]
       },
       "nbloc": {
-        "column": "HRun1",
+        "column": ["HRun*"],
         "type": "bloc"
       }
     },
@@ -33,14 +33,14 @@
         "formula": [-1, "subtract", "onset"]
       },
       "nbloc": {
-        "column": "HRun1",
+        "column": ["HRun*"],
         "type": "bloc"
       }
     },
     {
       "name": "response_shape",
       "ioi": {
-        "column": ["ShapeBlock1", "ShapeBlock2", "ShapeBlock3"]
+        "column": ["ShapeBlock*"]
       },
       "onset": {
         "column": "StimSlide.OnsetTime"
@@ -49,11 +49,11 @@
         "column": "StimSlide.RT"
       },
       "nbloc": {
-        "column": "HRun1",
+        "column": ["HRun*"],
         "type": "bloc"
       },
       "ntrial": {
-        "column": ["ShapeBlock1", "ShapeBlock2", "ShapeBlock3"]
+        "column": ["ShapeBlock*"]
       },
       "stim_top": {
         "column": "Top",
@@ -71,7 +71,7 @@
     {
       "name": "response_face",
       "ioi": {
-        "column": ["FaceBlock1", "FaceBlock2", "FaceBlock3"]
+        "column": ["FaceBlock*"]
       },
       "onset": {
         "column": "StimSlide.OnsetTime"
@@ -80,11 +80,11 @@
         "column": "StimSlide.RT"
       },
       "nbloc": {
-        "column": "HRun1",
+        "column": ["HRun*"],
         "type": "bloc"
       },
       "ntrial": {
-        "column": ["FaceBlock1", "FaceBlock2", "FaceBlock3"]
+        "column": ["FaceBlock*"]
       },
       "stim_top": {
         "column": "Top",
@@ -113,7 +113,7 @@
         "when_no_value": "median"
       },
       "nbloc": {
-        "column": "HRun1",
+        "column": ["HRun*"],
         "type": "bloc"
       }
     }

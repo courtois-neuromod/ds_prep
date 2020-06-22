@@ -15,6 +15,7 @@ import json
 import logging
 import numpy as np
 import os
+import re
 
 from convert_eprime.convert import _text_to_df
 import pandas as pd
@@ -123,7 +124,7 @@ def assert_task_df(df_columns, json_dict):
     allColumns = list(dict.fromkeys(allColumns))
 
     for curr_column in allColumns:
-        if not "run" in curr_column.lower():
+        if "*" not in curr_column.lower():
             if not set([curr_column]).issubset(df_columns):
                 raise IOError("Column: \"{}\" does not exist "
                               "into df".format(curr_column))
@@ -303,18 +304,24 @@ def merge_columns(df, curr_dict):
     else:  # Value does not exist
 
         # Ugly hardcode because random name of columns
-        if '*' in curr_dict[column][0]:
-            runNum = df['RunNumber'][0]
-            curr_dict[column] = [subColumn.replace('*', runNum) for subColumn in curr_dict[column]]
+        # Needs to be more robust
+        if '*' in curr_dict[column][0] and len(curr_dict[column]) == 1:
+            curr_dict[column] = [i for i in list(df.columns) if re.search(curr_dict[column][0], i)]
+            if len(curr_dict[column]) > 1:
+                listColumns = curr_dict[column][1::]
+            else:
+                listColumns = []
+        else:
+            listColumns = curr_dict[column][1::]
 
-        listColumns = curr_dict[column][1::]
         new_serie = df[curr_dict[column][0]]
         index_wo_nan = new_serie.astype(str) != "nan"
 
         for curr_column in listColumns:
             new_index = df[curr_column].astype(str) != "nan"
             if np.any(new_index & index_wo_nan):
-                raise IOError('Columns contain values at the same index')
+                logging.info('{} won\'t be merge for because it contains values'
+                             ' at the same index'.format(curr_column))
             else:
                 index_wo_nan = index_wo_nan | new_index
                 new_serie = new_serie.combine_first(df[curr_column])

@@ -16,7 +16,7 @@
         "formula": [-1, "subtract", "onset"]
       },
       "nbloc": {
-        "column": "MotorRun1List",
+        "column": ["MotorRun[1-9]List*$"],
         "type": "bloc"
       }
     },
@@ -34,7 +34,7 @@
         "formula": [-1, "subtract", "onset"]
       },
       "nbloc": {
-        "column": "MotorRun1List",
+        "column": ["MotorRun[1-9]List*$"],
         "type": "bloc"
       }
     },
@@ -54,7 +54,7 @@
         "formula": [-1, "subtract", "onset"]
       },
       "nbloc": {
-        "column": "MotorRun1List",
+        "column": ["MotorRun[1-9]List*$"],
         "type": "bloc"
       }
     },
@@ -72,7 +72,7 @@
         "formula": [-1, "subtract", "onset"]
       },
       "nbloc": {
-        "column": "MotorRun1List",
+        "column": ["MotorRun[1-9]List*$"],
         "type": "bloc"
       }
     },
@@ -90,7 +90,7 @@
         "formula": [-1, "subtract", "onset"]
       },
       "nbloc": {
-        "column": "MotorRun1List"
+        "column": ["MotorRun[1-9]List*$"]
       }
     },
     {
@@ -107,10 +107,10 @@
         "column": "CrossLeft.OnsetToOnsetTime"
       },
       "nbloc": {
-        "column": "MotorRun1List"
+        "column": ["MotorRun[1-9]List*$"]
       },
       "trial":{
-        "column": "MotorRun1List.Sample"
+        "column": ["MotorRun[1-9]List.Sample*$"]
       }
     },
     {
@@ -127,10 +127,10 @@
           "column": "CrossRight.OnsetToOnsetTime"
         },
         "nbloc": {
-          "column": "MotorRun1List"
+          "column": ["MotorRun[1-9]List*$"]
         },
         "trial":{
-          "column": "MotorRun1List.Sample"
+          "column": ["MotorRun[1-9]List.Sample*$"]
         }
     },
     {
@@ -147,11 +147,11 @@
         "column": "CrossLeft.OnsetToOnsetTime"
       },
       "nbloc": {
-        "column": "MotorRun1List",
+        "column": ["MotorRun[1-9]List*$"],
         "type": "bloc"
       },
       "trial":{
-        "column": "MotorRun1List.Sample"
+        "column": ["MotorRun[1-9]List.Sample*$"]
       }
     },
     {
@@ -168,11 +168,11 @@
         "column": "CrossRight.OnsetToOnsetTime"
       },
       "nbloc": {
-        "column": "MotorRun1List",
+        "column": ["MotorRun[1-9]List*$"],
         "type": "bloc"
       },
       "trial":{
-        "column": "MotorRun1List.Sample"
+        "column": ["MotorRun[1-9]List.Sample*$"]
       }
     },
     {
@@ -189,11 +189,11 @@
         "column": "CrossCenter.OnsetToOnsetTime"
       },
       "nbloc": {
-        "column": "MotorRun1List",
+        "column": ["MotorRun[1-9]List*$"],
         "type": "bloc"
       },
       "trial":{
-        "column": "MotorRun1List.Sample"
+        "column": ["MotorRun[1-9]List.Sample*$"]
       }
     }
   ]
