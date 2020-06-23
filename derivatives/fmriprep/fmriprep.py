@@ -116,7 +116,6 @@ def write_func_job(layout, subject, session, args):
     #run_shapes = [run.get_image().shape for run in bold_runs]
     #run_lengths = [rs[-1] for rs in run_shapes]
 
-
     job_specs = dict(
         jobname = f"fmriprep_study-{study}_sub-{subject}_ses-{session}",
         email = args.email,
@@ -248,7 +247,7 @@ def main():
     # prefectch templateflow templates
     os.environ['TEMPLATEFLOW_HOME'] = TEMPLATEFLOW_HOME
     import templateflow.api as tf_api
-    tf_api.get(OUTPUT_TEMPLATES)
+    tf_api.get(OUTPUT_TEMPLATES+['OASIS30ANTs'])
 
     if args.preproc == 'anat':
         run_smriprep(layout, args)
