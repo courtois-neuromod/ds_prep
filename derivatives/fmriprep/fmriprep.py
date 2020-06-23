@@ -25,10 +25,10 @@ OUTPUT_TEMPLATES = ['MNI152NLin2009cAsym']
 SINGULARITY_CMD_BASE = " ".join([
     "singularity run",
     "--cleanenv",
-    f"$SLURM_TMPDIR:/work", # use SLURM_TMPDIR to overcome scratch file number limit
+    "-B $SLURM_TMPDIR:/work", # use SLURM_TMPDIR to overcome scratch file number limit
     #f"-B /scratch/{os.environ['USER']}:/work",
     f"-B {TEMPLATEFLOW_HOME}:/templateflow",
-    f"-B /etc/pki:/etc/pki/",
+    "-B /etc/pki:/etc/pki/",
     ])
 
 slurm_preamble = """#!/bin/bash
@@ -48,8 +48,8 @@ export SINGULARITYENV_FS_LICENSE=$HOME/.freesurfer.txt
 export SINGULARITYENV_TEMPLATEFLOW_HOME=/templateflow
 """
 
-def write_debug_copy_work_if_crash(fd, subject, args):
-    fd.write(f"if [ ! -eq $? 0 ] ; then cp -R $SLURM_TMPDIR /scratch/{os.environ['USER']}/{args.preproc}_{subject}_$(date +%Y-%m-%d.%H:%M:%S).workdir ; fi")
+def write_debug_copy_work_if_crash(fd, jobname):
+    fd.write(f"if [ $? -ne 0 ] ; then cp -R $SLURM_TMPDIR /scratch/{os.environ['USER']}/{jobname}.workdir ; fi")
 
 def write_anat_job(layout, subject, args):
     job_specs = dict(
@@ -92,7 +92,7 @@ def write_anat_job(layout, subject, args):
             derivatives_path,
             "participant",
             "\n"]))
-        write_debug_copy_work_if_crash(f, subject, args)
+        write_debug_copy_work_if_crash(f, job_specs['jobname'])
     return job_path
 
 
@@ -160,7 +160,7 @@ def write_func_job(layout, subject, session, args):
             derivatives_path,
             "participant",
             "\n"]))
-        write_debug_copy_work_if_crash(f, subject, args)
+        write_debug_copy_work_if_crash(f, job_specs['jobname'])
 
     return job_path
 
