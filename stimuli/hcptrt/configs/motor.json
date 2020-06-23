@@ -17,6 +17,7 @@
       },
       "nbloc": {
         "column": ["MotorRun[1-9]List*$"],
+        "regex": "True",
         "type": "bloc"
       }
     },
@@ -35,6 +36,7 @@
       },
       "nbloc": {
         "column": ["MotorRun[1-9]List*$"],
+        "regex": "True",
         "type": "bloc"
       }
     },
@@ -55,6 +57,7 @@
       },
       "nbloc": {
         "column": ["MotorRun[1-9]List*$"],
+        "regex": "True",
         "type": "bloc"
       }
     },
@@ -73,6 +76,7 @@
       },
       "nbloc": {
         "column": ["MotorRun[1-9]List*$"],
+        "regex": "True",
         "type": "bloc"
       }
     },
@@ -90,7 +94,8 @@
         "formula": [-1, "subtract", "onset"]
       },
       "nbloc": {
-        "column": ["MotorRun[1-9]List*$"]
+        "column": ["MotorRun[1-9]List*$"],
+        "regex": "True"
       }
     },
     {
@@ -107,10 +112,12 @@
         "column": "CrossLeft.OnsetToOnsetTime"
       },
       "nbloc": {
-        "column": ["MotorRun[1-9]List*$"]
+        "column": ["MotorRun[1-9]List*$"],
+        "regex": "True"
       },
       "trial":{
-        "column": ["MotorRun[1-9]List.Sample*$"]
+        "column": ["MotorRun[1-9]List.Sample*$"],
+        "regex": "True"
       }
     },
     {
@@ -127,10 +134,12 @@
           "column": "CrossRight.OnsetToOnsetTime"
         },
         "nbloc": {
-          "column": ["MotorRun[1-9]List*$"]
+          "column": ["MotorRun[1-9]List*$"],
+          "regex": "True"
         },
         "trial":{
-          "column": ["MotorRun[1-9]List.Sample*$"]
+          "column": ["MotorRun[1-9]List.Sample*$"],
+          "regex": "True"
         }
     },
     {
@@ -148,10 +157,12 @@
       },
       "nbloc": {
         "column": ["MotorRun[1-9]List*$"],
+        "regex": "True",
         "type": "bloc"
       },
       "trial":{
-        "column": ["MotorRun[1-9]List.Sample*$"]
+        "column": ["MotorRun[1-9]List.Sample*$"],
+        "regex": "True"
       }
     },
     {
@@ -169,10 +180,12 @@
       },
       "nbloc": {
         "column": ["MotorRun[1-9]List*$"],
+        "regex": "True",
         "type": "bloc"
       },
       "trial":{
-        "column": ["MotorRun[1-9]List.Sample*$"]
+        "column": ["MotorRun[1-9]List.Sample*$"],
+        "regex": "True"
       }
     },
     {
@@ -190,10 +203,12 @@
       },
       "nbloc": {
         "column": ["MotorRun[1-9]List*$"],
+        "regex": "True",
         "type": "bloc"
       },
       "trial":{
-        "column": ["MotorRun[1-9]List.Sample*$"]
+        "column": ["MotorRun[1-9]List.Sample*$"],
+        "regex": "True"
       }
     }
   ]

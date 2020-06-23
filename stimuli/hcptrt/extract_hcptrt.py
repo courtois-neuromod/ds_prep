@@ -23,6 +23,7 @@ import pandas as pd
 column = "column"
 value = "value"
 formula = "formula"
+regex = "regex"
 when_no_value = "when_no_value"
 type = "type"
 
@@ -110,24 +111,25 @@ def assert_task_df(df_columns, json_dict):
             if isinstance(curr_event[curr_key], list):
                 for element in curr_event[curr_key]:
                     if column in element:
-                        if isinstance(element[column], list):
-                            allColumns = allColumns + element[column]
-                        else:
-                            allColumns.append(element[column])
+                        if regex in element:
+                            if isinstance(element[column], list):
+                                allColumns = allColumns + element[column]
+                            else:
+                                allColumns.append(element[column])
             else:
                 if column in curr_event[curr_key]:
-                    if isinstance(curr_event[curr_key][column], list):
-                        allColumns = allColumns + curr_event[curr_key][column]
-                    else:
-                        allColumns.append(curr_event[curr_key][column])
+                    if regex not in curr_event[curr_key]:
+                        if isinstance(curr_event[curr_key][column], list):
+                            allColumns = allColumns + curr_event[curr_key][column]
+                        else:
+                            allColumns.append(curr_event[curr_key][column])
 
     allColumns = list(dict.fromkeys(allColumns))
 
     for curr_column in allColumns:
-        if "*" not in curr_column.lower():
-            if not set([curr_column]).issubset(df_columns):
-                raise IOError("Column: \"{}\" does not exist "
-                              "into df".format(curr_column))
+        if not set([curr_column]).issubset(df_columns):
+            raise IOError("Column: \"{}\" does not exist "
+                          "into df".format(curr_column))
 
 
 def get_ioi(df, ioi_dict):
@@ -303,9 +305,7 @@ def merge_columns(df, curr_dict):
 
     else:  # Value does not exist
 
-        # Ugly hardcode because random name of columns
-        # Needs to be more robust
-        if '*' in curr_dict[column][0] and len(curr_dict[column]) == 1:
+        if regex in curr_dict and len(curr_dict[column]) == 1:
             curr_dict[column] = [i for i in list(df.columns) if re.search(curr_dict[column][0], i)]
             if len(curr_dict[column]) > 1:
                 listColumns = curr_dict[column][1::]

@@ -11,7 +11,8 @@
         "column": "Stim.OnsetTime"
       },
       "trial": {
-        "column": ["Run[1-9]Block[1-9]*$"]
+        "column": ["Run[1-9]Block[1-9]*$"],
+        "regex": "True"
       },
       "duration": {
         "column": "Stim.RT"

@@ -16,6 +16,7 @@
       },
       "nbloc": {
         "column": ["HRun*"],
+        "regex": "True",
         "type": "bloc"
       }
     },
@@ -34,13 +35,15 @@
       },
       "nbloc": {
         "column": ["HRun*"],
+        "regex": "True",
         "type": "bloc"
       }
     },
     {
       "name": "response_shape",
       "ioi": {
-        "column": ["ShapeBlock*"]
+        "column": ["ShapeBlock*"],
+        "regex": "True"
       },
       "onset": {
         "column": "StimSlide.OnsetTime"
@@ -50,10 +53,12 @@
       },
       "nbloc": {
         "column": ["HRun*"],
+        "regex": "True",
         "type": "bloc"
       },
       "ntrial": {
-        "column": ["ShapeBlock*"]
+        "column": ["ShapeBlock*"],
+        "regex": "True"
       },
       "stim_top": {
         "column": "Top",
@@ -71,7 +76,8 @@
     {
       "name": "response_face",
       "ioi": {
-        "column": ["FaceBlock*"]
+        "column": ["FaceBlock*"],
+        "regex": "True"
       },
       "onset": {
         "column": "StimSlide.OnsetTime"
@@ -81,10 +87,12 @@
       },
       "nbloc": {
         "column": ["HRun*"],
+        "regex": "True",
         "type": "bloc"
       },
       "ntrial": {
-        "column": ["FaceBlock*"]
+        "column": ["FaceBlock*"],
+        "regex": "True"
       },
       "stim_top": {
         "column": "Top",
@@ -114,6 +122,7 @@
       },
       "nbloc": {
         "column": ["HRun*"],
+        "regex": "True",
         "type": "bloc"
       }
     }
