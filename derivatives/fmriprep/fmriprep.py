@@ -21,11 +21,12 @@ TEMPLATEFLOW_HOME = os.path.join(
         'SCRATCH',
         os.path.join(os.environ['HOME'],'.cache')),
     'templateflow')
-OUTPUT_TEMPLATES = ['MNI152NLin2009cAsym', 'fsLR']
+OUTPUT_TEMPLATES = ['MNI152NLin2009cAsym']
 SINGULARITY_CMD_BASE = " ".join([
     "singularity run",
     "--cleanenv",
-    f"-B /scratch/{os.environ['USER']}:/work",
+    f"$SLURM_TMPDIR:/work", # use SLURM_TMPDIR to overcome scratch file number limit
+    #f"-B /scratch/{os.environ['USER']}:/work",
     f"-B {TEMPLATEFLOW_HOME}:/templateflow",
     f"-B /etc/pki:/etc/pki/",
     ])
@@ -46,6 +47,9 @@ slurm_preamble = """#!/bin/bash
 export SINGULARITYENV_FS_LICENSE=$HOME/.freesurfer.txt
 export SINGULARITYENV_TEMPLATEFLOW_HOME=/templateflow
 """
+
+def write_debug_copy_work_if_crash(fd, subject, args):
+    fd.write(f"if [ ! -eq $? 0 ] ; then cp -R $SLURM_TMPDIR /scratch/{os.environ['USER']}/{args.preproc}_{subject}_$(date +%Y-%m-%d.%H:%M:%S).workdir ; fi")
 
 def write_anat_job(layout, subject, args):
     job_specs = dict(
@@ -87,7 +91,8 @@ def write_anat_job(layout, subject, args):
             "/data",
             derivatives_path,
             "participant",
-            ]))
+            "\n"]))
+        write_debug_copy_work_if_crash(f, subject, args)
     return job_path
 
 
@@ -97,7 +102,9 @@ def write_func_job(layout, subject, session, args):
         os.path.dirname(layout.root),
         'anat',
         'derivatives',
-        FMRIPREP_VERSION)
+        FMRIPREP_VERSION,
+        'fmriprep',
+        )
     derivatives_path = os.path.join(layout.root, 'derivatives', FMRIPREP_VERSION)
 
     bold_runs = layout.get(
@@ -105,9 +112,9 @@ def write_func_job(layout, subject, session, args):
         session=session,
         extension=['.nii', '.nii.gz'],
         suffix='bold')
-    n_runs = len(bold_runs)
-    run_shapes = [run.get_image().shape for run in bold_runs]
-    run_lengths = [rs[-1] for rs in run_shapes]
+    #n_runs = len(bold_runs)
+    #run_shapes = [run.get_image().shape for run in bold_runs]
+    #run_lengths = [rs[-1] for rs in run_shapes]
 
 
     job_specs = dict(
@@ -142,7 +149,7 @@ def write_func_job(layout, subject, session, args):
             f"--anat-derivatives /anat",
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
             "--ignore slicetiming",
-            "--output-spaces", " ".join(OUTPUT_TEMPLATES),
+            "--output-spaces", *OUTPUT_TEMPLATES,
             "--cifti-output 91k",
             "--notrack",
             "--write-graph",
@@ -153,7 +160,8 @@ def write_func_job(layout, subject, session, args):
             "/data",
             derivatives_path,
             "participant",
-            ]))
+            "\n"]))
+        write_debug_copy_work_if_crash(f, subject, args)
 
     return job_path
 
@@ -209,7 +217,7 @@ def run_fmriprep(layout, args):
 
         sessions = layout.get_sessions(subject=subject)
         for session in sessions:
-            write_func_job(layout, subject, session, args)
+            job_path = write_func_job(layout, subject, session, args)
             if not args.no_submit:
                 submit_slurm_job(job_path)
 
