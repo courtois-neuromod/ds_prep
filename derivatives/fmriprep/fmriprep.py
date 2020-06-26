@@ -10,8 +10,8 @@ script_dir = os.path.dirname(__file__)
 PYBIDS_CACHE_PATH = '.pybids_cache'
 SLURM_JOB_DIR = '.slurm'
 
-SMRIPREP_REQ = {'cpus': 8, 'mem_per_cpu': 4096, 'time':'24:00:00'}
-FMRIPREP_REQ = {'cpus': 8, 'mem_per_cpu': 4096, 'time':'36:00:00'}
+SMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'24:00:00', 'omp_nthreads': 8}
+FMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'36:00:00', 'omp_nthreads': 8}
 
 FMRIPREP_VERSION = "fmriprep-20.1.0"
 FMRIPREP_SINGULARITY_PATH = os.path.abspath(os.path.join(script_dir, f"../../containers/{FMRIPREP_VERSION}.simg"))
@@ -87,6 +87,8 @@ def write_anat_job(layout, subject, args):
             "--cifti-output 91k",
             "--skip_bids_validation",
             "--write-graph",
+            f"--omp-nthreads {job_specs['omp_nthreads']}",
+            f"--nprocs {job_specs['cpus']}",
             f"--mem_mb {job_specs['mem_per_cpu']*job_specs['cpus']}",
             "/data",
             derivatives_path,
@@ -153,7 +155,9 @@ def write_func_job(layout, subject, session, args):
             "--notrack",
             "--write-graph",
             "--skip_bids_validation",
-            f"--mem_mb {job_specs['mem_per_cpu'] * job_specs['cpus']}",
+            f"--omp-nthreads {job_specs['omp_nthreads']}",
+            f"--nprocs {job_specs['cpus']}",
+            f"--mem_mb {job_specs['mem_per_cpu']*job_specs['cpus']}",
              # monitor resources to design a heuristic for runtime/cpu/ram of func data
             "--resource-monitor",
             "/data",
