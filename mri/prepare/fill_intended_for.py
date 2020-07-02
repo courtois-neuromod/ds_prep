@@ -3,46 +3,56 @@ import shutil, stat
 from bids import BIDSLayout
 import json
 import logging
+import argparse
+import numpy as np
 
-def fill_intended_for(path):
-    path = os.path.abspath(path)
-    layout = BIDSLayout(path, validate=False)
+PYBIDS_CACHE_PATH = '.pybids_cache_withmeta'
+
+def fill_intended_for(args):
+    path = os.path.abspath(args.bids_path)
+    pybids_cache_path = os.path.join(path, PYBIDS_CACHE_PATH)
+
+    layout = BIDSLayout(
+        path,
+        database_path=pybids_cache_path,
+        reset_database=args.force_reindex,
+        validate=False)
     bolds = layout.get(suffix='bold',extensions='.nii.gz')
     json_to_modify = dict()
 
+    bolds_with_no_fmap = []
+
     for bold in bolds:
+        bold_meta_const = bold.tags['global'].value['const']
         fmaps = layout.get(
-            suffix='epi', extension='.nii.gz',
+            suffix='epi', extension='.nii.gz', acquisition='sbref',
             subject=bold.entities['subject'], session=bold.entities['session'])
 
-        print(bold.path)
         shim_settings = bold.tags['ShimSetting'].value
         # First: get epi fieldmaps with similar ShimSetting
-        #print(shim_settings)
-        #print([(fm.tags['ShimSetting'].value,fm.tags['PhaseEncodingDirection'].value) for fm in fmaps])
         fmaps_match = [fm for fm in fmaps \
-            if fm.tags['ShimSetting'].value == shim_settings]
-        # Second: if not 2 fmap found we extend our search
+            if np.allclose(fm.tags['ShimSetting'].value, shim_settings)]
         pedirs = set([fm.tags['PhaseEncodingDirection'].value for fm in fmaps_match])
-        print(len(fmaps_match), pedirs)
 
-        # Second: if not 2 fmap found we extend our search
+        # Second: if not 2 fmap found we extend our search to similar ImageOrientationPatient
         if len(fmaps_match)<2 or len(pedirs)<2:
-            logging.warning("We couldn't find two epi fieldmaps with matching ShimSettings and two pedirs: "\
-                + " including other based on ImageOrientationPatient/ImagePositionPatient.")
+            logging.warning(
+                f"We couldn't find two epi fieldmaps with matching ShimSettings and two pedirs for: {bold.path}. "
+                "Including other based on ImageOrientationPatient.")
             fmaps_match.extend([fm for fm in fmaps \
-                if fm.tags['global'].value['const']['ImageOrientationPatient'] == bold.tags['global'].value['const']['ImageOrientationPatient'] \
-                and fm.tags['global'].value['const']['ImagePositionPatient'] == bold.tags['global'].value['const']['ImagePositionPatient']])
+                if np.allclose(fm.tags['ImageOrientationPatientDICOM'].value, bold.tags['ImageOrientationPatientDICOM'].value) ])
 
             pedirs = set([fm.tags['PhaseEncodingDirection'].value for fm in fmaps_match])
-            print(len(fmaps_match), pedirs)
 
         # get all fmap possible
         if len(fmaps_match)<2 or len(pedirs)<2:
-            logging.warning("We couldn't find two epi fieldmaps with matching ImageOrientationPatient and ImagePositionPatient and two pedirs: "\
-                + " including non-matching ones.")
+            logging.error(
+                f"We couldn't find two epi fieldmaps with matching ImageOrientationPatient and two pedirs for {bold.path}. "
+                "Please review manually.")
+            bolds_with_no_fmap.append(bold)
+            continue
             # TODO: maybe match on time distance
-            fmaps_match = fmaps
+            #fmaps_match = fmaps
 
         # only get 2 images with opposed pedir
         fmaps_match_pe_pos = [fm for fm in fmaps_match if '-' not in fm.tags['PhaseEncodingDirection'].value]
@@ -56,22 +66,21 @@ def fill_intended_for(path):
         for fmap in [fmaps_match_pe_pos, fmaps_match_pe_neg]:
             if ('IntendedFor' not in fmap.tags) or \
                 (bold.path not in fmap.tags.get('IntendedFor').value):
-                print('adding to IntendedFor')
                 fmap_json_path = fmap.get_associations()[0].path
                 if fmap_json_path not in json_to_modify:
                     json_to_modify[fmap_json_path] = []
-                json_to_modify[fmap_json_path].append(os.path.relpath(bold.path,path))
+                json_to_modify[fmap_json_path].append(os.path.relpath(bold.path, bold.path.split('ses-')[0]))
 
-    print(json_to_modify)
     for json_path, intendedfor in json_to_modify.items():
-        logging.info("updating %s"%json_path)
+        #logging.info("updating %s"%json_path)
         json_path = os.path.join(path, json_path)
         with open(json_path, 'r', encoding='utf-8') as fd:
             meta = json.load(fd)
         if 'IntendedFor' not in meta:
             meta['IntendedFor'] = []
-        meta['IntendedFor'].extend(intendedfor)
-        meta['IntendedFor'] = list(set(meta['IntendedFor']))
+        meta['IntendedFor'] = sorted(intendedfor)
+        #meta['IntendedFor'].extend(intendedfor)
+        #meta['IntendedFor'] = sorted(list(set(meta['IntendedFor'])))
 
         #backup_path = json_path + '.bak'
         #if not os.path.exists(backup_path):
@@ -83,6 +92,29 @@ def fill_intended_for(path):
             meta = json.dump(meta, fd, indent=3, sort_keys=True)
         os.chmod(json_path, file_mask)
 
+    if len(bolds_with_no_fmap):
+        bolds_with_no_fmap_path = [os.path.relpath(path, bold.path) for bold in bolds_with_no_fmap]
+        logging.error("No phase-reversed fieldmap was found for the following files:" +
+        "\n".join(bolds_with_no_fmap_path))
+        no_fmap_file = os.path.join(path, 'bolds_with_no_fmap.log')
+        with open(no_fmap_file, 'w') as fd:
+            fd.write('\n'.join(bolds_with_no_fmap_path) + '\n')
+        logging.info("This list was exported in {}".format(no_fmap_file))
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawTextHelpFormatter,
+        description='Fill "IntendedFor" field of fieldmaps jsons according to scanning parameters.')
+    parser.add_argument('bids_path',
+                   help='BIDS folder to modify')
+    parser.add_argument(
+        '--force-reindex', action='store_true',
+        help='Force pyBIDS reset_database and reindexing')
+
+    return parser.parse_args()
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    fill_intended_for(sys.argv[1])
+
+    args = parse_args()
+    fill_intended_for(args)
