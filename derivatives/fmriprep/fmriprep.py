@@ -49,7 +49,9 @@ export SINGULARITYENV_TEMPLATEFLOW_HOME=/templateflow
 """
 
 def write_debug_copy_work_if_crash(fd, jobname):
-    fd.write(f"if [ $? -ne 0 ] ; then cp -R $SLURM_TMPDIR /scratch/{os.environ['USER']}/{jobname}.workdir ; fi")
+    fd.write("fmriprep_exitcode = $? \n")
+    fd.write(f"if [ $fmriprep_exitcode -ne 0 ] ; then cp -R $SLURM_TMPDIR /scratch/{os.environ['USER']}/{jobname}.workdir ; fi \n")
+    fd.write("exit $fmriprep_exitcode \n")
 
 def write_anat_job(layout, subject, args):
     job_specs = dict(
@@ -105,7 +107,6 @@ def write_func_job(layout, subject, session, args):
         'anat',
         'derivatives',
         FMRIPREP_VERSION,
-        'fmriprep',
         )
     derivatives_path = os.path.join(layout.root, 'derivatives', FMRIPREP_VERSION)
 
@@ -147,7 +148,8 @@ def write_func_job(layout, subject, session, args):
             FMRIPREP_SINGULARITY_PATH,
             "-w /work",
             f"--participant-label {subject}",
-            f"--anat-derivatives /anat",
+            "--anat-derivatives /anat/fmriprep",
+            "--fs-subjects-dir /anat/freesurfer",
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
             "--ignore slicetiming",
             "--output-spaces", *OUTPUT_TEMPLATES,
