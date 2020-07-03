@@ -225,7 +225,7 @@ def run_fmriprep(layout, args):
         #if TODO: check if derivative already exists for that subject
 
         if args.session_label:
-            sessions = 
+            sessions = args.session_label
         else:
             sessions = layout.get_sessions(subject=subject)
         for session in sessions:
