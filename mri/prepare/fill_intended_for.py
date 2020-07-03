@@ -17,10 +17,20 @@ def fill_intended_for(args):
         database_path=pybids_cache_path,
         reset_database=args.force_reindex,
         validate=False)
-    bolds = layout.get(suffix='bold',extensions='.nii.gz')
+    extra_filters = {}
+    if args.participant_label:
+        extra_filters['subject'] = args.participant_label
+    if args.session_label:
+        extra_filters['session'] = args.session_label
+    bolds = layout.get(
+        suffix='bold',
+        extensions='.nii.gz',
+        **extra_filters
+        )
     json_to_modify = dict()
 
     bolds_with_no_fmap = []
+    bolds_with_shim_mismatch = []
 
     for bold in bolds:
         bold_meta_const = bold.tags['global'].value['const']
@@ -36,6 +46,7 @@ def fill_intended_for(args):
 
         # Second: if not 2 fmap found we extend our search to similar ImageOrientationPatient
         if len(fmaps_match)<2 or len(pedirs)<2:
+            bolds_with_shim_mismatch.append(bold)
             logging.warning(
                 f"We couldn't find two epi fieldmaps with matching ShimSettings and two pedirs for: {bold.path}. "
                 "Including other based on ImageOrientationPatient.")
@@ -89,17 +100,25 @@ def fill_intended_for(args):
         file_mask = os.stat(json_path)[stat.ST_MODE]
         os.chmod(json_path, file_mask | stat.S_IWUSR)
         with open(json_path, 'w', encoding='utf-8') as fd:
-            meta = json.dump(meta, fd, indent=3, sort_keys=True)
+            meta = json.dump(meta, fd, indent=2, sort_keys=True)
         os.chmod(json_path, file_mask)
 
     if len(bolds_with_no_fmap):
-        bolds_with_no_fmap_path = [os.path.relpath(path, bold.path) for bold in bolds_with_no_fmap]
-        logging.error("No phase-reversed fieldmap was found for the following files:" +
+        bolds_with_no_fmap_path = [os.path.relpath(bold.path, path) for bold in bolds_with_no_fmap]
+        logging.error("No phase-reversed fieldmap was found for the following files:\n" +
         "\n".join(bolds_with_no_fmap_path))
         no_fmap_file = os.path.join(path, 'bolds_with_no_fmap.log')
-        with open(no_fmap_file, 'w') as fd:
+        with open(no_fmap_file, 'a') as fd:
             fd.write('\n'.join(bolds_with_no_fmap_path) + '\n')
         logging.info("This list was exported in {}".format(no_fmap_file))
+    if len(bolds_with_shim_mismatch):
+        bolds_with_shim_mismatch_paths = [os.path.relpath(bold.path, path) for bold in bolds_with_shim_mismatch]
+        logging.error("No phase-reversed with matching ShimSettings was found following files:\n" +
+        "\n".join(bolds_with_shim_mismatch_paths))
+        shim_mismatch_file = os.path.join(path, 'bolds_with_shim_mismatch_paths.log')
+        with open(shim_mismatch_file, 'a') as fd:
+            fd.write('\n'.join(bolds_with_shim_mismatch_paths) + '\n')
+        logging.info("This list was exported in {}".format(shim_mismatch_file))
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -107,6 +126,14 @@ def parse_args():
         description='Fill "IntendedFor" field of fieldmaps jsons according to scanning parameters.')
     parser.add_argument('bids_path',
                    help='BIDS folder to modify')
+    parser.add_argument(
+        '--participant-label', action='store', nargs='+',
+        help='a space delimisted list of participant identifiers or a single '
+             'identifier (the sub- prefix can be removed)')
+    parser.add_argument(
+        '--session-label', action='store', nargs='+',
+        help='a space delimited list of session identifiers or a single '
+             'identifier (the ses- prefix can be removed)')
     parser.add_argument(
         '--force-reindex', action='store_true',
         help='Force pyBIDS reset_database and reindexing')
