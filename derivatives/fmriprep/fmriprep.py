@@ -189,8 +189,12 @@ def parse_args():
         help='fmriprep singularity container')
     parser.add_argument(
         '--participant-label', action='store', nargs='+',
-        help='a space delimisted list of participant identifiers or a single '
+        help='a space delimited list of participant identifiers or a single '
              'identifier (the sub- prefix can be removed)')
+    parser.add_argument(
+        '--session-label', action='store', nargs='+',
+        help='a space delimited list of session identifiers or a single '
+             'identifier (the ses- prefix can be removed)')
     parser.add_argument(
         '--force-reindex', action='store_true',
         help='Force pyBIDS reset_database and reindexing')
@@ -220,7 +224,10 @@ def run_fmriprep(layout, args):
     for subject in subjects:
         #if TODO: check if derivative already exists for that subject
 
-        sessions = layout.get_sessions(subject=subject)
+        if args.session_label:
+            sessions = 
+        else:
+            sessions = layout.get_sessions(subject=subject)
         for session in sessions:
             job_path = write_func_job(layout, subject, session, args)
             if not args.no_submit:
