@@ -49,7 +49,7 @@ export SINGULARITYENV_TEMPLATEFLOW_HOME=/templateflow
 """
 
 def write_debug_copy_work_if_crash(fd, jobname):
-    fd.write("fmriprep_exitcode = $? \n")
+    fd.write("fmriprep_exitcode=$?\n")
     fd.write(f"if [ $fmriprep_exitcode -ne 0 ] ; then cp -R $SLURM_TMPDIR /scratch/{os.environ['USER']}/{jobname}.workdir ; fi \n")
     fd.write("exit $fmriprep_exitcode \n")
 
