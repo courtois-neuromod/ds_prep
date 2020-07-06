@@ -11,7 +11,7 @@ PYBIDS_CACHE_PATH = '.pybids_cache'
 SLURM_JOB_DIR = '.slurm'
 
 SMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'24:00:00', 'omp_nthreads': 8}
-FMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'36:00:00', 'omp_nthreads': 8}
+FMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'6:00:00', 'omp_nthreads': 8}
 
 FMRIPREP_VERSION = "fmriprep-20.1.0"
 FMRIPREP_SINGULARITY_PATH = os.path.abspath(os.path.join(script_dir, f"../../containers/{FMRIPREP_VERSION}.simg"))
@@ -49,7 +49,7 @@ export SINGULARITYENV_TEMPLATEFLOW_HOME=/templateflow
 """
 
 def write_debug_copy_work_if_crash(fd, jobname):
-    fd.write("fmriprep_exitcode = $? \n")
+    fd.write("fmriprep_exitcode=$?\n")
     fd.write(f"if [ $fmriprep_exitcode -ne 0 ] ; then cp -R $SLURM_TMPDIR /scratch/{os.environ['USER']}/{jobname}.workdir ; fi \n")
     fd.write("exit $fmriprep_exitcode \n")
 
