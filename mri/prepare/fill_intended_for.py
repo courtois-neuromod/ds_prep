@@ -5,6 +5,8 @@ import json
 import logging
 import argparse
 import numpy as np
+import datetime
+from operator import itemgetter
 
 PYBIDS_CACHE_PATH = '.pybids_cache_withmeta'
 
@@ -34,6 +36,8 @@ def fill_intended_for(args):
 
     for bold in bolds:
         bold_meta_const = bold.tags['global'].value['const']
+        bold_scan_time = datetime.datetime.strptime(bold.tags['AcquisitionTime'].value, '%H:%M:%S.%f')
+
         fmaps = layout.get(
             suffix='epi', extension='.nii.gz', acquisition='sbref',
             subject=bold.entities['subject'], session=bold.entities['session'])
@@ -67,17 +71,38 @@ def fill_intended_for(args):
 
         # only get 2 images with opposed pedir
         fmaps_match_pe_pos = [fm for fm in fmaps_match if '-' not in fm.tags['PhaseEncodingDirection'].value]
-        fmaps_match_pe_pos = fmaps_match_pe_pos[0] if len(fmaps_match_pe_pos) else None
         fmaps_match_pe_neg = [fm for fm in fmaps_match if '-' in fm.tags['PhaseEncodingDirection'].value]
-        fmaps_match_pe_neg = fmaps_match_pe_neg[0] if len(fmaps_match_pe_neg) else None
 
         if not fmaps_match_pe_pos or not fmaps_match_pe_neg:
             logging.error("no matching fieldmaps")
             continue
+
+        # to match the sbref with the corresponding bold, there is a diff of ~11sec
+        delta_for_sbref = datetime.timedelta(seconds=-15)
+
         for fmap in [fmaps_match_pe_pos, fmaps_match_pe_neg]:
-            if ('IntendedFor' not in fmap.tags) or \
-                (bold.path not in fmap.tags.get('IntendedFor').value):
-                fmap_json_path = fmap.get_associations()[0].path
+            fmaps_time_diffs = sorted([
+              (fm, datetime.datetime.strptime(fm.tags.get('AcquisitionTime').value, '%H:%M:%S.%f')-bold_scan_time) \
+              for fm in fmap
+             ], key=itemgetter(1))
+
+            if args.match_strategy == 'before':
+                match_fmap = [fm for fm, ftd in fmaps_time_diffs if ftd<=delta_for_sbref]
+                if len(match_fmap):
+                    match_fmap = match_fmap[-1]
+                else:
+                    logging.warning(f"No fmap matched the {args.match_strategy} strategy for {bold.path}, taking the first match after scan.")
+                    match_fmap = fmaps_time_diffs[0][0]
+            elif args.match_strategy == 'after':
+                match_fmap = [fm for fm, ftd in fmaps_time_diffs if ftd>=delta_for_sbref]
+                if len(match_fmap):
+                    match_fmap = match_fmap[0]
+                else:
+                    logging.warning(f"No fmap matched the {args.match_strategy} strategy for {bold.path}, taking the first match before scan.")
+                    match_fmap = fmaps_time_diffs[-1][0]
+            if ('IntendedFor' not in match_fmap.tags) or \
+                (bold.path not in match_fmap.tags.get('IntendedFor').value):
+                fmap_json_path = match_fmap.get_associations()[0].path
                 if fmap_json_path not in json_to_modify:
                     json_to_modify[fmap_json_path] = []
                 json_to_modify[fmap_json_path].append(os.path.relpath(bold.path, bold.path.split('ses-')[0]))
@@ -137,6 +162,11 @@ def parse_args():
     parser.add_argument(
         '--force-reindex', action='store_true',
         help='Force pyBIDS reset_database and reindexing')
+    parser.add_argument(
+        "--match_strategy",
+        choices=["before","after"],
+        default="before",
+        help='Strategy to resolve multiple matches: "before"/"after" closest matching in time  ')
 
     return parser.parse_args()
 
