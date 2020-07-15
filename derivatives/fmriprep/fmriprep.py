@@ -48,8 +48,9 @@ export SINGULARITYENV_FS_LICENSE=$HOME/.freesurfer.txt
 export SINGULARITYENV_TEMPLATEFLOW_HOME=/templateflow
 """
 
-def write_debug_copy_work_if_crash(fd, jobname):
+def write_job_footer(fd, jobname):
     fd.write("fmriprep_exitcode=$?\n")
+    #TODO: copy resource monitor output
     fd.write(f"if [ $fmriprep_exitcode -ne 0 ] ; then cp -R $SLURM_TMPDIR /scratch/{os.environ['USER']}/{jobname}.workdir ; fi \n")
     fd.write("exit $fmriprep_exitcode \n")
 
@@ -96,7 +97,7 @@ def write_anat_job(layout, subject, args):
             derivatives_path,
             "participant",
             "\n"]))
-        write_debug_copy_work_if_crash(f, job_specs['jobname'])
+        write_job_footer(f, job_specs['jobname'])
     return job_path
 
 
@@ -152,6 +153,7 @@ def write_func_job(layout, subject, session, args):
             "--fs-subjects-dir /anat/freesurfer",
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
             "--ignore slicetiming",
+            "--use-syn-sdc",
             "--output-spaces", *OUTPUT_TEMPLATES,
             "--cifti-output 91k",
             "--notrack",
@@ -166,7 +168,7 @@ def write_func_job(layout, subject, session, args):
             derivatives_path,
             "participant",
             "\n"]))
-        write_debug_copy_work_if_crash(f, job_specs['jobname'])
+        write_job_footer(f, job_specs['jobname'])
 
     return job_path
 
