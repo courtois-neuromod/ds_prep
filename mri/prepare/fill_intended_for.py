@@ -7,6 +7,7 @@ import argparse
 import numpy as np
 import datetime
 from operator import itemgetter
+from heudiconv.utils import json_dumps_pretty
 
 PYBIDS_CACHE_PATH = '.pybids_cache_withmeta'
 
@@ -26,7 +27,7 @@ def fill_intended_for(args):
         extra_filters['session'] = args.session_label
     bolds = layout.get(
         suffix='bold',
-        extensions='.nii.gz',
+        extension='.nii.gz',
         **extra_filters
         )
     json_to_modify = dict()
@@ -55,7 +56,8 @@ def fill_intended_for(args):
                 f"We couldn't find two epi fieldmaps with matching ShimSettings and two pedirs for: {bold.path}. "
                 "Including other based on ImageOrientationPatient.")
             fmaps_match.extend([fm for fm in fmaps \
-                if np.allclose(fm.tags['ImageOrientationPatientDICOM'].value, bold.tags['ImageOrientationPatientDICOM'].value) ])
+                if np.allclose(fm.tags['ImageOrientationPatientDICOM'].value, bold.tags['ImageOrientationPatientDICOM'].value)
+                and fm not in fmaps_match ])
 
             pedirs = set([fm.tags['PhaseEncodingDirection'].value for fm in fmaps_match])
 
@@ -77,8 +79,6 @@ def fill_intended_for(args):
             logging.error("no matching fieldmaps")
             continue
 
-        # to match the sbref with the corresponding bold, there is a diff of ~11sec
-        delta_for_sbref = datetime.timedelta(seconds=-15)
 
         for fmap in [fmaps_match_pe_pos, fmaps_match_pe_neg]:
             fmaps_time_diffs = sorted([
@@ -87,6 +87,7 @@ def fill_intended_for(args):
              ], key=itemgetter(1))
 
             if args.match_strategy == 'before':
+                delta_for_sbref = datetime.timedelta(seconds=0)
                 match_fmap = [fm for fm, ftd in fmaps_time_diffs if ftd<=delta_for_sbref]
                 if len(match_fmap):
                     match_fmap = match_fmap[-1]
@@ -94,6 +95,8 @@ def fill_intended_for(args):
                     logging.warning(f"No fmap matched the {args.match_strategy} strategy for {bold.path}, taking the first match after scan.")
                     match_fmap = fmaps_time_diffs[0][0]
             elif args.match_strategy == 'after':
+                # to match the sbref with the corresponding bold, there is a diff of ~11sec
+                delta_for_sbref = datetime.timedelta(seconds=-15)
                 match_fmap = [fm for fm, ftd in fmaps_time_diffs if ftd>=delta_for_sbref]
                 if len(match_fmap):
                     match_fmap = match_fmap[0]
@@ -125,7 +128,7 @@ def fill_intended_for(args):
         file_mask = os.stat(json_path)[stat.ST_MODE]
         os.chmod(json_path, file_mask | stat.S_IWUSR)
         with open(json_path, 'w', encoding='utf-8') as fd:
-            meta = json.dump(meta, fd, indent=2, sort_keys=True)
+            fd.write(json_dumps_pretty(meta))
         os.chmod(json_path, file_mask)
 
     if len(bolds_with_no_fmap):
