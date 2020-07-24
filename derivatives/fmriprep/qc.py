@@ -10,8 +10,6 @@ import os
 
 def build_app(layout):
 
-    subjects = sorted([p.split('-')[1][:-1] for p in glob.glob('sub-*/')])
-
     static_image_route = '/images/'
     image_directory = os.getcwd()
     preproc_steps = [
@@ -22,6 +20,16 @@ def build_app(layout):
         ('Correlations among nuisance regressors', 'confoundcorr'),
     ]
 
+
+    def list_runs(subject):
+        paths = sorted([os.path.basename(p) for p in glob.glob(f"sub-{subject}/figures/*desc-sdc_bold.svg")])
+        print(paths)
+        runs = ['_'.join([ent for ent in p.split('_') if ent.split('-')[0] in ['ses', 'task', 'run']]) for p in paths]
+        return runs, paths
+
+    subjects = sorted([p.split('-')[1][:-1] for p in glob.glob('sub-*/')])
+    default_runs = [{'label': run, 'value': path} for run, path in zip(*list_runs(subjects[0]))]
+
     app = dash.Dash()
 
     app.layout = html.Div([
@@ -31,25 +39,30 @@ def build_app(layout):
             value=subjects[0]
         ),
         dcc.Dropdown(
-            id='run-dropdown'
+            id='run-dropdown',
+            options=default_runs,
+            value=default_runs[0]['value']
         ),
         dcc.Tabs(
             id='step-tabs',
-            children = [dcc.Tab(label=step_name, value=step) for step_name, step in preproc_steps],
-            value = preproc_steps[0][1]
+            children=[dcc.Tab(label=step_name, value=step) for step_name, step in preproc_steps],
+            value=preproc_steps[0][1]
         ),
-        html.ObjectEl(id='image')
+        html.ObjectEl(id='image', width='100%')
     ])
-
 
 
     @app.callback(
         dash.dependencies.Output('run-dropdown', 'options'),
         [dash.dependencies.Input('subject-dropdown', 'value')])
-    def update_subject(subject):
-        paths = sorted([os.path.basename(p) for p in glob.glob(f"sub-{subject}/figures/*desc-sdc_bold.svg")])
-        runs = ['_'.join([ent for ent in p.split('_') if ent.split('-')[0] in ['session', 'task', 'run']]) for p in paths]
-        return [{'label': run, 'value': path} for run, path in zip(runs, paths)]
+    def update_runs_list(subject):
+        return [{'label': run, 'value': path} for run, path in zip(*list_runs(subject))]
+
+    @app.callback(
+        dash.dependencies.Output('run-dropdown', 'value'),
+        [dash.dependencies.Input('subject-dropdown', 'value')])
+    def update_runs_value(subject):
+        return list_runs(subject)[1][0]
 
     @app.callback(
         dash.dependencies.Output('image', 'data'),
