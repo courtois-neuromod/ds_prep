@@ -14,9 +14,10 @@
         "column": "PresentStoryFile.OffsetTime",
         "formula": [0, "subtract", "onset"]
       },
-      "stimuli": {
+      "stim_file": {
         "column": "StoryFile",
-        "type": "stim"
+        "type": "stim",
+        "task": "language/story"
       }
     },
     {
@@ -29,8 +30,40 @@
         "column": "ThatWasAbout.OnsetTime"
       },
       "duration": {
-        "column": "ThatWasAbout.OffsetTime",
+        "column": "PresentStoryOption2.FinishTime",
         "formula": [0, "subtract", "onset"]
+      },
+      "stim_file_question1": {
+        "column": "StoryOption1",
+        "type": "stim",
+        "task": "language/story"
+      },
+      "stim_file_question2": {
+        "column": "StoryOption2",
+        "type": "stim",
+        "task": "language/story"
+      },
+      "question_option1": {
+        "column": "Option1"
+      },
+      "question_option2": {
+        "column": "Option2"
+      },
+      "onset_that_was_about": {
+        "column": "ThatWasAbout.OnsetTime",
+        "type": "subTTL"
+      },
+      "onset_question_option1": {
+        "column": "PresentStoryOption1.OnsetTime",
+        "type": "subTTL"
+      },
+      "onset_or": {
+        "column": "OrAudio.OnsetTime",
+        "type": "subTTL"
+      },
+      "onset_question_option2": {
+        "column": "PresentStoryOption2.OnsetTime",
+        "type": "subTTL"
       }
     },
     {
@@ -43,8 +76,22 @@
         "column": "ResponsePeriod.OnsetTime"
       },
       "duration": {
-        "column": "ResponsePeriod.OffsetTime",
-        "formula" : [0, "subtract", "onset"]
+        "column": "ResponsePeriod.RT",
+        "rt": "True"
+      },
+      "correct_answer": {
+        "column": "FilteredTrialStats.CRESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "option1",
+          "b": "option2"}
+      },
+      "answer":{
+        "column": "FilteredTrialStats.RESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "option1",
+          "b": "option2"}
       }
     },
     {
@@ -60,9 +107,10 @@
         "column": "PresentMathFile.OffsetTime",
         "formula": [0, "subtract", "onset"]
       },
-      "stimuli": {
+      "stim_file": {
         "column": "MathFile",
-        "type": "stim"
+        "type": "stim",
+        "task": "language/math"
       }
     },
     {
@@ -77,6 +125,11 @@
       "duration": {
         "column": "PresentMathOptions.OffsetTime",
         "formula": [0, "subtract", "onset"]
+      },
+      "stim_file_question1": {
+        "column": "MathOptionsFile",
+        "type": "stim",
+        "task": "language/math"
       }
     },
     {
@@ -90,7 +143,22 @@
       },
       "duration": {
         "column": "ResponsePeriod.OffsetTime",
-        "formula" : [0, "subtract", "onset"]
+        "formula" : [0, "subtract", "onset"],
+        "rt": "True"
+      },
+      "answer": {
+        "column": "FilteredTrialStats.RESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "option1",
+          "b": "option2"}
+      },
+      "correct_answer": {
+        "column": "FilteredTrialStats.CRESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "option1",
+          "b": "option2"}
       }
     }
   ]

@@ -2,39 +2,65 @@
   "TTL": "SyncSlide.OnsetTime",
   "events":[
     {
-      "name": "response",
+      "name": {
+        "column": "BlockType",
+        "when_no_value": "Cue"
+      },
       "ioi": {
         "column": "Procedure",
-        "value": "TrialsPROC"
+        "value": ["TrialsPROC", "Cue0BackPROC"]
       },
       "onset": {
-        "column": "Stim.OnsetTime"
+        "column": ["CueTarget.OnsetTime", "Stim.OnsetTime"]
       },
       "trial": {
         "column": ["Run[1-9]Block[1-9]*$"],
         "regex": "True"
       },
       "duration": {
-        "column": "Stim.RT"
+        "column": "Stim.RT",
+        "rt": "True"
       },
       "answer":{
-        "column": "Stim.RESP"
+        "column": "Stim.RESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "match",
+          "b": "no_match"}
       },
       "correct_answer":{
-        "column": "Stim.CRESP"
+        "column": "Stim.CRESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "match",
+          "b": "no_match"}
       },
-      "stimuli": {
+      "stim_file": {
         "column": "Stimulus",
-        "type": "stim"
+        "type": "stim",
+        "task": "wm"
       },
       "target_type": {
         "column": "TargetType"
       },
       "stim_type": {
         "column": "StimType"
+      }
+    },
+    {
+      "name": "countdown",
+      "ioi": {
+        "column": "ReadyList"
       },
-      "block_type": {
-        "column": "BlockType"
+      "onset": {
+        "column": "SyncSlide.OnsetTime"
+      },
+      "duration": {
+        "column": "SyncSlide.FinishTime",
+        "formula": [0, "subtract", "onset"]
+      },
+      "countdown_stim" : {
+        "column": "Stimulus"
       }
     }
   ]

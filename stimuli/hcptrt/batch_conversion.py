@@ -46,7 +46,6 @@ def get_closest_eprime(eprime_files, scan_time):
     eprime_choosen = ''
     all_vals = []
     for eprime_file in eprime_files:
-
         # Dummy values to make it crash if
         session_time = 0
         onset_time = '0'
@@ -119,7 +118,7 @@ def main():
             logging.info('Found {} with {} with diff {}s'.format(task_bold.filename,
                                                                   eprime_file,
                                                                   min_diff))
-            out_tsv_path = task_bold.path.replace('_bold.nii.gz', '_event.tsv')
+            out_tsv_path = task_bold.path.replace('_bold.nii.gz', '_events.tsv')
             convert_event_file(eprime_file,
                                ents['task'],
                                out_tsv_path,

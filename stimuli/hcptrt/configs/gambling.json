@@ -2,7 +2,9 @@
   "TTL": "SyncSlide.OnsetTime",
   "events":[
     {
-      "name": "response",
+      "name": {
+        "column": "TrialType"
+      },
       "ioi": {
         "column": "Procedure",
         "value": "GamblingTrialPROC"
@@ -11,13 +13,52 @@
         "column": "QuestionMark.OnsetTime"
       },
       "duration": {
-        "column": "QuestionMark.RT"
+        "column": "QuestionMark.RT",
+        "rt": "True"
       },
       "answer": {
-        "column": "QuestionMark.RESP"
+        "column": "QuestionMark.RESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "lower_than_five",
+          "b": "higher_than_five"}
+      }
+    },
+    {
+      "name": "Feedback",
+      "ioi": {
+        "column": "Procedure",
+        "value": "GamblingTrialPROC"
       },
-      "trial_type": {
-        "column": "TrialType"
+      "onset":{
+          "column": "Feedback.OnsetTime"
+      },
+      "duration":{
+        "column": "Feedback.OnsetToOnsetTime"
+      },
+      "stim_file_feedback": {
+        "column": "FeedbackImage",
+        "type": "stim",
+        "task": "gambling"
+      },
+      "feedback_number": {
+        "column": "FeedbackNumber"
+      }
+    },
+    {
+      "name": "countdown",
+      "ioi": {
+        "column": "Stimulus"
+      },
+      "onset": {
+        "column": "SyncSlide.OnsetTime"
+      },
+      "duration": {
+        "column": "SyncSlide.FinishTime",
+        "formula": [0, "subtract", "onset"]
+      },
+      "countdown_stim" : {
+        "column": "Stimulus"
       }
     }
   ]

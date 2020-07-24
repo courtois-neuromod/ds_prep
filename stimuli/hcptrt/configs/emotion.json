@@ -49,7 +49,8 @@
         "column": "StimSlide.OnsetTime"
       },
       "duration": {
-        "column": "StimSlide.RT"
+        "column": "StimSlide.RT",
+        "rt": "True"
       },
       "nbloc": {
         "column": ["HRun*"],
@@ -60,17 +61,34 @@
         "column": ["ShapeBlock*"],
         "regex": "True"
       },
-      "stim_top": {
+      "stim_file_top": {
         "column": "Top",
-        "type": "stim"
+        "type": "stim",
+        "task": "emotion"
       },
-      "stim_left": {
+      "stim_file_left": {
         "column": "Left",
-        "type": "stim"
+        "type": "stim",
+        "task": "emotion"
       },
-      "stim_right": {
+      "stim_file_right": {
         "column": "Right",
-        "type": "stim"
+        "type": "stim",
+        "task": "emotion"
+      },
+      "answer": {
+        "column": "StimSlide.RESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "left",
+          "b": "right"}
+      },
+      "correct_answer": {
+        "column": "StimSlide.CRESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "left",
+          "b": "right"}
       }
     },
     {
@@ -83,7 +101,8 @@
         "column": "StimSlide.OnsetTime"
       },
       "duration": {
-        "column": "StimSlide.RT"
+        "column": "StimSlide.RT",
+        "rt": "True"
       },
       "nbloc": {
         "column": ["HRun*"],
@@ -94,36 +113,50 @@
         "column": ["FaceBlock*"],
         "regex": "True"
       },
-      "stim_top": {
+      "stim_file_top": {
         "column": "Top",
-        "type": "stim"
+        "type": "stim",
+        "task": "emotion"
       },
-      "stim_left": {
+      "stim_file_left": {
         "column": "Left",
-        "type": "stim"
+        "type": "stim",
+        "task": "emotion"
       },
-      "stim_right": {
+      "stim_file_right": {
         "column": "Right",
-        "type": "stim"
+        "type": "stim",
+        "task": "emotion"
+      },
+      "answer": {
+        "column": "StimSlide.RESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "left",
+          "b": "right"}
+      },
+      "correct_answer": {
+        "column": "StimSlide.CRESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "left",
+          "b": "right"}
       }
     },
     {
-      "name": "cross_fixation",
+      "name": "countdown",
       "ioi": {
-        "column": "Fixation.OnsetTime"
+        "column": "Stimulus"
       },
       "onset": {
-        "column": "Fixation.OnsetTime"
+        "column": "SyncSlide.OnsetTime"
       },
-      "duration":{
-        "column": "StimSlide.OnsetTime",
-        "formula": [-1, "subtract", "onset"],
-        "when_no_value": "median"
+      "duration": {
+        "column": "SyncSlide.FinishTime",
+        "formula": [0, "subtract", "onset"]
       },
-      "nbloc": {
-        "column": ["HRun*"],
-        "regex": "True",
-        "type": "bloc"
+      "countdown_stim" : {
+        "column": "Stimulus"
       }
     }
   ]

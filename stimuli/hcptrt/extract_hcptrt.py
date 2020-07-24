@@ -26,7 +26,9 @@ formula = "formula"
 regex = "regex"
 when_no_value = "when_no_value"
 type = "type"
-
+rt = "rt"
+task = "task"
+correspondance = "correspondance"
 
 def _build_args_parser():
     p = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
@@ -207,7 +209,6 @@ def get_durations(df, onset, duration_dict):
             curr_formula = duration_dict[formula]
             if len(curr_formula) == 3:
                 duration_serie = duration_serie.shift(periods=curr_formula[0])
-
             if curr_formula[1] == 'subtract':
                 duration_serie = duration_serie.astype(np.float) - \
                                     onset.astype(np.float)
@@ -223,8 +224,14 @@ def get_durations(df, onset, duration_dict):
             duration_serie[np.isnan(duration_serie.astype(np.float))] = \
                 np.nanmean(duration_serie.astype(np.float))
 
+    rt_serie = None
+    if rt in duration_dict:
+        if duration_dict[rt]:
+            rt_serie = duration_serie.rename('response_time')
+
     duration_serie = duration_serie.rename('duration')
-    return duration_serie
+
+    return duration_serie, rt_serie
 
 
 def intersection_columns(df, curr_dict):
@@ -329,7 +336,7 @@ def merge_columns(df, curr_dict):
     return new_serie
 
 
-def get_key(df, columnName, key_dict):
+def get_key(df, columnName, key_dict, ttl, onsets=None):
     """
     Get Key from event dict.
 
@@ -349,7 +356,6 @@ def get_key(df, columnName, key_dict):
     key_serie: pandas.core.DataFrame
         Series from specific key.
     """
-
     if isinstance(key_dict[column], str):
         key_serie = df[key_dict[column]]
     elif isinstance(key_dict[column], list):
@@ -359,19 +365,44 @@ def get_key(df, columnName, key_dict):
 
     if type in key_dict:
         if key_dict[type] == 'stim':
-            key_serie = '../../stimulis/' + key_serie
+
+            key_serie = key_serie.str.replace(' ','_')
+            key_serie = key_serie.str.replace('\\','/')
+            key_serie = key_serie.str.split('/', expand=True)
+            if len(key_serie.columns)>1:
+                key_serie = key_serie[len(key_serie.columns)-1]
+            else:
+                key_serie = key_serie[0]
+
+            key_serie = key_dict[task] + os.path.sep + key_serie
 
         if key_dict[type] == "bloc":
             key_serie = key_serie.astype(np.float) - \
                             np.floor(key_serie.astype(np.float)/2)
 
-    if when_no_value in key_serie:
-        if key_serie[when_no_value] == 'median':
+        if key_dict[type] == "convert":
+            for nConversion in key_dict[correspondance].keys():
+                key_serie = key_serie.str.replace(nConversion,
+                                                  key_dict[correspondance][nConversion  ])
+
+        if key_dict[type] == "subTTL":
+            key_serie = key_serie.astype(np.float).apply(_subTTL, var=ttl)
+
+        if key_dict[type] == "duration":
+            key_serie, _ = get_durations(df, onsets, key_dict)
+            key_serie = key_serie.astype(np.float).apply(_divide)
+
+    if when_no_value in key_dict:
+        if key_dict[when_no_value] == 'median':
             key_serie[np.isnan(key_serie.astype(np.float))] = \
                 np.nanmedian(key_serie.astype(np.float))
-        elif key_serie[when_no_value] == 'mean':
+        elif key_dict[when_no_value] == 'mean':
             key_serie[np.isnan(key_serie.astype(np.float))] = \
                 np.nanmean(key_serie.astype(np.float))
+        else:
+            key_serie.fillna(key_dict[when_no_value], inplace=True)
+
+
 
     key_serie = key_serie.rename(columnName)
 
@@ -384,12 +415,17 @@ def extract_event(df, curr_event, new_df, ttl):
     ioi = get_ioi(df, curr_event['ioi'])
 
     # Get onsets and durations
-    onsets = get_key(df, 'onset', curr_event['onset'])
-    durations = get_durations(df, onsets, curr_event['duration'])
+    onsets = get_key(df, 'onset', curr_event['onset'], ttl)
+    durations, rts = get_durations(df, onsets, curr_event['duration'])
 
     # Creation of the event dataframe
-    listOfType = [curr_event['name']] * len(ioi)
-    curr_event_df = pd.DataFrame(np.asarray(listOfType), columns=['type'])
+    if isinstance(curr_event['name'], str):
+        listOfType = [curr_event['name']] * len(ioi)
+        curr_event_df = pd.DataFrame(np.asarray(listOfType), columns=['trial_type'])
+    elif isinstance(curr_event['name'], dict):
+        curr_key = get_key(df, 'name', curr_event['name'], ttl)
+        curr_List = curr_key.tolist()
+        curr_event_df = pd.DataFrame(np.asarray(curr_List), columns=['trial_type'])
 
     # Delete already used keys
     del curr_event['onset']
@@ -400,7 +436,8 @@ def extract_event(df, curr_event, new_df, ttl):
     # Loop over all keys
     for curr_key in curr_event.keys():
         curr_event_df = curr_event_df.join(get_key(df, curr_key,
-                                                   curr_event[curr_key]))
+                                                   curr_event[curr_key], ttl,
+                                                   onsets))
 
     # Reduce all df to index of interest
     curr_event_df = curr_event_df[ioi]
@@ -414,6 +451,11 @@ def extract_event(df, curr_event, new_df, ttl):
     # Join all df into one
     curr_event_df = curr_event_df.join(onsets)
     curr_event_df = curr_event_df.join(durations)
+
+    if isinstance(rts, pd.core.series.Series):
+        rts = rts[ioi]
+        rts = rts.astype(np.float).apply(_divide)
+        curr_event_df = curr_event_df.join(rts)
 
     # Concat each event_df into one
     new_df = pd.concat([new_df, curr_event_df])
@@ -487,12 +529,12 @@ def convert_event_file(in_file, in_task, out_file,
     TTL = get_TTL(df, task['TTL'])
 
     for curr_event in task["events"]:
-        logging.info('Current event: {}'.format(curr_event['name']))
+        #logging.info('Current event: {}'.format(curr_event['name']))
         new_df = extract_event(df, curr_event, new_df, TTL)
 
     # Sort new_df by onset
     new_df = new_df.sort_values('onset')
-    logging.info(new_df)
+    #logging.info(new_df)
     # Extract new_df into tsv file
     new_df.to_csv(out_file, index=False, sep='\t')
 

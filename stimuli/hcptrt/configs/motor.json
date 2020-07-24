@@ -12,13 +12,7 @@
       },
       "duration": {
         "column": "CrossLeft.OnsetTime",
-        "type": "rt",
         "formula": [-1, "subtract", "onset"]
-      },
-      "nbloc": {
-        "column": ["MotorRun[1-9]List*$"],
-        "regex": "True",
-        "type": "bloc"
       }
     },
     {
@@ -33,11 +27,6 @@
       "duration": {
         "column": "CrossRight.OnsetTime",
         "formula": [-1, "subtract", "onset"]
-      },
-      "nbloc": {
-        "column": ["MotorRun[1-9]List*$"],
-        "regex": "True",
-        "type": "bloc"
       }
     },
     {
@@ -52,13 +41,7 @@
       },
       "duration": {
         "column": "CrossRight.OnsetTime",
-        "type": "rt",
         "formula": [-1, "subtract", "onset"]
-      },
-      "nbloc": {
-        "column": ["MotorRun[1-9]List*$"],
-        "regex": "True",
-        "type": "bloc"
       }
     },
     {
@@ -73,11 +56,6 @@
       "duration": {
         "column": "CrossLeft.OnsetTime",
         "formula": [-1, "subtract", "onset"]
-      },
-      "nbloc": {
-        "column": ["MotorRun[1-9]List*$"],
-        "regex": "True",
-        "type": "bloc"
       }
     },
     {
@@ -92,10 +70,6 @@
       "duration": {
         "column": "CrossCenter.OnsetTime",
         "formula": [-1, "subtract", "onset"]
-      },
-      "nbloc": {
-        "column": ["MotorRun[1-9]List*$"],
-        "regex": "True"
       }
     },
     {
@@ -110,37 +84,21 @@
       },
       "duration": {
         "column": "CrossLeft.OnsetToOnsetTime"
-      },
-      "nbloc": {
-        "column": ["MotorRun[1-9]List*$"],
-        "regex": "True"
-      },
-      "trial":{
-        "column": ["MotorRun[1-9]List.Sample*$"],
-        "regex": "True"
       }
     },
     {
-        "name": "response_right_hand",
-        "ioi": {
-          "column": ["Procedure", "BlockType"],
-          "value": ["CrossRightPROC", "Right Hand"],
-          "formula": "intersection"
-        },
-        "onset": {
-          "column": "CrossRight.OnsetTime"
-        },
-        "duration": {
-          "column": "CrossRight.OnsetToOnsetTime"
-        },
-        "nbloc": {
-          "column": ["MotorRun[1-9]List*$"],
-          "regex": "True"
-        },
-        "trial":{
-          "column": ["MotorRun[1-9]List.Sample*$"],
-          "regex": "True"
-        }
+      "name": "response_right_hand",
+      "ioi": {
+        "column": ["Procedure", "BlockType"],
+        "value": ["CrossRightPROC", "Right Hand"],
+        "formula": "intersection"
+      },
+      "onset": {
+        "column": "CrossRight.OnsetTime"
+      },
+      "duration": {
+        "column": "CrossRight.OnsetToOnsetTime"
+      }
     },
     {
       "name": "response_left_foot",
@@ -154,15 +112,6 @@
       },
       "duration": {
         "column": "CrossLeft.OnsetToOnsetTime"
-      },
-      "nbloc": {
-        "column": ["MotorRun[1-9]List*$"],
-        "regex": "True",
-        "type": "bloc"
-      },
-      "trial":{
-        "column": ["MotorRun[1-9]List.Sample*$"],
-        "regex": "True"
       }
     },
     {
@@ -177,15 +126,6 @@
       },
       "duration": {
         "column": "CrossRight.OnsetToOnsetTime"
-      },
-      "nbloc": {
-        "column": ["MotorRun[1-9]List*$"],
-        "regex": "True",
-        "type": "bloc"
-      },
-      "trial":{
-        "column": ["MotorRun[1-9]List.Sample*$"],
-        "regex": "True"
       }
     },
     {
@@ -200,15 +140,22 @@
       },
       "duration": {
         "column": "CrossCenter.OnsetToOnsetTime"
+      }
+    },
+    {
+      "name": "countdown",
+      "ioi": {
+        "column": "Stimulus"
       },
-      "nbloc": {
-        "column": ["MotorRun[1-9]List*$"],
-        "regex": "True",
-        "type": "bloc"
+      "onset": {
+        "column": "CountDownSlide.OnsetTime"
       },
-      "trial":{
-        "column": ["MotorRun[1-9]List.Sample*$"],
-        "regex": "True"
+      "duration": {
+        "column": "CountDownSlide.FinishTime",
+        "formula": [0, "subtract", "onset"]
+      },
+      "countdown_stim" : {
+        "column": "Stimulus"
       }
     }
   ]
