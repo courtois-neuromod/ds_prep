@@ -11,7 +11,7 @@ PYBIDS_CACHE_PATH = '.pybids_cache'
 SLURM_JOB_DIR = '.slurm'
 
 SMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'24:00:00', 'omp_nthreads': 8}
-FMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'6:00:00', 'omp_nthreads': 8}
+FMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'12:00:00', 'omp_nthreads': 8}
 
 FMRIPREP_VERSION = "fmriprep-20.1.0"
 FMRIPREP_SINGULARITY_PATH = os.path.abspath(os.path.join(script_dir, f"../../containers/{FMRIPREP_VERSION}.simg"))
@@ -102,6 +102,7 @@ def write_anat_job(layout, subject, args):
 
 
 def write_func_job(layout, subject, session, args):
+    outputs_exist = False
     study = os.path.basename(layout.root)
     anat_path = os.path.join(
         os.path.dirname(layout.root),
@@ -116,6 +117,26 @@ def write_func_job(layout, subject, session, args):
         session=session,
         extension=['.nii', '.nii.gz'],
         suffix='bold')
+
+    bold_derivatives = []
+    for bold_run in bold_runs:
+        entities = bold_run.entities
+        entities = [(ent, entities[ent]) for ent in ['subject', 'session', 'task', 'run'] if ent in entities] + \
+            [('space', OUTPUT_TEMPLATES[0]), ('desc','preproc')]
+        preproc_path = os.path.join(
+            derivatives_path,
+            "fmriprep",
+            f"sub-{subject}",
+            f"ses-{session}",
+            "func",
+            '_'.join(['%s-%s'%(k[:3] if k in ['subject', 'session'] else k,v) for k,v in entities])+'_bold.nii.gz'
+        )
+        print(preproc_path)
+        bold_deriv = os.path.lexists(preproc_path) # test if file or symlink (even broken if git-annex and not pulled)
+        if bold_deriv:
+            print(f"found existing derivatives for {bold_run.path} : {preproc_path}")
+        bold_derivatives.append(bold_deriv)
+    outputs_exist = all(bold_derivatives)
     #n_runs = len(bold_runs)
     #run_shapes = [run.get_image().shape for run in bold_runs]
     #run_lengths = [rs[-1] for rs in run_shapes]
@@ -170,7 +191,7 @@ def write_func_job(layout, subject, session, args):
             "\n"]))
         write_job_footer(f, job_specs['jobname'])
 
-    return job_path
+    return job_path, outputs_exist
 
 def submit_slurm_job(job_path):
     return subprocess.run(["sbatch", job_path])
@@ -224,14 +245,16 @@ def run_fmriprep(layout, args):
         subjects = layout.get_subjects()
 
     for subject in subjects:
-        #if TODO: check if derivative already exists for that subject
-
         if args.session_label:
             sessions = args.session_label
         else:
             sessions = layout.get_sessions(subject=subject)
         for session in sessions:
-            job_path = write_func_job(layout, subject, session, args)
+            #if TODO: check if derivative already exists for that subject
+            job_path, outputs_exist = write_func_job(layout, subject, session, args)
+            if outputs_exist:
+                print(f"output already exists for sub-{subject} ses-{session}, not rerunning")
+                continue
             if not args.no_submit:
                 submit_slurm_job(job_path)
 
