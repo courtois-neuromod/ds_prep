@@ -121,20 +121,27 @@ def write_func_job(layout, subject, session, args):
     bold_derivatives = []
     for bold_run in bold_runs:
         entities = bold_run.entities
-        entities = [(ent, entities[ent]) for ent in ['subject', 'session', 'task', 'run'] if ent in entities] + \
-            [('space', OUTPUT_TEMPLATES[0]), ('desc','preproc')]
-        preproc_path = os.path.join(
+        entities = [(ent, entities[ent]) for ent in ['subject', 'session', 'task', 'run'] if ent in entities]
+        preproc_entities = entities + [('space', OUTPUT_TEMPLATES[0]), ('desc','preproc')]
+        dtseries_entities = entities + [('space', 'fsLR'), ('den','91k')]
+        func_path =  os.path.join(
             derivatives_path,
             "fmriprep",
             f"sub-{subject}",
             f"ses-{session}",
             "func",
-            '_'.join(['%s-%s'%(k[:3] if k in ['subject', 'session'] else k,v) for k,v in entities])+'_bold.nii.gz'
+            )
+        preproc_path = os.path.join(
+            func_path,
+            '_'.join(['%s-%s'%(k[:3] if k in ['subject', 'session'] else k,v) for k,v in preproc_entities])+'_bold.nii.gz'
         )
-        print(preproc_path)
-        bold_deriv = os.path.lexists(preproc_path) # test if file or symlink (even broken if git-annex and not pulled)
+        dtseries_path = os.path.join(
+            func_path,
+            '_'.join(['%s-%s'%(k[:3] if k in ['subject', 'session'] else k,v) for k,v in dtseries_entities])+'_bold.dtseries.nii'
+        )
+        bold_deriv = os.path.lexists(preproc_path) and os.path.lexists(dtseries_path) # test if file or symlink (even broken if git-annex and not pulled)
         if bold_deriv:
-            print(f"found existing derivatives for {bold_run.path} : {preproc_path}")
+            print(f"found existing derivatives for {bold_run.path} : {preproc_path}, {dtseries_path}")
         bold_derivatives.append(bold_deriv)
     outputs_exist = all(bold_derivatives)
     #n_runs = len(bold_runs)
@@ -253,7 +260,7 @@ def run_fmriprep(layout, args):
             #if TODO: check if derivative already exists for that subject
             job_path, outputs_exist = write_func_job(layout, subject, session, args)
             if outputs_exist:
-                print(f"output already exists for sub-{subject} ses-{session}, not rerunning")
+                print(f"all output already exists for sub-{subject} ses-{session}, not rerunning")
                 continue
             if not args.no_submit:
                 submit_slurm_job(job_path)
