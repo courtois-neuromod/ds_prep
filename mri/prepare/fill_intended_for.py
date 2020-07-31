@@ -36,7 +36,6 @@ def fill_intended_for(args):
     bolds_with_shim_mismatch = []
 
     for bold in bolds:
-        bold_meta_const = bold.tags['global'].value['const']
         bold_scan_time = datetime.datetime.strptime(bold.tags['AcquisitionTime'].value, '%H:%M:%S.%f')
 
         fmaps = layout.get(
