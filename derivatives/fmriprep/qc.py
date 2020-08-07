@@ -1,3 +1,4 @@
+import argparse
 import bids
 import dash
 import dash_core_components as dcc
@@ -8,7 +9,7 @@ import glob
 import os
 
 
-def build_app(layout):
+def build_app(derivatives_path):
 
     static_image_route = '/images/'
     image_directory = os.getcwd()
@@ -22,12 +23,12 @@ def build_app(layout):
 
 
     def list_runs(subject):
-        paths = sorted([os.path.basename(p) for p in glob.glob(f"sub-{subject}/figures/*desc-sdc_bold.svg")])
+        paths = sorted([os.path.basename(p) for p in glob.glob(f"{derivatives_path}/sub-{subject}/figures/*desc-sdc_bold.svg")])
         print(paths)
         runs = ['_'.join([ent for ent in p.split('_') if ent.split('-')[0] in ['ses', 'task', 'run']]) for p in paths]
         return runs, paths
 
-    subjects = sorted([p.split('-')[1][:-1] for p in glob.glob('sub-*/')])
+    subjects = sorted([os.path.basename(p[:-1]).split('-')[1] for p in glob.glob(f"{derivatives_path}/sub-*/")])
     default_runs = [{'label': run, 'value': path} for run, path in zip(*list_runs(subjects[0]))]
 
     app = dash.Dash()
@@ -77,7 +78,8 @@ def build_app(layout):
 
     @app.server.route('/images/<subject>/<image_path>')
     def serve_image(subject, image_path):
-        image_directory = os.path.join(os.getcwd(), 'sub-%s'%subject, 'figures')
+        print(subject, image_path)
+        image_directory = os.path.abspath(os.path.join(derivatives_path, 'sub-%s'%subject, 'figures'))
         if not os.path.exists(os.path.join(image_directory, image_path)):
             raise RuntimeError('image_path not found')
         return flask.send_from_directory(image_directory, image_path)
@@ -85,6 +87,18 @@ def build_app(layout):
 
     return app
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawTextHelpFormatter,
+        description='run dash app to view fmriprep qc images')
+    parser.add_argument('derivatives_path',
+                   help='fmriprep derivative folder')
+    parser.add_argument(
+        '--port', action='store', default=8050,
+        help='server port')
+    return parser.parse_args()
+
 if __name__ == '__main__':
-    app = build_app(None)
-    app.run_server(debug=True, dev_tools_silence_routes_logging=False)
+    args = parse_args()
+    app = build_app(args.derivatives_path)
+    app.run_server(debug=True, dev_tools_silence_routes_logging=False, port=args.port)
