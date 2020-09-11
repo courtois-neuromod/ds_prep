@@ -155,7 +155,7 @@ def parse_args():
                    help='BIDS folder to modify')
     parser.add_argument(
         '--participant-label', action='store', nargs='+',
-        help='a space delimisted list of participant identifiers or a single '
+        help='a space delimited list of participant identifiers or a single '
              'identifier (the sub- prefix can be removed)')
     parser.add_argument(
         '--session-label', action='store', nargs='+',
