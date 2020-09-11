@@ -47,6 +47,17 @@ slurm_preamble = """#!/bin/bash
 export SINGULARITYENV_FS_LICENSE=$HOME/.freesurfer.txt
 export SINGULARITYENV_TEMPLATEFLOW_HOME=/templateflow
 """
+def load_bidsignore(bids_root):
+    """Load .bidsignore file from a BIDS dataset, returns list of regexps"""
+    bids_ignore_path = bids_root / '.bidsignore'
+    if bids_ignore_path.exists():
+        import re
+        import fnmatch
+        bids_ignores = bids_ignore_path.read_text().splitlines()
+        return tuple([re.compile(fnmatch.translate(bi))
+                      for bi in bids_ignores
+                      if len(bi) and bi.strip()[0] != '#'])
+    return tuple()
 
 def write_job_footer(fd, jobname):
     fd.write("fmriprep_exitcode=$?\n")
@@ -76,6 +87,8 @@ def write_anat_job(layout, subject, args):
     with open(os.path.join(layout.root,bids_filters_path), 'w') as f:
         json.dump(bids_filters, f)
 
+    pybids_cache_path = os.path.join(layout.root, PYBIDS_CACHE_PATH)
+
     with open(job_path, 'w') as f:
         f.write(slurm_preamble.format(**job_specs))
         f.write(" ".join([
@@ -85,6 +98,7 @@ def write_anat_job(layout, subject, args):
             "-w /work",
             f"--participant-label {subject}",
             "--anat-only",
+            f"--bids-database-dir {pybids_cache_path}",
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
             "--output-spaces", " ".join(OUTPUT_TEMPLATES),
             "--cifti-output 91k",
@@ -162,6 +176,8 @@ def write_func_job(layout, subject, session, args):
         SLURM_JOB_DIR,
         f"{job_specs['jobname']}_bids_filters.json")
 
+    pybids_cache_path = os.path.join(layout.root, PYBIDS_CACHE_PATH)
+
     # filter for session
     bids_filters = json.load(open(BIDS_FILTERS_FILE))
     bids_filters['bold'].update({'session': session})
@@ -179,6 +195,7 @@ def write_func_job(layout, subject, session, args):
             f"--participant-label {subject}",
             "--anat-derivatives /anat/fmriprep",
             "--fs-subjects-dir /anat/freesurfer",
+            f"--bids-database-dir {pybids_cache_path}",
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
             "--ignore slicetiming",
             "--use-syn-sdc",
@@ -275,8 +292,16 @@ def main():
         args.bids_path,
         database_path=pybids_cache_path,
         reset_database=args.force_reindex,
-        index_metadata=False,
-        validate=False)
+        #index_metadata=False,
+        #validate=False,
+        ignore=(
+            "code",
+            "stimuli",
+            "sourcedata",
+            "models",
+            re.compile(r"^\."),
+        ) + load_bidsignore(args.bids_path),
+    )
 
     job_path = os.path.join(
         layout.root,
