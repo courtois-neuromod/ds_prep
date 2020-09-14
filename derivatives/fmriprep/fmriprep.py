@@ -62,6 +62,7 @@ def load_bidsignore(bids_root):
 def write_job_footer(fd, jobname):
     fd.write("fmriprep_exitcode=$?\n")
     #TODO: copy resource monitor output
+    fd.write(f"cp $SLURM_TMPDIR/fmriprep_wf/resource_monitor.json /scratch/{os.environ['USER']}/{jobname}_resource_monitor.json \n")
     fd.write(f"if [ $fmriprep_exitcode -ne 0 ] ; then cp -R $SLURM_TMPDIR /scratch/{os.environ['USER']}/{jobname}.workdir ; fi \n")
     fd.write("exit $fmriprep_exitcode \n")
 
