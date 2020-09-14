@@ -4,6 +4,8 @@ import argparse
 import bids
 import subprocess
 import json
+import re
+import pathlib
 
 script_dir = os.path.dirname(__file__)
 
@@ -224,10 +226,13 @@ def parse_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,
         description='submit smriprep jobs')
-    parser.add_argument('bids_path',
-                   help='BIDS folder to run smriprep on.')
-    parser.add_argument('preproc',
-                   help='anat or func')
+    parser.add_argument(
+        'bids_path',
+        type=pathlib.Path,
+        help='BIDS folder to run smriprep on.')
+    parser.add_argument(
+        'preproc',
+        help='anat or func')
     parser.add_argument(
         '--email', action='store',
         help='email for SLURM notifications')
