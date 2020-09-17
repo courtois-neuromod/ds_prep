@@ -18,6 +18,11 @@
         "column": "StoryFile",
         "type": "stim",
         "task": "language/story"
+      },
+      "ntrial": {
+        "column": "AccTrialCounter",
+        "type": "trial",
+        "formula": ["add", 1]
       }
     },
     {
@@ -64,6 +69,11 @@
       "onset_question_option2": {
         "column": "PresentStoryOption2.OnsetTime",
         "type": "subTTL"
+      },
+      "ntrial": {
+        "column": "AccTrialCounter",
+        "type": "trial",
+        "formula": ["add", 1]
       }
     },
     {
@@ -92,6 +102,11 @@
         "correspondance": {
           "a": "option1",
           "b": "option2"}
+      },
+      "ntrial": {
+        "column": "AccTrialCounter",
+        "type": "trial",
+        "formula": ["add", 1]
       }
     },
     {
@@ -111,6 +126,11 @@
         "column": "MathFile",
         "type": "stim",
         "task": "language/math"
+      },
+      "ntrial": {
+        "column": "AccTrialCounter",
+        "type": "trial",
+        "formula": ["add", 1]
       }
     },
     {
@@ -130,6 +150,11 @@
         "column": "MathOptionsFile",
         "type": "stim",
         "task": "language/math"
+      },
+      "ntrial": {
+        "column": "AccTrialCounter",
+        "type": "trial",
+        "formula": ["add", 1]
       }
     },
     {
@@ -159,6 +184,11 @@
         "correspondance": {
           "a": "option1",
           "b": "option2"}
+      },
+      "ntrial": {
+        "column": "AccTrialCounter",
+        "type": "trial",
+        "formula": ["add", 1]
       }
     }
   ]

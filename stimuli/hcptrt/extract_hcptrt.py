@@ -25,6 +25,7 @@ value = "value"
 formula = "formula"
 regex = "regex"
 when_no_value = "when_no_value"
+when_zero = "when_zero"
 type = "type"
 rt = "rt"
 task = "task"
@@ -216,6 +217,7 @@ def get_durations(df, onset, duration_dict):
                 duration_serie = duration_serie.astype(np.float) + \
                                     onset.astype(np.float)
 
+    # Replace NaN with Median or Mean
     if when_no_value in duration_dict:
         if duration_dict[when_no_value] == 'median':
             duration_serie[np.isnan(duration_serie.astype(np.float))] = \
@@ -223,6 +225,10 @@ def get_durations(df, onset, duration_dict):
         elif duration_dict[when_no_value] == 'mean':
             duration_serie[np.isnan(duration_serie.astype(np.float))] = \
                 np.nanmean(duration_serie.astype(np.float))
+
+    if when_zero in duration_dict:
+        #  Replace zeros with when_zero value
+        duration_serie[duration_serie.astype(np.float) == 0.0] = duration_dict[when_zero]
 
     rt_serie = None
     if rt in duration_dict:
@@ -311,9 +317,9 @@ def merge_columns(df, curr_dict):
                 new_serie = new_serie.combine_first(new_serie)
 
     else:  # Value does not exist
-
         if regex in curr_dict and len(curr_dict[column]) == 1:
             curr_dict[column] = [i for i in list(df.columns) if re.search(curr_dict[column][0], i)]
+
             if len(curr_dict[column]) > 1:
                 listColumns = curr_dict[column][1::]
             else:
@@ -356,12 +362,15 @@ def get_key(df, columnName, key_dict, ttl, onsets=None):
     key_serie: pandas.core.DataFrame
         Series from specific key.
     """
-    if isinstance(key_dict[column], str):
-        key_serie = df[key_dict[column]]
-    elif isinstance(key_dict[column], list):
-        key_serie = merge_columns(df, key_dict)
-    else:
-        logging.error('not coded yet - get_key')
+    if column in key_dict:
+        if isinstance(key_dict[column], str):
+            key_serie = df[key_dict[column]]
+        elif isinstance(key_dict[column], list):
+            key_serie = merge_columns(df, key_dict)
+        else:
+            logging.error('not coded yet - get_key')
+    elif value in key_dict:
+        key_serie = pd.Series(data=[key_dict[value]] * df.shape[0])
 
     if type in key_dict:
         if key_dict[type] == 'stim':
@@ -383,7 +392,7 @@ def get_key(df, columnName, key_dict, ttl, onsets=None):
         if key_dict[type] == "convert":
             for nConversion in key_dict[correspondance].keys():
                 key_serie = key_serie.str.replace(nConversion,
-                                                  key_dict[correspondance][nConversion  ])
+                                                  key_dict[correspondance][nConversion])
 
         if key_dict[type] == "subTTL":
             key_serie = key_serie.astype(np.float).apply(_subTTL, var=ttl)
@@ -391,6 +400,15 @@ def get_key(df, columnName, key_dict, ttl, onsets=None):
         if key_dict[type] == "duration":
             key_serie, _ = get_durations(df, onsets, key_dict)
             key_serie = key_serie.astype(np.float).apply(_divide)
+
+        #if key_dict[type] == "trial" or key_dict[type] == "bloc":
+        #    key_serie = key_serie.astype(np.float).apply(_subTTL, var=1)
+
+    if formula in key_dict:
+        if key_dict[formula][0] == 'sub':
+            key_serie = key_serie.astype(np.float).apply(_sub, var=key_dict[formula][1])
+        if key_dict[formula][0] == 'add':
+            key_serie = key_serie.astype(np.float).apply(_add, var=key_dict[formula][1])
 
     if when_no_value in key_dict:
         if key_dict[when_no_value] == 'median':
@@ -474,6 +492,11 @@ def _divide(val):
 def _subTTL(val, var):
     return (val - var) / 1000
 
+def _sub(val, var):
+    return (val - var)
+
+def _add(val, var):
+    return (val + var)
 
 def convert_event_file(in_file, in_task, out_file,
                        extract_eprime=False,

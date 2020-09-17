@@ -50,7 +50,8 @@
       },
       "duration": {
         "column": "StimSlide.RT",
-        "rt": "True"
+        "rt": "True",
+        "when_zero": "2033"
       },
       "nbloc": {
         "column": ["HRun*"],

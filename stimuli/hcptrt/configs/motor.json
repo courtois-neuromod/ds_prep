@@ -13,6 +13,10 @@
       "duration": {
         "column": "CrossLeft.OnsetTime",
         "formula": [-1, "subtract", "onset"]
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
       }
     },
     {
@@ -27,6 +31,10 @@
       "duration": {
         "column": "CrossRight.OnsetTime",
         "formula": [-1, "subtract", "onset"]
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
       }
     },
     {
@@ -42,6 +50,10 @@
       "duration": {
         "column": "CrossRight.OnsetTime",
         "formula": [-1, "subtract", "onset"]
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
       }
     },
     {
@@ -56,6 +68,10 @@
       "duration": {
         "column": "CrossLeft.OnsetTime",
         "formula": [-1, "subtract", "onset"]
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
       }
     },
     {
@@ -70,6 +86,10 @@
       "duration": {
         "column": "CrossCenter.OnsetTime",
         "formula": [-1, "subtract", "onset"]
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
       }
     },
     {
@@ -84,6 +104,10 @@
       },
       "duration": {
         "column": "CrossLeft.OnsetToOnsetTime"
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
       }
     },
     {
@@ -98,6 +122,10 @@
       },
       "duration": {
         "column": "CrossRight.OnsetToOnsetTime"
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
       }
     },
     {
@@ -112,6 +140,10 @@
       },
       "duration": {
         "column": "CrossLeft.OnsetToOnsetTime"
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
       }
     },
     {
@@ -126,6 +158,10 @@
       },
       "duration": {
         "column": "CrossRight.OnsetToOnsetTime"
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
       }
     },
     {
@@ -140,6 +176,10 @@
       },
       "duration": {
         "column": "CrossCenter.OnsetToOnsetTime"
+      },
+      "nbloc": {
+        "column": "MotorRun1List",
+        "type": "bloc"
       }
     },
     {

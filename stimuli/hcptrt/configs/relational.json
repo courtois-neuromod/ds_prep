@@ -56,10 +56,12 @@
         }
       },
       "nbloc": {
-        "column": "BlockNumber"
+        "column": "BlockNumber",
+        "formula": ["sub", 3]
       },
       "trial": {
-        "column" : "RunTrialNumber"
+        "column" : "RunTrialNumber",
+        "formula": ["sub", 1]
       },
       "answer": {
         "column": ["RelationalSlide.RESP", "ControlSlide.RESP"],

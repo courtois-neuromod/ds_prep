@@ -6,8 +6,8 @@
         "column": "TrialType"
       },
       "ioi": {
-        "column": "Procedure",
-        "value": "GamblingTrialPROC"
+        "column": ["R*MostlyReward*"],
+        "regex": "True"
       },
       "onset": {
         "column": "QuestionMark.OnsetTime"
@@ -22,13 +22,25 @@
         "correspondance": {
           "a": "lower_than_five",
           "b": "higher_than_five"}
+      },
+      "block_type": {
+        "value": "MostlyReward"
+      },
+      "nbloc": {
+        "column": "Run4List",
+        "type": "bloc"
+      },
+      "ntrial": {
+        "column": "RunTrialNumber",
+        "type": "trial",
+        "formula": ["sub", 1]
       }
     },
     {
       "name": "Feedback",
       "ioi": {
-        "column": "Procedure",
-        "value": "GamblingTrialPROC"
+        "column": ["R*MostlyReward*"],
+        "regex": "True"
       },
       "onset":{
           "column": "Feedback.OnsetTime"
@@ -43,6 +55,86 @@
       },
       "feedback_number": {
         "column": "FeedbackNumber"
+      },
+      "block_type": {
+        "value": "MostlyReward"
+      },
+      "nbloc": {
+        "column": "Run4List",
+        "type": "bloc"
+      },
+      "ntrial": {
+        "column": "RunTrialNumber",
+        "type": "trial",
+        "formula": ["sub", 1]
+      }
+    },
+    {
+      "name": {
+        "column": "TrialType"
+      },
+      "ioi": {
+        "column": ["R*MostlyPunishment*"],
+        "regex": "True"
+      },
+      "onset": {
+        "column": "QuestionMark.OnsetTime"
+      },
+      "duration": {
+        "column": "QuestionMark.RT",
+        "rt": "True"
+      },
+      "answer": {
+        "column": "QuestionMark.RESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "lower_than_five",
+          "b": "higher_than_five"}
+      },
+      "block_type": {
+        "value": "MostlyPunishment"
+      },
+      "nbloc": {
+        "column": "Run4List",
+        "type": "bloc"
+      },
+      "ntrial": {
+        "column": "RunTrialNumber",
+        "type": "trial",
+        "formula": ["sub", 1]
+      }
+    },
+    {
+      "name": "Feedback",
+      "ioi": {
+        "column": ["R*MostlyPunishment*"],
+        "regex": "True"
+      },
+      "onset":{
+          "column": "Feedback.OnsetTime"
+      },
+      "duration":{
+        "column": "Feedback.OnsetToOnsetTime"
+      },
+      "stim_file_feedback": {
+        "column": "FeedbackImage",
+        "type": "stim",
+        "task": "gambling"
+      },
+      "feedback_number": {
+        "column": "FeedbackNumber"
+      },
+      "block_type": {
+        "value": "MostlyPunishment"
+      },
+      "nbloc": {
+        "column": "Run4List",
+        "type": "bloc"
+      },
+      "ntrial": {
+        "column": "RunTrialNumber",
+        "type": "trial",
+        "formula": ["sub", 1]
       }
     },
     {
