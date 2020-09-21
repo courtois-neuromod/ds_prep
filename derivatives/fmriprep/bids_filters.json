@@ -5,8 +5,7 @@
   },
   "t2w": {
     "reconstruction": null,
-    "acquisition": null,
-    "bp": null
+    "acquisition": null
   },
   "bold" : {
   }

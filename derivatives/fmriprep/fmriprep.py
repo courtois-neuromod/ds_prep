@@ -15,8 +15,8 @@ SLURM_JOB_DIR = '.slurm'
 SMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'24:00:00', 'omp_nthreads': 8}
 FMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'12:00:00', 'omp_nthreads': 8}
 
-FMRIPREP_VERSION = "fmriprep-20.2.0rc0"
-FMRIPREP_SINGULARITY_PATH = os.path.abspath(os.path.join(script_dir, f"../../containers/{FMRIPREP_VERSION}.simg"))
+FMRIPREP_VERSION = "fmriprep-20.2.0rc1"
+FMRIPREP_SINGULARITY_PATH = os.path.abspath(os.path.join(script_dir, f"../../containers/{FMRIPREP_VERSION}.sif"))
 BIDS_FILTERS_FILE = os.path.join(script_dir, 'bids_filters.json')
 TEMPLATEFLOW_HOME = os.path.join(
     os.environ.get(
@@ -90,7 +90,7 @@ def write_anat_job(layout, subject, args):
     with open(os.path.join(layout.root,bids_filters_path), 'w') as f:
         json.dump(bids_filters, f)
 
-    pybids_cache_path = os.path.join(layout.root, PYBIDS_CACHE_PATH)
+    pybids_cache_path = os.path.join('/data', PYBIDS_CACHE_PATH)
 
     with open(job_path, 'w') as f:
         f.write(slurm_preamble.format(**job_specs))
@@ -179,7 +179,7 @@ def write_func_job(layout, subject, session, args):
         SLURM_JOB_DIR,
         f"{job_specs['jobname']}_bids_filters.json")
 
-    pybids_cache_path = os.path.join(layout.root, PYBIDS_CACHE_PATH)
+    pybids_cache_path = os.path.join('/data', PYBIDS_CACHE_PATH)
 
     # filter for session
     bids_filters = json.load(open(BIDS_FILTERS_FILE))
