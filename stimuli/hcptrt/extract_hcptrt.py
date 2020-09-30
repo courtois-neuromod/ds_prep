@@ -202,7 +202,9 @@ def get_durations(df, onset, duration_dict):
         Series of Index with durations.
     """
 
-    if isinstance(duration_dict[column], list):
+    if not column in duration_dict:
+        duration_serie = pd.Series(data=[duration_dict[value]] * df.shape[0])
+    elif isinstance(duration_dict[column], list):
         duration_serie = merge_columns(df, duration_dict)
     elif isinstance(duration_dict[column], str):
         duration_serie = df[duration_dict[column]]
