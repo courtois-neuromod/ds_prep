@@ -27,7 +27,8 @@
         "value": "MostlyReward"
       },
       "nbloc": {
-        "column": "Run4List",
+        "column": ["^Run[1-9]List$"],
+        "regex": "True",
         "type": "bloc"
       },
       "ntrial": {
@@ -60,8 +61,9 @@
         "value": "MostlyReward"
       },
       "nbloc": {
-        "column": "Run4List",
-        "type": "bloc"
+        "column": ["^Run[1-9]List$"],
+        "type": "bloc",
+        "regex": "True"
       },
       "ntrial": {
         "column": "RunTrialNumber",
@@ -95,8 +97,9 @@
         "value": "MostlyPunishment"
       },
       "nbloc": {
-        "column": "Run4List",
-        "type": "bloc"
+        "column": ["^Run[1-9]List$"],
+        "type": "bloc",
+        "regex": "True"
       },
       "ntrial": {
         "column": "RunTrialNumber",
@@ -128,8 +131,9 @@
         "value": "MostlyPunishment"
       },
       "nbloc": {
-        "column": "Run4List",
-        "type": "bloc"
+        "column": ["^Run[1-9]List$"],
+        "type": "bloc",
+        "regex": "True"
       },
       "ntrial": {
         "column": "RunTrialNumber",
