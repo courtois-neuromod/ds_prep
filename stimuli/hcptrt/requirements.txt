@@ -1,0 +1,2 @@
+-e git://github.com/tsalo/convert-eprime@620f46bba42474c471595d5d4a56e7c755359800#egg=convert-eprime
+pandas==1.0.2

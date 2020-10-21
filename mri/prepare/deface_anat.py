@@ -9,18 +9,19 @@ import numpy as np
 import scipy.ndimage
 import datalad.api
 from datalad.support.annexrepo import AnnexRepo
+from deepbrain import Extractor
+import scipy.ndimage.morphology
 
 from dipy.align.imaffine import (transform_centers_of_mass,
                                   AffineMap,
                                   MutualInformationMetric,
-                                  AffineRegistration)
-from dipy.align.transforms import (AffineTransform3D, RigidTransform3D)
-
-from nipype.interfaces import fsl
-
+                                  AffineRegistration,
+                                  VerbosityLevels)
+from dipy.align.transforms import (AffineTransform3D, RigidTransform3D, RigidScalingTransform3D, RigidIsoscalingTransform3D)
 
 PYBIDS_CACHE_PATH = '.pybids_cache'
 MNI_PATH = '../../global/templates/MNI152_T1_1mm.nii.gz'
+MNI_MASK_PATH = '../../global/templates/MNI152_T1_1mm_brain.nii.gz'
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -53,6 +54,9 @@ def parse_args():
         '--other-bids-filters', dest='other_bids_filters', action='store',
         type=_bids_filter,
         help="path to or inline json with pybids filters to select all images to deface")
+    parser.add_argument(
+        '--debug', dest='debug_level', action='store', default='info',
+        help="debug level")
     return parser.parse_args()
 
 def _filter_pybids_any(dct):
@@ -63,44 +67,60 @@ def _bids_filter(json_str):
         json_str = Path(json_str).read_text()
     return json.loads(json_str, object_hook=_filter_pybids_any)
 
-def registration(ref, moving):
+def registration(ref, moving, ref_mask=None, moving_mask=None):
+    ref_mask_data, mov_mask_data = None, None
     ref_data = ref.get_fdata()
+    if ref_mask:
+        ref_mask_data = ref_mask.get_fdata() > 0.5
     mov_data = moving.get_fdata()
-    c_of_mass = transform_centers_of_mass(ref_data, ref.affine,
-                                          mov_data, moving.affine)
-    nbins = 32
-    sampling_prop = None
-    metric = MutualInformationMetric(nbins, sampling_prop)
-    sigmas = [5.0, 3.0, 1.0, 0]
-    factors = [8, 4, 2, 1]
-    level_iters = [10000, 1000, 100, 1]
+    if moving_mask:
+        mov_mask_data = moving_mask.get_fdata() > 0.5
+
+    metric = MutualInformationMetric(nbins=32, sampling_proportion=None)
     transform = RigidTransform3D()
     affreg = AffineRegistration(metric=metric,
-                                level_iters=level_iters,
-                                sigmas=sigmas,
-                                factors=factors)
+                                level_iters=[10000, 1000, 0],
+                                factors=[6, 4, 2],
+                                sigmas=[4, 2, 0])
     rigid = affreg.optimize(ref_data, mov_data, transform, None,
                             ref.affine, moving.affine,
-                            starting_affine=c_of_mass.affine)
-    transform = AffineTransform3D()
+                            starting_affine='mass',
+                            static_mask=ref_mask_data,
+                            moving_mask=mov_mask_data)
+
+    affreg = AffineRegistration(metric=metric,
+                                level_iters=[10000, 1000, 0],
+                                factors=[4, 2, 2],
+                                sigmas=[4, 2, 0])
+    transform = RigidScalingTransform3D()
+    #transform = AffineTransform3D()
     return affreg.optimize(ref_data, mov_data, transform, None,
                            ref.affine, moving.affine,
-                           starting_affine=rigid.affine)
+                           starting_affine=rigid.affine,
+                           static_mask=ref_mask_data,
+                           moving_mask=mov_mask_data)
 
 
 def output_debug_images(ref, moving, affine):
+    moving_nb = moving.get_image()
+    moving_suffix = moving.entities['suffix']
+    moving_reg_path = moving.path.replace(f"_{moving_suffix}",f"_space-MNIlinreg_{moving_suffix}")
     moving_reg = affine.transform(
-        moving.get_fdata(),
-        image_grid2world=moving.affine,
+        moving_nb.get_fdata(),
+        image_grid2world=moving_nb.affine,
         sampling_grid_shape=ref.shape,
         sampling_grid2world=ref.affine)
-    nb.Nifti1Image(moving_reg, ref.affine).to_filename('moving_reg.nii.gz')
+    logging.info(f"writing reference serie linearly warped to MNI template: {moving_reg_path}")
+    nb.Nifti1Image(moving_reg, ref.affine).to_filename(moving_reg_path)
+
+    ref_inv_path = moving.path.replace(f"_{moving_suffix}",f"_mod-{moving_suffix}_MNIlinreg")
     ref_inv = affine.transform_inverse(
         ref.get_fdata(),
         image_grid2world=ref.affine,
-        sampling_grid_shape=moving.shape,
-        sampling_grid2world=moving.affine)
-    nb.Nifti1Image(ref_inv, moving.affine).to_filename('ref_inv.nii.gz')
+        sampling_grid_shape=moving_nb.shape,
+        sampling_grid2world=moving_nb.affine)
+    logging.info(f"writing MNI template image linearly warped to the reference serie: {ref_inv_path}")
+    nb.Nifti1Image(ref_inv, moving_nb.affine).to_filename(ref_inv_path)
 
 
 def warp_mask(tpl_mask, target, affine):
@@ -115,6 +135,7 @@ def warp_mask(tpl_mask, target, affine):
 def main():
 
     args = parse_args()
+    logging.basicConfig(level=logging.getLevelName(args.debug_level.upper()))
 
     pybids_cache_path = os.path.join(args.bids_path, PYBIDS_CACHE_PATH)
 
@@ -139,26 +160,39 @@ def main():
     script_dir = os.path.dirname(__file__)
 
     mni_path = os.path.abspath(os.path.join(script_dir, MNI_PATH))
+    mni_mask_path = os.path.abspath(os.path.join(script_dir, MNI_MASK_PATH))
     # if the MNI template image is not available locally
     if not os.path.exists(os.path.realpath(mni_path)):
         datalad.api.get(mni_path, dataset=datalad.api.Dataset(script_dir+'/../../'))
     tmpl_image = nb.load(mni_path)
+    tmpl_image_mask = nb.load(mni_mask_path)
     tmpl_defacemask = generate_deface_ear_mask(tmpl_image)
+    brain_xtractor = Extractor()
 
     for ref_image in deface_ref_images:
         subject = ref_image.entities['subject']
         session = ref_image.entities['session']
 
         ref_image_nb = ref_image.get_image()
-        ref2tpl_affine = registration(tmpl_image, ref_image_nb)
+
         matrix_path = ref_image.path.replace(
             '_%s.%s'%(ref_image.entities['suffix'],ref_image.entities['extension']),
             '_mod-%s_defacemaskreg.mat'%ref_image.entities['suffix'])
-        np.savetxt(matrix_path, ref2tpl_affine.affine)
-        new_files.append(matrix_path)
+
+        if os.path.exists(matrix_path):
+            logging.info('reusing existing registration matrix')
+            ref2tpl_affine = AffineMap(np.loadtxt(matrix_path))
+        else:
+            logging.info(f"running registration of reference serie: {ref_image.path}")
+            brain_mask = (brain_xtractor.run(ref_image_nb.get_fdata())>.99).astype(np.uint8)
+            brain_mask[:] = scipy.ndimage.morphology.binary_dilation(brain_mask, iterations=4)
+            brain_mask_nb = nb.Nifti1Image(brain_mask, ref_image_nb.affine)
+            ref2tpl_affine = registration(tmpl_image, ref_image_nb, tmpl_image_mask, brain_mask_nb)
+            np.savetxt(matrix_path, ref2tpl_affine.affine)
+            new_files.append(matrix_path)
 
         if args.debug_images:
-            output_debug_images(tmpl_image, ref_image_nb, ref2tpl_affine)
+            output_debug_images(tmpl_image, ref_image, ref2tpl_affine)
 
         series_to_deface = []
         for filters in args.other_bids_filters:
@@ -166,11 +200,16 @@ def main():
                 extension=['nii','nii.gz'],
                 subject=subject, session=session, **filters))
 
+        # unlock before making any change to avoid unwanted save
+        if args.datalad:
+            annex_repo.unlock([serie.path for serie in series_to_deface])
+
         for serie in series_to_deface:
             if args.datalad:
                 if next(annex_repo.get_metadata(serie.path))[1].get('distribution-restrictions') is None:
+                    logging.info(f"skip {serie.path} as there are no distribution restrictions metadata set.")
                     continue
-                datalad.api.unlock(serie.path)
+            logging.info(f"defacing {serie.path}")
 
             serie_nb = serie.get_image()
             warped_mask = warp_mask(tmpl_defacemask, serie_nb, ref2tpl_affine)
@@ -178,8 +217,11 @@ def main():
                 warped_mask_path = serie.path.replace(
                     '_%s'%serie.entities['suffix'],
                     '_mod-%s_defacemask'%serie.entities['suffix'])
-                warped_mask.to_filename(warped_mask_path)
-                new_files.append(warped_mask_path)
+                if os.path.exists(warped_mask_path):
+                    logging.warning(f"{warped_mask_path} already exists : will not overwrite, clean before rerun")
+                else:
+                    warped_mask.to_filename(warped_mask_path)
+                    new_files.append(warped_mask_path)
 
             masked_serie = nb.Nifti1Image(
                 np.asanyarray(serie_nb.dataobj) * np.asanyarray(warped_mask.dataobj),
@@ -190,6 +232,7 @@ def main():
 
 
     if args.datalad and len(modified_files):
+        logging.info('saving files and metadata changes in datalad')
         annex_repo.set_metadata(modified_files, remove={'distribution-restrictions': 'sensitive'})
         datalad.api.save(modified_files + new_files, message='deface %d series/images and update distribution-restrictions'%len(modified_files))
 
