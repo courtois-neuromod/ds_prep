@@ -51,9 +51,10 @@ def match_all_bolds(bids_path, biopac_path):
     sourcedata.mkdir(parents=True, exist_ok=True)
     sessions_list = sorted(bids_path.glob('sub-*/ses-*'))
     for session in sessions_list:
-        session_sourcedata = sourcedata / session.relative_to(bids_path)
+        session_bids_path = session.relative_to(bids_path)
+        session_sourcedata = sourcedata / session_bids_path
         session_sourcedata.mkdir(parents=True, exist_ok=True)
-        sub_ses_prefix = str(session).replace(os.path.sep,'_')
+        sub_ses_prefix = str(session_bids_path).replace(os.path.sep,'_')
         scans = pandas.read_csv(
             session / (sub_ses_prefix+'_scans.tsv'),
             delimiter='\t',
@@ -86,4 +87,4 @@ def match_all_bolds(bids_path, biopac_path):
 if __name__ == "__main__":
     parsed = parse_args()
     logging.basicConfig(level=logging.getLevelName(parsed.debug_level.upper()))
-    match_all_bolds(parsed.bids_path, parsed.biopac_path)
+    match_all_bolds(parsed.bids_path, parsed.biopac_data_path)
