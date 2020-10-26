@@ -99,7 +99,7 @@ def list_sub(root=None, sub=None, ses=None, type='.acq',
 
         # Save the dict under temporary folder at sourcedata
         if save:
-            if os.path.exists(os.path.join(root, 'tmpx')) is False:
+            if os.path.exists(os.path.join(root, 'tmp')) is False:
                 os.mkdir(os.path.join(root, 'tmp'))
             with open(f'{root}tmp/{sub}_ls_{type[1:]}.json',
                       'w', encoding='utf-8') as f:
