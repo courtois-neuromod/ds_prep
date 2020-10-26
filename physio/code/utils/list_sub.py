@@ -12,7 +12,8 @@ import json
 LGR = logging.getLogger(__name__)
 
 
-def list_sub(root=None, sub=None, ses=None, type='.acq', show=False, save=False):
+def list_sub(root=None, sub=None, ses=None, type='.acq',
+             show=False, save=False):
     """
     List a subject's files.
 
