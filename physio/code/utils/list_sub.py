@@ -81,7 +81,9 @@ def list_sub(root=None, sub=None, ses=None, type='.acq', show=False):
 
             # save the file_list as dict item
             ses_runs[exp] = file_list
-
+        # sort dict entries alphabetically
+        ses_runs = {key: value for key, value in
+                    sorted(ses_runs.items(), key=lambda item: int(item[0][-3:]))}
         # display the lists (optional)
         if show:
             for exp in ses_runs:

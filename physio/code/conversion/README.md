@@ -32,3 +32,7 @@ This workflow will be applied to all cneuromod physiological data acquisition, s
 6.  `-heur` : build `heur_movie10.py` to name files appropriately for the task
 
 # Use a CLI to get all info needed
+`python cneuromod/ds_prep/code/utils/list_sub.py -h`
+
+-indir /data/neuromod/DATA/cneuromod/movie10/sourcedata/physio
+-sub sub-01
