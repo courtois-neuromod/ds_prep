@@ -14,11 +14,11 @@ This workflow will be applied to all cneuromod physiological data acquisition, s
 -heur <path/to/heur.py>``
 
 ## How to get this info procedurally
-1.  `-in` : use `list_sub()` in `convert_seg2hdf.py` to get a dictionary of all files in a subject directory with keys representing sessions.
+1.  `-in` : use `list_sub.py` in `utils/` to get a dictionary of all files in a subject directory with keys representing sessions.
 
 2.  `-chtrig` : supposed to be always the same number, i.e. 4 for all cneuromod tasks.
 
-3.  `-ntp` : 
+3.  `-ntp` :
     a. use `_fmri_matches.tsv` in sessions directory to get number of expected runs, as well ``nii.gz`` location.
 
     b. Go to `func/...` dir and get each run's `...bold.json` file.
