@@ -50,7 +50,7 @@ def _get_parser():
     optional.add_argument('-save', '--save-dict',
                           dest='save',
                           help='Specify if you want to save the dictionary',
-                          default=True)
+                          default=False)
     parser._action_groups.append(optional)
 
     return parser

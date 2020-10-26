@@ -13,7 +13,7 @@ LGR = logging.getLogger(__name__)
 
 
 def list_sub(root=None, sub=None, ses=None, type='.acq',
-             show=False, save=True):
+             show=False, save=False):
     """
     List a subject's files.
 
@@ -98,7 +98,7 @@ def list_sub(root=None, sub=None, ses=None, type='.acq',
                 print("list of files for session %s" % exp, ses_runs[exp])
 
         # Save the dict under temporary folder at sourcedata
-        if save:
+        if save is True:
             if os.path.exists(os.path.join(root, 'tmp')) is False:
                 os.mkdir(os.path.join(root, 'tmp'))
             with open(f'{root}tmp/{sub}_ls_{type[1:]}.json',
