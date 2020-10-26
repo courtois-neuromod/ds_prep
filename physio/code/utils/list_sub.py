@@ -1,6 +1,16 @@
 # -*- coding: utf-8 -*-
 # !/usr/bin/env python
+"""CLI for physio utils."""
+
+
 import os
+import logging
+from CLI import _get_parser
+import sys
+
+LGR = logging.getLogger(__name__)
+
+
 def list_sub(root=None, sub=None, ses=None, type='.acq', show=False):
     """
     List a subject's files.
@@ -79,3 +89,14 @@ def list_sub(root=None, sub=None, ses=None, type='.acq', show=False):
 
         # return a dictionary of sessions each containing a list of files
         return ses_runs
+
+#  Get arguments
+
+
+def _main(argv=None):
+    options = _get_parser().parse_args(argv)
+    list_sub(**vars(options))
+
+
+if __name__ == '__main__':
+    _main(sys.argv[1:])

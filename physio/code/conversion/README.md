@@ -30,3 +30,5 @@ This workflow will be applied to all cneuromod physiological data acquisition, s
 5.  `-outdir` : on our servers it is `data/neuromod/DATA/cneuromod/<task-dataset>/` from there, all subjects are listed and phys2bids should save converted files and command line reports.
 
 6.  `-heur` : build `heur_movie10.py` to name files appropriately for the task
+
+# Use a CLI to get all info needed
