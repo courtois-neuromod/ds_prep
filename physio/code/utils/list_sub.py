@@ -7,11 +7,13 @@ import os
 import logging
 from CLI import _get_parser
 import sys
+import json
 
 LGR = logging.getLogger(__name__)
 
 
-def list_sub(root=None, sub=None, ses=None, type='.acq', show=False):
+def list_sub(root=None, sub=None, ses=None, type='.acq',
+             show=False, save=True):
     """
     List a subject's files.
 
@@ -29,6 +31,10 @@ def list_sub(root=None, sub=None, ses=None, type='.acq', show=False):
         session name or number, like "ses-hcptrt1"
     type :
         what file are we looking for. Default is biosignals from biopac
+    show :
+        if you want to print the dictionary
+    save :
+        if you want to save the dictionary in json format
 
     Returns
     -------
@@ -81,13 +87,23 @@ def list_sub(root=None, sub=None, ses=None, type='.acq', show=False):
 
             # save the file_list as dict item
             ses_runs[exp] = file_list
-        # sort dict entries alphabetically
+
+        # sort dict entries numerically with ses ### code
         ses_runs = {key: value for key, value in
-                    sorted(ses_runs.items(), key=lambda item: int(item[0][-3:]))}
+                    sorted(ses_runs.items(),
+                           key=lambda item: int(item[0][-3:]))}
         # display the lists (optional)
         if show:
             for exp in ses_runs:
                 print("list of files for session %s" % exp, ses_runs[exp])
+
+        # Save the dict under temporary folder at sourcedata
+        if save:
+            if os.path.exists(os.path.join(root, 'tmpx')) is False:
+                os.mkdir(os.path.join(root, 'tmp'))
+            with open(f'{root}tmp/{sub}_ls_{type[1:]}.json',
+                      'w', encoding='utf-8') as f:
+                json.dump(ses_runs, f, indent=4)
 
         # return a dictionary of sessions each containing a list of files
         return ses_runs

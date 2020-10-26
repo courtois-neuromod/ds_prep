@@ -45,9 +45,12 @@ def _get_parser():
                           default='.acq')
     optional.add_argument('-show', '--show-dict',
                           dest='show',
-                          type=str,
                           help='Specify if you want to print dictionary',
                           default=False)
+    optional.add_argument('-save', '--save-dict',
+                          dest='save',
+                          help='Specify if you want to save the dictionary',
+                          default=True)
     parser._action_groups.append(optional)
 
     return parser
