@@ -6,7 +6,8 @@ import os
 from pathlib import Path
 # from pandas import DataFrame.to_csv - .to_csv is an attribute of dataframe
 from neurokit2 import read_acqknowledge
-from hdf5 import File
+from pandas import DataFrame, Series
+
 
 
 def batch_parse(root, subject, ses=None, save_path=None):
@@ -25,6 +26,10 @@ def batch_parse(root, subject, ses=None, save_path=None):
         default is None
     save_path: path
         root directory of
+    Returns:
+    --------
+    dirs : dict
+        list_sub dictionary 
     """
     # Check directory
     if os.path.exists(root) is False:
@@ -37,11 +42,12 @@ def batch_parse(root, subject, ses=None, save_path=None):
         raise ValueError("Couldn't find the following directory: ", save_path)
 
     # List the files that have to be parsed
-    files = list_sub(root, subject, ses)
+    dirs = list_sub(root, subject, ses)
 
-    # Main loop iterating through files in each dict key returned by list_sub
-    for exp in files:
-        for file in files[exp]:
+    # Main loop iterating through files in each dict key representing session returned by list_sub
+    # for this loop, exp refers to session's name, avoiding confusion with ses argument
+    for exp in dirs:
+        for file in dirs[exp]:
             # reading acq, resampling at 1000Hz
             bio_df, fs = read_acqknowledge(os.path.join(
                                        root, subject, exp, file))  # resampling
@@ -102,25 +108,32 @@ def batch_parse(root, subject, ses=None, save_path=None):
 
                 # joining path and file name with readable Run index(01 to 0n)
                 sep = '_'
-                name = sep.join([subject, exp, f'Run{idx+1:02}'])
+                name = sep.join([subject, exp, f'task-run{idx+1:02}'])
                 # saving the dataframe under specified dir and file name
-                if os.path.exists(f"{save_path}{subject}/") is False:
+                if os.path.exists(f"{save_path}{subject}") is False:
                     os.mkdir(Path(f"{save_path}{subject}"))
+                    if os.path.exists(f"{save_path}{subject}/{exp}") is False:
+                        os.mkdir(Path(f"{save_path}{subject}/{exp}"))
+                        
                 # write HDF5
-                hf = File(f"{save_path}{subject}/{name}.hdf5", 'w')
-                hf.create_dataset(name, data=run)
-                hf.create_dataset(f'{name}-sampling_rate', data=fs)
-                hf.close()
+                run.to_hdf(f"{save_path}{subject}/{exp}/{name}.h5", key='bio_df')
+                Series(fs).to_hdf(f"{save_path}{subject}/{exp}/{name}.h5", key='sampling_rate')
+                
+                #hf = File(f"{save_path}{subject}/{exp}/{name}.hdf5", 'w')
+                #hf.create_dataset(name, data=run)
+                #hf.create_dataset(f'{name}-sampling_rate', data=fs)
+                #hf.close()
+                
                 # plot the run and save it
-                fig = run.plot(title=name)
-                fig.savefig(f"{save_path}{subject}")
+                fig = run.plot(title=name).get_figure().savefig(f"{save_path}{subject}/{exp}/{name}")
+
                 # notify user
                 print(name, 'in file ', file,
                       '\nin experiment:', exp, 'is parsed.',
                       '\nand saved at', save_path, '| sampling rate is :', fs,
                       '\n', '~'*30)
 
-    return files
+    return dirs
 
 
 def list_sub(root=None, sub=None, ses=None, type='.acq', show=False):
@@ -133,15 +146,16 @@ def list_sub(root=None, sub=None, ses=None, type='.acq', show=False):
 
     Arguments
     ---------
-    root :
+    root : str path
         root directory of dataset, like "home/user/dataset"
-    sub :
+    sub : str BIDS code
         subject number, like "sub-01"
-    ses :
-        session name or number, like "ses-hcptrt1"
-    type :
+    ses : str BIDS code
+        session name or number, like "ses-001"
+    type : str
         what file are we looking for. Default is biosignals from biopac
-
+    show : bool
+        Defaults to False. Else, prints the output dict
     Returns
     -------
     ses_list :

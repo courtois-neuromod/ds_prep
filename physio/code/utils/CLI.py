@@ -55,6 +55,84 @@ def _get_parser():
 
     return parser
 
+def _get_parser2():
+    """
+    Parse command line inputs for this function.
 
+    Returns
+    -------
+    parser.parse_args() : argparse dict
+    Notes
+    -----
+    # Argument parser follow template provided by RalphyZ.
+    # https://stackoverflow.com/a/43456577
+    """
+    parser = argparse.ArgumentParser()
+    required = parser.add_argument_group('Required Argument:')
+
+    required.add_argument('-indir', '--input-directory',
+                          dest='root',
+                          type=str,
+                          help='Specify root directory of dataset',
+                          default=None)
+    required.add_argument('-sub', '--subject',
+                          dest='sub',
+                          type=str,
+                          help='Specify alongside \"-heur\". Code of '
+                               'subject to process.',
+                          default=None)
+
+
+    return parser
+
+
+ 
 if __name__ == '__main__':
     raise RuntimeError('CLI.py should not be run directly')
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+
