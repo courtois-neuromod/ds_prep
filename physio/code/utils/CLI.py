@@ -68,6 +68,7 @@ def _get_parser2():
     # https://stackoverflow.com/a/43456577
     """
     parser = argparse.ArgumentParser()
+    optional = parser._action_groups.pop()
     required = parser.add_argument_group('Required Argument:')
 
     required.add_argument('-indir', '--input-directory',
@@ -81,6 +82,22 @@ def _get_parser2():
                           help='Specify alongside \"-heur\". Code of '
                                'subject to process.',
                           default=None)
+    optional.add_argument('-ses', '--session',
+                          dest='ses',
+                          type=str,
+                          help='Specify alongside \"-heur\". Code of '
+                               'session to process.',
+                          default=None)
+
+    optional.add_argument('-show', '--show-dict',
+                          dest='show',
+                          help='Specify if you want to print dictionary',
+                          default=False)
+    optional.add_argument('-save', '--save-dict',
+                          dest='save',
+                          help='Specify if you want to save the dictionary',
+                          default=False)
+    parser._action_groups.append(optional)
 
 
     return parser

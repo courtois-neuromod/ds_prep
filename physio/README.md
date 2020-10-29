@@ -29,13 +29,13 @@ Let's see what we need to know
 
 2.  `-chtrig` : supposed to be always the same number, i.e. 4 for all cneuromod tasks.
 
-3.  `-ntp` :
+3.  `-ntp` : we'll need to do three things
 
-    a. use `_fmri_matches.tsv` in sessions directory to get number of expected runs, as well ``nii.gz`` location. Use utils to list `.tsv` files.
+    a. use `_fmri_matches.tsv` in each session directory to get number of expected runs, as well ``nii.gz`` location. Use utils to list `.tsv` files.
 
     b. Go to `func/...` dir and get each run's `...bold.json` file.
 
-    c. Get this key `{AcquisitionNumber[-1]}` for each run. This will give us the number of volumes acquired, i.e. the number of trigger timepoints to find in each run.
+    c. Get this key `{time:{samples:{AcquisitionNumber[-1]}` for each run. This will give us the number of volumes acquired, i.e. the number of trigger timepoints to find in each run.
 
 4.  `-tr` : is always the same for functional acquisitions, i.e. 1.49s
 
