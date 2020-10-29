@@ -29,7 +29,7 @@ def batch_parse(root, subject, ses=None, save_path=None):
     Returns:
     --------
     dirs : dict
-        list_sub dictionary 
+        list_sub dictionary
     """
     # Check directory
     if os.path.exists(root) is False:
@@ -44,8 +44,10 @@ def batch_parse(root, subject, ses=None, save_path=None):
     # List the files that have to be parsed
     dirs = list_sub(root, subject, ses)
 
-    # Main loop iterating through files in each dict key representing session returned by list_sub
-    # for this loop, exp refers to session's name, avoiding confusion with ses argument
+    # Main loop iterating through files in each dict key representing session
+    # returned by list_sub
+    # for this loop, exp refers to session's name,
+    # avoiding confusion with ses argument
     for exp in dirs:
         for file in dirs[exp]:
             # reading acq, resampling at 1000Hz
@@ -85,7 +87,8 @@ def batch_parse(root, subject, ses=None, save_path=None):
 
             # Parse  with the given indexes
             # Keep the first segment before scanner is turned on
-            # the first block is always from start to first parse
+            # then, first block is always from first trigger to first parse
+            block0 = bio_df[:start]
             block1 = bio_df[start:parse_list[0][0]]
 
             # runs are runs in the session
@@ -99,33 +102,39 @@ def batch_parse(root, subject, ses=None, save_path=None):
                 else:
                     runs += ([bio_df[parse_list[i][1]:parse_list[1+i][0]]])
 
+            sep = '_'
+            name0 = sep.join([subject, exp, "prep-before-scan"])
+            block0.plot(title=name0).get_figure().savefig(
+                                                     f"{save_path}{subject}/\n"
+                                                     f"{exp}/{name0}")
             # changing channel names
             for idx, run in enumerate(runs):
                 run = run.rename(columns={"PPG100C": 'PPG',
                                           "Custom, HLT100C - A 6": 'RSP',
                                           "GSR-EDA100C-MRI": 'EDA',
-                                          "ECG100C": 'ECG'})
+                                          "ECG100C": 'ECG',
+                                          "TTL": "TRIGGER"})
 
                 # joining path and file name with readable Run index(01 to 0n)
                 sep = '_'
                 name = sep.join([subject, exp, f'task-run{idx+1:02}'])
+
                 # saving the dataframe under specified dir and file name
+                # deal with unexisting paths
                 if os.path.exists(f"{save_path}{subject}") is False:
                     os.mkdir(Path(f"{save_path}{subject}"))
                     if os.path.exists(f"{save_path}{subject}/{exp}") is False:
                         os.mkdir(Path(f"{save_path}{subject}/{exp}"))
-                        
+
                 # write HDF5
-                run.to_hdf(f"{save_path}{subject}/{exp}/{name}.h5", key='bio_df')
-                Series(fs).to_hdf(f"{save_path}{subject}/{exp}/{name}.h5", key='sampling_rate')
-                
-                #hf = File(f"{save_path}{subject}/{exp}/{name}.hdf5", 'w')
-                #hf.create_dataset(name, data=run)
-                #hf.create_dataset(f'{name}-sampling_rate', data=fs)
-                #hf.close()
-                
+                run.to_hdf(f"{save_path}{subject}/\n"
+                           "{exp}/{name}.h5", key='bio_df')
+                Series(fs).to_hdf(f"{save_path}{subject}/\n"
+                                  "{exp}/{name}.h5", key='sampling_rate')
+
                 # plot the run and save it
-                fig = run.plot(title=name).get_figure().savefig(f"{save_path}{subject}/{exp}/{name}")
+                run.plot(title=name).get_figure().savefig(
+                                    f"{save_path}{subject}/{exp}/{name}")
 
                 # notify user
                 print(name, 'in file ', file,
@@ -211,7 +220,7 @@ def list_sub(root=None, sub=None, ses=None, type='.acq', show=False):
         # display the lists (optional)
         if show:
             for exp in ses_runs:
-                print("list of files for session %s" % exp, ses_runs[exp])
+                print(f"list of files for session {exp}: {ses_runs[exp]}")
 
         # return a dictionary of sessions each containing a list of files
         return ses_runs
