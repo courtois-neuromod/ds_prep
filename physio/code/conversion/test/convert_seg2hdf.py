@@ -6,8 +6,7 @@ import os
 from pathlib import Path
 # from pandas import DataFrame.to_csv - .to_csv is an attribute of dataframe
 from neurokit2 import read_acqknowledge
-from pandas import DataFrame, Series
-
+from pandas import Series
 
 
 def batch_parse(root, subject, ses=None, save_path=None):
