@@ -52,6 +52,7 @@ def get_closest_eprime(eprime_files, scan_time):
 
         # Read task_file_path
         with open(eprime_file, 'r', encoding='utf-16-le') as fo:
+            logging.info('Check eprime file: {}'.format(eprime_file))
             initial_tr_marker_found = False
 
             for line in fo:
@@ -134,6 +135,12 @@ def main():
             logging.info('Found {} with {} with diff {}s'.format(task_bold.filename,
                                                                   eprime_file,
                                                                   min_diff))
+            out_tsv_path = task_bold.path.replace('_bold.nii.gz', '_events.tsv')
+            convert_event_file(eprime_file,
+                               ents['task'],
+                               out_tsv_path,
+                               verbose=verbose,
+                               overwrite=overwrite)                               
         elif min_diff < 0:
             logging.info('Eprime was started AFTER MRI')
             logging.info('ERRROR -> No eprime were found with {} {}'.format(task_bold.filename, scan_time))
