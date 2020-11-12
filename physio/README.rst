@@ -34,9 +34,8 @@ Then, researchers can use datetime information to link the appropriate physiolog
 
  (NOTE : *maybe link [match_acq_bids.py] on ds_prep neuromod*)
 
-The File structure needed
+The File structure
 -------------------------
-At this point, what is imperative for ``phy2bids`` users to have in order to process files in batch is a BIDS root containing *n subject* directories (with BIDS compatible neuroimaging files), and also, a *sourcedata* directory.
 
 ::
 
@@ -91,15 +90,19 @@ Getting number of volumes per run
 We can use the path given here (in ``_physio_fmri_matches.tsv``) to access metadata of each run, in each session, for each subject.
 
 * List a specific file type in a subject directory by sessions.
+
     * ``courtois-neuromod/ds_prep/physio/code/utils/list_sub.py``
+
     * you can list both physiological acquisition files and the matches tables, using this utility code.
 
 * Get trigger information for each runs
+
     * ``courtois-neuromod/ds_prep/physio/code/utils/get_info.py``
+
     * you can fetch information from the json files in each session using this utility code.
 
-
-### Protocol
+Protocol
+========
 Use a job.sh script that can :
 a. Use `get_info` to push info needed in a file for each subject `sub-0*_all_ses-runs_info.json`
 b. send a task to a different CPU for each session in a subject's directory.
