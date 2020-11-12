@@ -70,15 +70,15 @@ At this point, what is imperative for ``phy2bids`` users to have in order to pro
 ``sourcedata`` is where raw/uncut physiological acquisition files can live. They are supposed to follow another *n subject* hierarchy that will also contain ``_physio_fmri_matches.tsv`` in each session. These matches table files point to the proper neuroimaging acquisitions.
 
 **Example** :
-+-----------------------------------+-----------------------------------+
-| (f)MRI acquisitions               | physiological acquisitions        |
-+===================================+===================================+
-| path/to/func/                     | path/to/                          |
-| sub-01_ses-008_taskNN_run01.nii.gz| generic_name_datetime.acq         |
-| path/to/func/                     | path/to/                          |
-| sub-01_ses-008_taskNN_run02.nii.gz| generic_name_datetime.acq         |
-| ...                               | ...                               |
-+-----------------------------------+-----------------------------------+
++------------------------------------+------------------------------------+
+| (f)MRI acquisitions                | physiological acquisitions         |
++====================================+====================================+
+| path/to/func/                      | path/to/                           |
+| sub-01_ses-008_taskNN_run01.nii.gz | generic_name_datetime.acq          |
+| path/to/func/                      | path/to/                           |
+| sub-01_ses-008_taskNN_run02.nii.gz | generic_name_datetime.acq          |
+| ...                                | ...                                |
++------------------------------------+------------------------------------+
 
 Getting number of volumes per run
 ---------------------------------
