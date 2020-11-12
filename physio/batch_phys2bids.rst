@@ -70,6 +70,7 @@ At this point, what is imperative for ``phy2bids`` users to have in order to pro
 ``sourcedata`` is where raw/uncut physiological acquisition files can live. They are supposed to follow another *n subject* hierarchy that will also contain ``_physio_fmri_matches.tsv`` in each session. These matches table files point to the proper neuroimaging acquisitions.
 
 **Example** :
+
 +------------------------------------+------------------------------------+
 | (f)MRI acquisitions                | physiological acquisitions         |
 +====================================+====================================+
