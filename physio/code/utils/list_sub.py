@@ -100,11 +100,11 @@ def list_sub(root=None, sub=None, ses=None, type='.acq',
         # Save the dict under temporary folder at sourcedata
         # ERRATUM : change sourcedata for folder where i have write access
         if save:
-            filename = os.path.join(save, 'metadata', f'{sub}_info.json'
+            filename = os.path.join(save, 'metadata', f'{sub}_info.json')
             if os.path.exists(os.path.join(save, 'metadata')) is False:
                 os.mkdir(os.path.join(save, 'metadata'))
 
-            with open(filename,'w', encoding='utf-8') as f:
+            with open(filename, 'w', encoding='utf-8') as f:
                 json.dump(ses_runs, f, indent=4)
 
         # return a dictionary of sessions each containing a list of files
