@@ -76,8 +76,10 @@ At this point, what is imperative for ``phy2bids`` users to have in order to pro
 +====================================+====================================+
 | path/to/func/                      | path/to/                           |
 | sub-01_ses-008_taskNN_run01.nii.gz | generic_name_datetime.acq          |
+|------------------------------------+------------------------------------|
 | path/to/func/                      | path/to/                           |
 | sub-01_ses-008_taskNN_run02.nii.gz | generic_name_datetime.acq          |
+|------------------------------------+------------------------------------|
 | ...                                | ...                                |
 +------------------------------------+------------------------------------+
 
