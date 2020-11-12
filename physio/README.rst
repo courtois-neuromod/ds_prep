@@ -1,25 +1,27 @@
-Using ``phys2bids`` for massive Amount of data
-############################################
-We have seen that ``phys2bids`` could automatically cut  parts of the physiological signals that we are interested in (i.e. where the trigger pulse indicates neuroimaging acquisitions). We have also seen that this workflow could be applied to "multi-run" neuroimaging acquisition sessions.
+Physiological data preparation for cneuromod scanning
+########################################################
+This repo is a blueprint for the full data preparation pipeline. Two main steps are considered :
+1.  The BIDS compatible conversion and segmentation of raw signals
+2.  The processing of all biosignals (i.e. noise removal and extraction of physiological activity)
 
- Now, let us outline how to apply the workflow to multiple physiological acquisition files procedurally.
+ 1. Converting acqknowledge files to BIDS using `phys2bids`
+============================================================
+`phys2bids` allows us to cut physiological signals recorded during MRI acquisition using the trigger pulse that is sent to it. These segmented `runs` can then be saved in a compressed format dictated from BIDS conventions.
 
- The goal of such procedure is to reduce the time-consuming steps required to match (f)MRI acquisitions with their proper physiological acquisition.
-
-.. note::
-      This is time consuming because, as we have seen, ``phys2bids`` has to know the number of trigger timepoints in order to deal with multi-run acquisitions. Of course, we do not want to manually input this parameter for each session.
-
-.. warning::
-    We still have to implement smarter solutions that require less patch working (maybe physiopy will have a parent workflow that calls all its tools, making a full physiological data preparation pipeline; help us !).
-
+This workflow will be applied to all cneuromod physiological data acquisition, starting with movie10 data (under `cneuromod/movie10/sourcedata/physio/`).
 
 ``phys2bids``'s Command Line Interface parameters
 ----------------------------------------------------
 * `-in` : *name of input file* - easy to find, but still have to get a list
+
 * `-chtrig` : *# of trigger channel* - if recording device is stable, no change
+
 * `-ntp` : *# of trigger timepoints per run* - tricky; we have to look for it in the metadata (`_bold.json`, `_<sequence>.json` of each neuroimaging acquisition run)
+
 * `-tr` : *length of Repetition Time in seconds* - preferably, we want to batch process sessions that contained the same MRI sequence
+
 * `-outdir` : *path inside BIDS dataset* - BIDS is still liberal to that matter. Do you want your BIDS-compatible raw segments (taskNN_run01.tsv.gz) to live under sourcedata or directly beside your BIDS compatible raw MRI data - or clean MRI data ?
+
 * `-heur` :
 
 Fetching the information we need from BIDS dataset
@@ -95,3 +97,11 @@ We can use the path given here (in ``_physio_fmri_matches.tsv``) to access metad
 * Get trigger information for each runs
     * ``courtois-neuromod/ds_prep/physio/code/utils/get_info.py``
     * you can fetch information from the json files in each session using this utility code.
+
+
+### Protocol
+Use a job.sh script that can :
+a. Use `get_info` to push info needed in a file for each subject `sub-0*_all_ses-runs_info.json`
+b. send a task to a different CPU for each session in a subject's directory.
+
+# 2. Cleaning
