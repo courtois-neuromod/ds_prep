@@ -36,6 +36,6 @@ if [ -n "$remote" ] ; then
 
   #push the derivatives to git
   datalad publish -d $derivative_path --to origin
-else ;
+else 
   datalad create -d $bids_path $derivative_path
 fi
