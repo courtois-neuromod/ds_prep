@@ -15,7 +15,7 @@ SLURM_JOB_DIR = '.slurm'
 SMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'24:00:00', 'omp_nthreads': 8}
 FMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'12:00:00', 'omp_nthreads': 8}
 
-FMRIPREP_DEFAULT_VERSION = "fmriprep-20.2.0rc0"
+FMRIPREP_DEFAULT_VERSION = "fmriprep-20.2.1lts"
 FMRIPREP_DEFAULT_SINGULARITY_PATH = os.path.abspath(os.path.join(script_dir, f"../../containers/{FMRIPREP_VERSION}.simg"))
 BIDS_FILTERS_FILE = os.path.join(script_dir, 'bids_filters.json')
 TEMPLATEFLOW_HOME = os.path.join(
