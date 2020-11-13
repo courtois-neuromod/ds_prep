@@ -60,8 +60,8 @@ def match_all_bolds(bids_path, biopac_path):
             delimiter='\t',
             parse_dates=['acq_time'])
         list_matches_out = session_sourcedata / (sub_ses_prefix + '_physio_fmri_matches.tsv')
-        #if list_matches_out.exists():
-        #    continue
+        if list_matches_out.exists():
+            continue
         matches = []
         for idx, scan in scans.iterrows():
             if '_bold.nii.gz' in scan.filename:
