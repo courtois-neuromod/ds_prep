@@ -129,7 +129,7 @@ def write_func_job(layout, subject, session, args):
         'derivatives',
          args.derivatives_name,
         )
-    derivatives_path = os.path.join(layout.root, 'derivatives', args.derivatives_name)
+    derivatives_path = os.path.join('/data', 'derivatives', args.derivatives_name)
 
     bold_runs = layout.get(
         subject=subject,
