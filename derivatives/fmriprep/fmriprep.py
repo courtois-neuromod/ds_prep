@@ -127,7 +127,7 @@ def write_func_job(layout, subject, session, args):
         os.path.dirname(layout.root),
         'anat',
         'derivatives',
-        FMRIPREP_VERSION,
+         args.derivatives_name,
         )
     derivatives_path = os.path.join(layout.root, 'derivatives', args.derivatives_name)
 
