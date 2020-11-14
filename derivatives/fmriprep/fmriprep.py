@@ -79,7 +79,7 @@ def write_anat_job(layout, subject, args):
         SLURM_JOB_DIR,
         f"{job_specs['jobname']}.sh")
 
-    derivatives_path = os.path.join("/data", 'derivatives', FMRIPREP_VERSION)
+    derivatives_path = os.path.join("/data", 'derivatives', args.derivatives_name)
 
 
     # use json load/dump to copy filters (and validate json in the meantime)
@@ -127,9 +127,9 @@ def write_func_job(layout, subject, session, args):
         os.path.dirname(layout.root),
         'anat',
         'derivatives',
-        FMRIPREP_VERSION,
+         args.derivatives_name,
         )
-    derivatives_path = os.path.join(layout.root, 'derivatives', FMRIPREP_VERSION)
+    derivatives_path = os.path.join(layout.root, 'derivatives', args.derivatives_name)
 
     bold_runs = layout.get(
         subject=subject,
@@ -235,6 +235,10 @@ def parse_args():
         'bids_path',
         type=pathlib.Path,
         help='BIDS folder to run smriprep on.')
+    parser.add_argument(
+        'derivatives_name',
+        type=pathlib.Path,
+        help='name of the output folder in derivatives.')
     parser.add_argument(
         'preproc',
         help='anat or func')
