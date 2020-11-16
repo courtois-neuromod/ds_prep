@@ -23,7 +23,7 @@ TEMPLATEFLOW_HOME = os.path.join(
         'SCRATCH',
         os.path.join(os.environ['HOME'],'.cache')),
     'templateflow')
-OUTPUT_TEMPLATES = ['MNI152NLin2009cAsym']
+OUTPUT_TEMPLATES = ['MNI152NLin2009cAsym','MNI152NLin6Asym']
 SINGULARITY_CMD_BASE = " ".join([
     "singularity run",
     "--cleanenv",
@@ -331,7 +331,7 @@ def main():
     # prefectch templateflow templates
     os.environ['TEMPLATEFLOW_HOME'] = TEMPLATEFLOW_HOME
     import templateflow.api as tf_api
-    tf_api.get(OUTPUT_TEMPLATES+['OASIS30ANTs'])
+    tf_api.get(OUTPUT_TEMPLATES+['OASIS30ANTs','fsLR','fsaverage'])
 
     if args.preproc == 'anat':
         run_smriprep(layout, args)
