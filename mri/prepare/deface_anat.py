@@ -179,6 +179,7 @@ def main():
         subject = ref_image.entities['subject']
         session = ref_image.entities['session']
 
+        datalad.api.get(ref_image.path)
         ref_image_nb = ref_image.get_image()
 
         matrix_path = ref_image.path.replace(
@@ -217,6 +218,7 @@ def main():
                     continue
             logging.info(f"defacing {serie.path}")
 
+            datalad.api.get(serie.path)
             serie_nb = serie.get_image()
             warped_mask = warp_mask(tmpl_defacemask, serie_nb, ref2tpl_affine)
             if args.save_all_masks or serie == ref_image:
