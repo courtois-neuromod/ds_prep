@@ -66,13 +66,13 @@ def get_info(root=None, sub=None, ses=None, show=True, save=None):
             # troubleshoot unexisting paths
             if os.path.exists(f"{root}/{filename[:-7]}.json") is False:
                 try:
-                    if os.path.exists(f"{root}/{filename[:-11]}\n"
+                    if os.path.exists(f"{root}/{filename[:-11]}"
                                       "run-01_bold.json") is False:
-                        with open(f"{root}/{filename[:-11]}\n"
+                        with open(f"{root}/{filename[:-11]}"
                                   "run-02_bold.json") as f:
                             bold = json.load(f)
                     else:
-                        with open(f"{root}/{filename[:-11]}\n"
+                        with open(f"{root}/{filename[:-11]}"
                                   "run-01_bold.json") as f:
                             bold = json.load(f)
                 # if there is no way to load the file, notify user
