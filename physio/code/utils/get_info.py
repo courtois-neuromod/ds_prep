@@ -93,8 +93,8 @@ def get_info(root=None, sub=None, ses=None, show=True, save=None):
             idx += 1
 
         # push all info in run in dict
-        nb_expected_runs[exp] = nb_expected_volumes_run
-        nb_expected_runs[exp]['expect_runs'] = len(df)
+        nb_expected_runs[exp]['volumes_runs'] = nb_expected_volumes_run
+        nb_expected_runs[exp]['expected_runs'] = len(df)
         nb_expected_runs[exp]['processed_runs'] = idx-1
         # strip part of the name
         nb_expected_runs[exp]['in_file'] = str(df.iloc[[0], [1]]
