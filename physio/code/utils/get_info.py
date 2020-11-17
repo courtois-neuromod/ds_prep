@@ -107,7 +107,7 @@ def get_info(root=None, sub=None, ses=None, show=True, save=None):
         if os.path.exists(f"{save}{sub}") is False:
             os.mkdir(f"{save}{sub}")
         with open(f"{save}{sub}/{sub}_volumes_all-ses-runs.json", 'w') as fp:
-            json.dump(nb_expected_runs, fp)
+            json.dump(json.dumps(nb_expected_runs, indent=4), fp)
     return nb_expected_runs
 
 
