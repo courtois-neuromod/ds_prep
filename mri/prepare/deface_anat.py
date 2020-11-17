@@ -35,6 +35,10 @@ def parse_args():
         help='a space delimited list of participant identifiers or a single '
              'identifier (the sub- prefix can be removed)')
     parser.add_argument(
+        '--session-label', action='store', nargs='+',
+        help='a space delimited list of sessions identifiers or a single '
+             'identifier (the ses- prefix can be removed)')
+    parser.add_argument(
         '--force-reindex', action='store_true',
         help='Force pyBIDS reset_database and reindexing')
     parser.add_argument(
@@ -150,8 +154,10 @@ def main():
         annex_repo = AnnexRepo(args.bids_path)
 
     subject_list = args.participant_label if args.participant_label else bids.layout.Query.ANY
+    session_list = args.session_label if args.session_label else bids.layout.Query.ANY
     deface_ref_images = layout.get(
         subject=subject_list,
+        session=session_list,
         **args.ref_bids_filters,
         extension=['nii','nii.gz'])
 
@@ -173,6 +179,7 @@ def main():
         subject = ref_image.entities['subject']
         session = ref_image.entities['session']
 
+        datalad.api.get(ref_image.path)
         ref_image_nb = ref_image.get_image()
 
         matrix_path = ref_image.path.replace(
@@ -211,6 +218,7 @@ def main():
                     continue
             logging.info(f"defacing {serie.path}")
 
+            datalad.api.get(serie.path)
             serie_nb = serie.get_image()
             warped_mask = warp_mask(tmpl_defacemask, serie_nb, ref2tpl_affine)
             if args.save_all_masks or serie == ref_image:
