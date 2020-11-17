@@ -55,6 +55,7 @@ def _get_parser():
 
     return parser
 
+
 def _get_parser2():
     """
     Parse command line inputs for this function.
@@ -99,57 +100,8 @@ def _get_parser2():
                           default=False)
     parser._action_groups.append(optional)
 
-
     return parser
 
 
- 
 if __name__ == '__main__':
     raise RuntimeError('CLI.py should not be run directly')
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
-
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
-
- 
-
