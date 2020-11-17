@@ -52,7 +52,7 @@ def get_info(root=None, sub=None, ses=None, show=True, save=None):
 
     # iterate through sessions and get _matches.tsv with list_sub dict
     for exp in ses_runs_matches:
-        df = read_csv(f"{root}/sourcedata/physio/{sub}/{exp}/\n"
+        df = read_csv(f"{root}/sourcedata/physio/{sub}/{exp}/"
                       f"{ses_runs_matches[exp][0]}", sep='\t')  # first item
 
         # initialize some info we need
