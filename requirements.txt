@@ -1,3 +1,4 @@
 -e git+https://github.com/dPys/deepbrain.git
 -e git+git@github.com:bpinsard/dipy.git@testing
 pybids>=0.10.2
+phys2bids>=2.2.3
