@@ -4,7 +4,7 @@ This repo is a blueprint for the full data preparation pipeline. Two main steps 
 1.  The BIDS compatible conversion and segmentation of raw signals
 2.  The processing of all biosignals (i.e. noise removal and extraction of physiological activity)
 
- 1. Converting acqknowledge files to BIDS using `phys2bids`
+1. Converting acqknowledge files to BIDS using `phys2bids`
 ============================================================
 `phys2bids` allows us to cut physiological signals recorded during MRI acquisition using the trigger pulse that is sent to it. These segmented `runs` can then be saved in a compressed format dictated from BIDS conventions.
 
@@ -72,16 +72,20 @@ The File structure
 
 **Example** :
 
+
 +------------------------------------+------------------------------------+
 | (f)MRI acquisitions                | physiological acquisitions         |
 +====================================+====================================+
 | path/to/func/                      | path/to/                           |
 | sub-01_ses-008_taskNN_run01.nii.gz | generic_name_datetime.acq          |
+|                                    |                                    |
 |------------------------------------+------------------------------------|
-| path/to/func/                      | path/to/                           |
+|path/to/func/                       | path/to/                           |
 | sub-01_ses-008_taskNN_run02.nii.gz | generic_name_datetime.acq          |
+|                                    |                                    |
 |------------------------------------+------------------------------------|
 | ...                                | ...                                |
+|                                    |                                    |
 +------------------------------------+------------------------------------+
 
 
@@ -107,4 +111,5 @@ Use a job.sh script that can :
 a. Use `get_info` to push info needed in a file for each subject `sub-0*_all_ses-runs_info.json`
 b. send a task to a different CPU for each session in a subject's directory.
 
-# 2. Cleaning
+2. Cleaning
+============
