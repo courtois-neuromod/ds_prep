@@ -28,7 +28,7 @@ Fetching the information we need from BIDS dataset
 ==================================================
 The information we need to fetch is essentially the *number of volumes* in each run, and for that : we need to link neuroimaging and physiological acquisitions
 
-``phys2bids`` is meant to be used in conjunction with other of the BIDS ecosystem. That is, ``phys2bids`` workflow relies on the metadata given by other BIDS processes. For instance, researchers may use `dicom2bids <http://nipy.org/workshops/2017-03-boston/lectures/bids-heudiconv/#1>`_ to convert their neuroimaging data to BIDS format.
+``phys2bids`` is meant to be used in conjunction with other utilities in the BIDS  ecosystem. That is, ``phys2bids`` multirun workflow relies on the metadata given by other BIDS processes. For instance, researchers may use `dicom2bids <http://nipy.org/workshops/2017-03-boston/lectures/bids-heudiconv/#1>`_ to convert their neuroimaging data to BIDS format.
 
 Then, researchers can use datetime information to link the appropriate physiological acquisition files with a specific neuroimaging acquisition. There are actually a number of ways to work this out, and it depends on the researcher's storage organization.
 
