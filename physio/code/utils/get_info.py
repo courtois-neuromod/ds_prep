@@ -57,7 +57,7 @@ def get_info(root=None, sub=None, ses=None, show=True, save=None):
 
         # initialize some info we need
         idx = 1
-        nb_expected_volumes_run = {}
+        nb_expected_volumes_run = []
         # get _bold.json filename in the matches.tsv we just read
         for filename in df.iloc[:, 0]:
             # strip part of root path
@@ -85,15 +85,13 @@ def get_info(root=None, sub=None, ses=None, show=True, save=None):
                 with open(f"{root}/{filename[:-7]}.json") as f:
                     bold = json.load(f)
             # we want to GET THE NB OF VOLUMES
-            nb_expected_volumes_run[f'run-{idx:02}'
-                                    ] = bold["time"
-                                             ]["samples"
-                                               ]["AcquisitionNumber"][-1]
+            nb_expected_volumes_run += bold["time"]["samples"
+                                                    ]["AcquisitionNumber"][-1]
             # not super elegant but does the trick - counts the nb of runs/ses
             idx += 1
 
         # push all info in run in dict
-        nb_expected_runs[exp] = nb_expected_volumes_run
+        nb_expected_runs[exp]['volumes'] = nb_expected_volumes_run
         nb_expected_runs[exp]['expect_runs'] = len(df)
         nb_expected_runs[exp]['processed_runs'] = idx-1
         # strip part of the name
