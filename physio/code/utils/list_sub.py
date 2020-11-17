@@ -23,17 +23,17 @@ def list_sub(root=None, sub=None, ses=None, type='.acq',
 
     Arguments
     ---------
-    root :
+    root : PATH
         root directory of dataset, like "home/user/dataset"
-    sub :
+    sub : str
         subject number, like "sub-01"
-    ses :
+    ses :  str
         session name or number, like "ses-hcptrt1"
-    type :
+    type : str of file type
         what file are we looking for. Default is biosignals from biopac
-    show :
+    show : bool
         if you want to print the dictionary
-    save :
+    save : PATH
         if you want to save the dictionary in json format
 
     Returns
@@ -99,13 +99,13 @@ def list_sub(root=None, sub=None, ses=None, type='.acq',
 
         # Save the dict under temporary folder at sourcedata
         # ERRATUM : change sourcedata for folder where i have write access
-       # if save:
-        #    filename = os.path.join(root, 'tmp', f'{sub}_info.json'
-         #   if os.path.exists(os.path.join(root, 'tmp')) is False:
-          #      os.mkdir(os.path.join(root, 'tmp'))
+        if save:
+            filename = os.path.join(save, 'metadata', f'{sub}_info.json')
+            if os.path.exists(os.path.join(save, 'metadata')) is False:
+                os.mkdir(os.path.join(save, 'metadata'))
 
-           # with open(filename,'w', encoding='utf-8') as f:
-            #    json.dump(ses_runs, f, indent=4)
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(ses_runs, f, indent=4)
 
         # return a dictionary of sessions each containing a list of files
         return ses_runs
