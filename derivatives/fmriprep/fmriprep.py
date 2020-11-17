@@ -15,15 +15,15 @@ SLURM_JOB_DIR = '.slurm'
 SMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'24:00:00', 'omp_nthreads': 8}
 FMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'12:00:00', 'omp_nthreads': 8}
 
-FMRIPREP_VERSION = "fmriprep-20.2.0rc0"
-FMRIPREP_SINGULARITY_PATH = os.path.abspath(os.path.join(script_dir, f"../../containers/{FMRIPREP_VERSION}.simg"))
+FMRIPREP_DEFAULT_VERSION = "fmriprep-20.2.1lts"
+FMRIPREP_DEFAULT_SINGULARITY_PATH = os.path.abspath(os.path.join(script_dir, f"../../containers/{FMRIPREP_DEFAULT_VERSION}.simg"))
 BIDS_FILTERS_FILE = os.path.join(script_dir, 'bids_filters.json')
 TEMPLATEFLOW_HOME = os.path.join(
     os.environ.get(
         'SCRATCH',
         os.path.join(os.environ['HOME'],'.cache')),
     'templateflow')
-OUTPUT_TEMPLATES = ['MNI152NLin2009cAsym']
+OUTPUT_TEMPLATES = ['MNI152NLin2009cAsym','MNI152NLin6Asym']
 SINGULARITY_CMD_BASE = " ".join([
     "singularity run",
     "--cleanenv",
@@ -79,7 +79,7 @@ def write_anat_job(layout, subject, args):
         SLURM_JOB_DIR,
         f"{job_specs['jobname']}.sh")
 
-    derivatives_path = os.path.join("/data", 'derivatives', FMRIPREP_VERSION)
+    derivatives_path = os.path.join("/data", 'derivatives', args.derivatives_name)
 
 
     # use json load/dump to copy filters (and validate json in the meantime)
@@ -90,14 +90,16 @@ def write_anat_job(layout, subject, args):
     with open(os.path.join(layout.root,bids_filters_path), 'w') as f:
         json.dump(bids_filters, f)
 
-    pybids_cache_path = os.path.join(layout.root, PYBIDS_CACHE_PATH)
+    pybids_cache_path = os.path.join('/data', PYBIDS_CACHE_PATH)
+
+    fmriprep_singularity_path = args.container or FMRIPREP_DEFAULT_SINGULARITY_PATH
 
     with open(job_path, 'w') as f:
         f.write(slurm_preamble.format(**job_specs))
         f.write(" ".join([
             SINGULARITY_CMD_BASE,
             f"-B {layout.root}:/data",
-            FMRIPREP_SINGULARITY_PATH,
+            fmriprep_singularity_path,
             "-w /work",
             f"--participant-label {subject}",
             "--anat-only",
@@ -125,9 +127,9 @@ def write_func_job(layout, subject, session, args):
         os.path.dirname(layout.root),
         'anat',
         'derivatives',
-        FMRIPREP_VERSION,
+         args.derivatives_name,
         )
-    derivatives_path = os.path.join(layout.root, 'derivatives', FMRIPREP_VERSION)
+    derivatives_path = os.path.join('/data', 'derivatives', args.derivatives_name)
 
     bold_runs = layout.get(
         subject=subject,
@@ -179,7 +181,7 @@ def write_func_job(layout, subject, session, args):
         SLURM_JOB_DIR,
         f"{job_specs['jobname']}_bids_filters.json")
 
-    pybids_cache_path = os.path.join(layout.root, PYBIDS_CACHE_PATH)
+    pybids_cache_path = os.path.join('/data', PYBIDS_CACHE_PATH)
 
     # filter for session
     bids_filters = json.load(open(BIDS_FILTERS_FILE))
@@ -187,13 +189,15 @@ def write_func_job(layout, subject, session, args):
     with open(os.path.join(layout.root, bids_filters_path), 'w') as f:
         json.dump(bids_filters, f)
 
+    fmriprep_singularity_path = args.container or FMRIPREP_DEFAULT_SINGULARITY_PATH
+
     with open(job_path, 'w') as f:
         f.write(slurm_preamble.format(**job_specs))
         f.write(" ".join([
             SINGULARITY_CMD_BASE,
             f"-B {layout.root}:/data",
             f"-B {anat_path}:/anat",
-            FMRIPREP_SINGULARITY_PATH,
+            fmriprep_singularity_path,
             "-w /work",
             f"--participant-label {subject}",
             "--anat-derivatives /anat/fmriprep",
@@ -231,6 +235,10 @@ def parse_args():
         'bids_path',
         type=pathlib.Path,
         help='BIDS folder to run smriprep on.')
+    parser.add_argument(
+        'derivatives_name',
+        type=pathlib.Path,
+        help='name of the output folder in derivatives.')
     parser.add_argument(
         'preproc',
         help='anat or func')
@@ -323,7 +331,7 @@ def main():
     # prefectch templateflow templates
     os.environ['TEMPLATEFLOW_HOME'] = TEMPLATEFLOW_HOME
     import templateflow.api as tf_api
-    tf_api.get(OUTPUT_TEMPLATES+['OASIS30ANTs'])
+    tf_api.get(OUTPUT_TEMPLATES+['OASIS30ANTs','fsLR','fsaverage'])
 
     if args.preproc == 'anat':
         run_smriprep(layout, args)
