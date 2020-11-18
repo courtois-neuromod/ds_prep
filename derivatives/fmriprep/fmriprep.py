@@ -16,7 +16,7 @@ SMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'24:00:00', 'omp_nthread
 FMRIPREP_REQ = {'cpus': 16, 'mem_per_cpu': 4096, 'time':'12:00:00', 'omp_nthreads': 8}
 
 FMRIPREP_DEFAULT_VERSION = "fmriprep-20.2.1lts"
-FMRIPREP_DEFAULT_SINGULARITY_PATH = os.path.abspath(os.path.join(script_dir, f"../../containers/{FMRIPREP_DEFAULT_VERSION}.simg"))
+FMRIPREP_DEFAULT_SINGULARITY_PATH = os.path.abspath(os.path.join(script_dir, f"../../containers/{FMRIPREP_DEFAULT_VERSION}.sif"))
 BIDS_FILTERS_FILE = os.path.join(script_dir, 'bids_filters.json')
 TEMPLATEFLOW_HOME = os.path.join(
     os.environ.get(
@@ -79,7 +79,7 @@ def write_anat_job(layout, subject, args):
         SLURM_JOB_DIR,
         f"{job_specs['jobname']}.sh")
 
-    derivatives_path = os.path.join("/data", 'derivatives', args.derivatives_name)
+    derivatives_path = os.path.join(layout.root, 'derivatives', args.derivatives_name)
 
 
     # use json load/dump to copy filters (and validate json in the meantime)
@@ -90,7 +90,7 @@ def write_anat_job(layout, subject, args):
     with open(os.path.join(layout.root,bids_filters_path), 'w') as f:
         json.dump(bids_filters, f)
 
-    pybids_cache_path = os.path.join('/data', PYBIDS_CACHE_PATH)
+    pybids_cache_path = os.path.join(layout.root, PYBIDS_CACHE_PATH)
 
     fmriprep_singularity_path = args.container or FMRIPREP_DEFAULT_SINGULARITY_PATH
 
@@ -98,7 +98,7 @@ def write_anat_job(layout, subject, args):
         f.write(slurm_preamble.format(**job_specs))
         f.write(" ".join([
             SINGULARITY_CMD_BASE,
-            f"-B {layout.root}:/data",
+            f"-B {layout.root}:{layout.root}",
             fmriprep_singularity_path,
             "-w /work",
             f"--participant-label {subject}",
@@ -112,7 +112,7 @@ def write_anat_job(layout, subject, args):
             f"--omp-nthreads {job_specs['omp_nthreads']}",
             f"--nprocs {job_specs['cpus']}",
             f"--mem_mb {job_specs['mem_per_cpu']*job_specs['cpus']}",
-            "/data",
+            layout.root,
             derivatives_path,
             "participant",
             "\n"]))
@@ -129,7 +129,7 @@ def write_func_job(layout, subject, session, args):
         'derivatives',
          args.derivatives_name,
         )
-    derivatives_path = os.path.join('/data', 'derivatives', args.derivatives_name)
+    derivatives_path = os.path.join(layout.root, 'derivatives', args.derivatives_name)
 
     bold_runs = layout.get(
         subject=subject,
@@ -181,7 +181,7 @@ def write_func_job(layout, subject, session, args):
         SLURM_JOB_DIR,
         f"{job_specs['jobname']}_bids_filters.json")
 
-    pybids_cache_path = os.path.join('/data', PYBIDS_CACHE_PATH)
+    pybids_cache_path = os.path.join(layout.root, PYBIDS_CACHE_PATH)
 
     # filter for session
     bids_filters = json.load(open(BIDS_FILTERS_FILE))
@@ -195,7 +195,7 @@ def write_func_job(layout, subject, session, args):
         f.write(slurm_preamble.format(**job_specs))
         f.write(" ".join([
             SINGULARITY_CMD_BASE,
-            f"-B {layout.root}:/data",
+            f"-B {layout.root}:{layout.root}",
             f"-B {anat_path}:/anat",
             fmriprep_singularity_path,
             "-w /work",
@@ -216,7 +216,7 @@ def write_func_job(layout, subject, session, args):
             f"--mem_mb {job_specs['mem_per_cpu']*job_specs['cpus']}",
              # monitor resources to design a heuristic for runtime/cpu/ram of func data
             "--resource-monitor",
-            "/data",
+            layout.root,
             derivatives_path,
             "participant",
             "\n"]))
