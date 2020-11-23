@@ -68,7 +68,7 @@ def write_job_footer(fd, jobname):
     fd.write(f"if [ $fmriprep_exitcode -ne 0 ] ; then cp -R $SLURM_TMPDIR /scratch/{os.environ['USER']}/{jobname}.workdir ; fi \n")
     fd.write("exit $fmriprep_exitcode \n")
 
-def write_anat_job(layout, subject, args):
+def write_fmriprep_job(layout, subject, args, anat_only=True):
     job_specs = dict(
         jobname = f"smriprep_sub-{subject}",
         email=args.email,
@@ -102,7 +102,7 @@ def write_anat_job(layout, subject, args):
             fmriprep_singularity_path,
             "-w /work",
             f"--participant-label {subject}",
-            "--anat-only",
+            "--anat-only" if anat_only else '',
             f"--bids-database-dir {pybids_cache_path}",
             f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
             "--output-spaces", " ".join(OUTPUT_TEMPLATES),
@@ -118,7 +118,6 @@ def write_anat_job(layout, subject, args):
             "\n"]))
         write_job_footer(f, job_specs['jobname'])
     return job_path
-
 
 def write_func_job(layout, subject, session, args):
     outputs_exist = False
@@ -264,19 +263,7 @@ def parse_args():
         help='Generate scripts, do not submit SLURM jobs, for testing.')
     return parser.parse_args()
 
-def run_smriprep(layout, args):
-
-    subjects = args.participant_label
-    if not subjects:
-        subjects = layout.get_subjects()
-
-    for subject in subjects:
-        #if TODO: check if derivative already exists for that subject
-        job_path = write_anat_job(layout, subject, args)
-        if not args.no_submit:
-            submit_slurm_job(job_path)
-
-def run_fmriprep(layout, args):
+def run_fmriprep(layout, args, pipe='all'):
 
     subjects = args.participant_label
     if not subjects:
@@ -287,14 +274,20 @@ def run_fmriprep(layout, args):
             sessions = args.session_label
         else:
             sessions = layout.get_sessions(subject=subject)
-        for session in sessions:
-            #if TODO: check if derivative already exists for that subject
-            job_path, outputs_exist = write_func_job(layout, subject, session, args)
-            if outputs_exist:
-                print(f"all output already exists for sub-{subject} ses-{session}, not rerunning")
-                continue
-            if not args.no_submit:
-                submit_slurm_job(job_path)
+
+        if pipe == 'func':
+            for session in sessions:
+                #if TODO: check if derivative already exists for that subject
+                job_path, outputs_exist = write_func_job(layout, subject, session, args)
+                if outputs_exist:
+                    print(f"all output already exists for sub-{subject} ses-{session}, not rerunning")
+                    continue
+                yield job_path
+        elif pipe == 'anat':
+            yield write_fmriprep_job(layout, subject, args, anat_only=True)
+        elif pipe == 'all':
+            yield write_fmriprep_job(layout, subject, args, anat_only=False)
+
 
 def main():
 
@@ -333,10 +326,9 @@ def main():
     import templateflow.api as tf_api
     tf_api.get(OUTPUT_TEMPLATES+['OASIS30ANTs','fsLR','fsaverage'])
 
-    if args.preproc == 'anat':
-        run_smriprep(layout, args)
-    elif args.preproc =='func':
-        run_fmriprep(layout, args)
+    for job_file in run_fmriprep(layout, args, args.preproc):
+        if not args.no_submit:
+            submit_slurm_job(job_file)
 
 if __name__ == "__main__":
     main()
