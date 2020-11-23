@@ -25,8 +25,6 @@ if [ -n "$remote" ] ; then
 
   pushd $derivative_path
 
-  datalad save -m 'add default gitattributes' .gitattributes
-
   # configure s3 bucket
   bucket_name="cneuromod."${ds_name}".derivatives."$derivative
   init_remote_s3 $bucket_name
@@ -36,6 +34,9 @@ if [ -n "$remote" ] ; then
 
   #push the derivatives to git
   datalad publish -d $derivative_path --to origin
-else 
+else
   datalad create -d $bids_path $derivative_path
 fi
+
+cp ${BASH_SOURCE%/*}/.gitattributes_default $derivative_path/.gitattributes
+datalad save -m 'add default gitattributes' .gitattributes
