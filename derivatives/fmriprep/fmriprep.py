@@ -84,10 +84,11 @@ def write_anat_job(layout, subject, args):
 
     # use json load/dump to copy filters (and validate json in the meantime)
     bids_filters_path = os.path.join(
+        layout.root,
         SLURM_JOB_DIR,
         "bids_filters.json")
     bids_filters = json.load(open(BIDS_FILTERS_FILE))
-    with open(os.path.join(layout.root,bids_filters_path), 'w') as f:
+    with open(os.path.join(layout.root, bids_filters_path), 'w') as f:
         json.dump(bids_filters, f)
 
     pybids_cache_path = os.path.join(layout.root, PYBIDS_CACHE_PATH)
@@ -104,7 +105,7 @@ def write_anat_job(layout, subject, args):
             f"--participant-label {subject}",
             "--anat-only",
             f"--bids-database-dir {pybids_cache_path}",
-            f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
+            f"--bids-filter-file {bids_filters_path}",
             "--output-spaces", " ".join(OUTPUT_TEMPLATES),
             "--cifti-output 91k",
             "--skip_bids_validation",
@@ -178,6 +179,7 @@ def write_func_job(layout, subject, session, args):
         SLURM_JOB_DIR,
         f"{job_specs['jobname']}.sh")
     bids_filters_path = os.path.join(
+        layout.root,
         SLURM_JOB_DIR,
         f"{job_specs['jobname']}_bids_filters.json")
 
@@ -186,7 +188,7 @@ def write_func_job(layout, subject, session, args):
     # filter for session
     bids_filters = json.load(open(BIDS_FILTERS_FILE))
     bids_filters['bold'].update({'session': session})
-    with open(os.path.join(layout.root, bids_filters_path), 'w') as f:
+    with open(bids_filters_path, 'w') as f:
         json.dump(bids_filters, f)
 
     fmriprep_singularity_path = args.container or FMRIPREP_DEFAULT_SINGULARITY_PATH
@@ -203,7 +205,7 @@ def write_func_job(layout, subject, session, args):
             "--anat-derivatives /anat/fmriprep",
             "--fs-subjects-dir /anat/freesurfer",
             f"--bids-database-dir {pybids_cache_path}",
-            f"--bids-filter-file {os.path.join('/data', bids_filters_path)}",
+            f"--bids-filter-file {bids_filters_path}",
             "--ignore slicetiming",
             "--use-syn-sdc",
             "--output-spaces", *OUTPUT_TEMPLATES,
@@ -302,12 +304,23 @@ def main():
 
     pybids_cache_path = os.path.join(args.bids_path, PYBIDS_CACHE_PATH)
 
+    print(dict(
+        path=args.bids_path,
+        database_path=pybids_cache_path,
+        reset_database=args.force_reindex,
+        ignore=(
+            "code",
+            "stimuli",
+            "sourcedata",
+            "models",
+            re.compile(r"^\."),
+        ) + load_bidsignore(args.bids_path),
+    ))
+    
     layout = bids.BIDSLayout(
         args.bids_path,
         database_path=pybids_cache_path,
         reset_database=args.force_reindex,
-        #index_metadata=False,
-        #validate=False,
         ignore=(
             "code",
             "stimuli",
