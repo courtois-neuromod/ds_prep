@@ -27,23 +27,33 @@ type = "type"
 
 
 def _build_args_parser():
-    p = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
-                                description=__doc__)
+    p = argparse.ArgumentParser(
+        formatter_class=argparse.RawTextHelpFormatter, description=__doc__
+    )
 
-    p.add_argument('in_file',
-                   help='Task output (.txt) to convert.')
-    p.add_argument('in_task',
-                   help='Config JSON file defining the task you want to '
-                        'convert.')
-    p.add_argument('out_file',
-                   help='output tsv file.')
-    p.add_argument('--extract_eprime', action='store_true',
-                   help='Extract eprime file into raw tsv file. \n'
-                        'It helps to create a config file.')
-    p.add_argument('-f', dest='overwrite', action='store_true',
-                   help='Force overwriting of the output files.')
-    p.add_argument('-v', action='store_true', dest='verbose',
-                   help='If set, produces verbose output.')
+    p.add_argument("in_file", help="Task output (.txt) to convert.")
+    p.add_argument(
+        "in_task", help="Config JSON file defining the task you want to " "convert."
+    )
+    p.add_argument("out_file", help="output tsv file.")
+    p.add_argument(
+        "--extract_eprime",
+        action="store_true",
+        help="Extract eprime file into raw tsv file. \n"
+        "It helps to create a config file.",
+    )
+    p.add_argument(
+        "-f",
+        dest="overwrite",
+        action="store_true",
+        help="Force overwriting of the output files.",
+    )
+    p.add_argument(
+        "-v",
+        action="store_true",
+        dest="verbose",
+        help="If set, produces verbose output.",
+    )
     return p
 
 
@@ -67,14 +77,13 @@ def assert_task_exists(in_task):
     if in_task_extension == ".json":
         fullpath = in_task
     else:
-        raise IOError('Task has to be a json file or choose one from config'
-                      ' folder.')
+        raise IOError("Task has to be a json file or choose one from config" " folder.")
 
     if os.path.exists(fullpath):
-        with open(fullpath, 'r') as json_file:
+        with open(fullpath, "r") as json_file:
             task = json.load(json_file)
     else:
-        raise IOError('{} does not exist'.format(in_task))
+        raise IOError("{} does not exist".format(in_task))
 
     return task
 
@@ -118,8 +127,7 @@ def assert_task_df(df_columns, json_dict):
 
     for curr_column in allColumns:
         if not set([curr_column]).issubset(df_columns):
-            raise IOError("Column: \"{}\" does not exist "
-                          "into df".format(curr_column))
+            raise IOError('Column: "{}" does not exist ' "into df".format(curr_column))
 
 
 def get_ioi(df, ioi_dict):
@@ -139,7 +147,7 @@ def get_ioi(df, ioi_dict):
     ioi: pandas.core.series.Series
         Series of Index of interest.
     """
-    indexes = np.zeros((len(df), ), dtype=bool)
+    indexes = np.zeros((len(df),), dtype=bool)
 
     columnName = ioi_dict[column]
     if isinstance(columnName, list):  # Column(list)
@@ -147,9 +155,11 @@ def get_ioi(df, ioi_dict):
             if ioi_dict[formula] == "intersection":
                 indexes = intersection_columns(df, ioi_dict)
             else:
-                logging.error("function: get_ioi - If you have multiple "
-                              "columns you need a formula to know what "
-                              "should be done. Default merge")
+                logging.error(
+                    "function: get_ioi - If you have multiple "
+                    "columns you need a formula to know what "
+                    "should be done. Default merge"
+                )
         else:
             ioi_serie = merge_columns(df, ioi_dict)
             indexes = ~np.isnan(ioi_serie.astype(np.float))
@@ -198,22 +208,26 @@ def get_durations(df, onset, duration_dict):
             if len(curr_formula) == 3:
                 duration_serie = duration_serie.shift(periods=curr_formula[0])
 
-            if curr_formula[1] == 'subtract':
-                duration_serie = duration_serie.astype(np.float) - \
-                                    onset.astype(np.float)
-            elif curr_formula[1] == 'add':
-                duration_serie = duration_serie.astype(np.float) + \
-                                    onset.astype(np.float)
+            if curr_formula[1] == "subtract":
+                duration_serie = duration_serie.astype(np.float) - onset.astype(
+                    np.float
+                )
+            elif curr_formula[1] == "add":
+                duration_serie = duration_serie.astype(np.float) + onset.astype(
+                    np.float
+                )
 
     if when_no_value in duration_dict:
-        if duration_dict[when_no_value] == 'median':
-            duration_serie[np.isnan(duration_serie.astype(np.float))] = \
-                np.nanmedian(duration_serie.astype(np.float))
-        elif duration_dict[when_no_value] == 'mean':
-            duration_serie[np.isnan(duration_serie.astype(np.float))] = \
-                np.nanmean(duration_serie.astype(np.float))
+        if duration_dict[when_no_value] == "median":
+            duration_serie[np.isnan(duration_serie.astype(np.float))] = np.nanmedian(
+                duration_serie.astype(np.float)
+            )
+        elif duration_dict[when_no_value] == "mean":
+            duration_serie[np.isnan(duration_serie.astype(np.float))] = np.nanmean(
+                duration_serie.astype(np.float)
+            )
 
-    duration_serie = duration_serie.rename('duration')
+    duration_serie = duration_serie.rename("duration")
     return duration_serie
 
 
@@ -266,14 +280,13 @@ def merge_columns(df, curr_dict):
     """
     curr_columns = curr_dict[column]
     if not isinstance(curr_columns, list):
-        raise IOError("If you want to merge columns you need at least "
-                      "2 columns.")
+        raise IOError("If you want to merge columns you need at least " "2 columns.")
 
     if value in curr_dict:  # Value exist
         curr_values = curr_dict[value]
         if isinstance(curr_values, list):  # Value (list)
             if len(curr_values) != len(curr_columns):
-                raise IOError('List of values should match columns')
+                raise IOError("List of values should match columns")
         elif isinstance(curr_values, str):  # Value (str)
             curr_values = [curr_values] * len(curr_columns)
 
@@ -288,7 +301,7 @@ def merge_columns(df, curr_dict):
             new_serie = df[curr_column]
             new_serie[new_serie != listValues[idx]] = "nan"
             if np.any(new_index & index_serie):
-                raise IOError('Columns contain values at the same index')
+                raise IOError("Columns contain values at the same index")
             else:
                 index_serie = index_serie | new_index
                 new_serie = new_serie.combine_first(new_serie)
@@ -301,7 +314,7 @@ def merge_columns(df, curr_dict):
         for curr_column in listColumns:
             new_index = df[curr_column].astype(str) != "nan"
             if np.any(new_index & index_wo_nan):
-                raise IOError('Columns contain values at the same index')
+                raise IOError("Columns contain values at the same index")
             else:
                 index_wo_nan = index_wo_nan | new_index
                 new_serie = new_serie.combine_first(df[curr_column])
@@ -335,23 +348,26 @@ def get_key(df, columnName, key_dict):
     elif isinstance(key_dict[column], list):
         key_serie = merge_columns(df, key_dict)
     else:
-        logging.error('not coded yet - get_key')
+        logging.error("not coded yet - get_key")
 
     if type in key_dict:
-        if key_dict[type] == 'stim':
-            key_serie = '../../stimulis/' + key_serie
+        if key_dict[type] == "stim":
+            key_serie = "../../stimulis/" + key_serie
 
         if key_dict[type] == "bloc":
-            key_serie = key_serie.astype(np.float) - \
-                            np.floor(key_serie.astype(np.float)/2)
+            key_serie = key_serie.astype(np.float) - np.floor(
+                key_serie.astype(np.float) / 2
+            )
 
     if when_no_value in key_serie:
-        if key_serie[when_no_value] == 'median':
-            key_serie[np.isnan(key_serie.astype(np.float))] = \
-                np.nanmedian(key_serie.astype(np.float))
-        elif key_serie[when_no_value] == 'mean':
-            key_serie[np.isnan(key_serie.astype(np.float))] = \
-                np.nanmean(key_serie.astype(np.float))
+        if key_serie[when_no_value] == "median":
+            key_serie[np.isnan(key_serie.astype(np.float))] = np.nanmedian(
+                key_serie.astype(np.float)
+            )
+        elif key_serie[when_no_value] == "mean":
+            key_serie[np.isnan(key_serie.astype(np.float))] = np.nanmean(
+                key_serie.astype(np.float)
+            )
 
     key_serie = key_serie.rename(columnName)
 
@@ -361,26 +377,25 @@ def get_key(df, columnName, key_dict):
 def extract_event(df, curr_event, new_df, ttl):
 
     #  Get usefull indexes: ioi -> index of interest
-    ioi = get_ioi(df, curr_event['ioi'])
+    ioi = get_ioi(df, curr_event["ioi"])
 
     # Get onsets and durations
-    onsets = get_key(df, 'onset', curr_event['onset'])
-    durations = get_durations(df, onsets, curr_event['duration'])
+    onsets = get_key(df, "onset", curr_event["onset"])
+    durations = get_durations(df, onsets, curr_event["duration"])
 
     # Creation of the event dataframe
-    listOfType = [curr_event['name']] * len(ioi)
-    curr_event_df = pd.DataFrame(np.asarray(listOfType), columns=['type'])
+    listOfType = [curr_event["name"]] * len(ioi)
+    curr_event_df = pd.DataFrame(np.asarray(listOfType), columns=["type"])
 
     # Delete already used keys
-    del curr_event['onset']
-    del curr_event['duration']
-    del curr_event['name']
-    del curr_event['ioi']
+    del curr_event["onset"]
+    del curr_event["duration"]
+    del curr_event["name"]
+    del curr_event["ioi"]
 
     # Loop over all keys
     for curr_key in curr_event.keys():
-        curr_event_df = curr_event_df.join(get_key(df, curr_key,
-                                                   curr_event[curr_key]))
+        curr_event_df = curr_event_df.join(get_key(df, curr_key, curr_event[curr_key]))
 
     # Reduce all df to index of interest
     curr_event_df = curr_event_df[ioi]
@@ -406,17 +421,16 @@ def get_TTL(df, column):
 
 
 def _divide(val):
-    return val/1000
+    return val / 1000
 
 
 def _subTTL(val, var):
     return (val - var) / 1000
 
 
-def convert_event_file(in_file, in_task, out_file,
-                       extract_eprime=False,
-                       overwrite=False,
-                       verbose=False):
+def convert_event_file(
+    in_file, in_task, out_file, extract_eprime=False, overwrite=False, verbose=False
+):
     """
     Convert txt data from eprime to tsv.
 
@@ -445,7 +459,7 @@ def convert_event_file(in_file, in_task, out_file,
 
     if os.path.exists(out_file):
         if not overwrite:
-            raise IOError('Output file: {} already exists'.format(out_file))
+            raise IOError("Output file: {} already exists".format(out_file))
 
     # Get json file from task name
     task = assert_task_exists(in_task)
@@ -454,7 +468,7 @@ def convert_event_file(in_file, in_task, out_file,
     df = _text_to_df(in_file)
 
     if extract_eprime:
-        df.to_csv(out_file, index=False, sep='\t')
+        df.to_csv(out_file, index=False, sep="\t")
         return
 
     # Assert all columns in task exist in df
@@ -464,17 +478,17 @@ def convert_event_file(in_file, in_task, out_file,
     new_df = pd.DataFrame()
 
     # Get TTL
-    TTL = get_TTL(df, task['TTL'])
+    TTL = get_TTL(df, task["TTL"])
 
     for curr_event in task["events"]:
-        logging.info('Current event: {}'.format(curr_event['name']))
+        logging.info("Current event: {}".format(curr_event["name"]))
         new_df = extract_event(df, curr_event, new_df, TTL)
 
     # Sort new_df by onset
-    new_df = new_df.sort_values('onset')
+    new_df = new_df.sort_values("onset")
     logging.info(new_df)
     # Extract new_df into tsv file
-    new_df.to_csv(out_file, index=False, sep='\t')
+    new_df.to_csv(out_file, index=False, sep="\t")
 
 
 def main():
@@ -487,10 +501,14 @@ def main():
     verbose = args.verbose
     extract_eprime = args.extract_eprime
     overwrite = args.overwrite
-    convert_event_file(in_file, in_task, out_file,
-                       extract_eprime=extract_eprime,
-                       overwrite=overwrite,
-                       verbose=verbose)
+    convert_event_file(
+        in_file,
+        in_task,
+        out_file,
+        extract_eprime=extract_eprime,
+        overwrite=overwrite,
+        verbose=verbose,
+    )
 
 
 if __name__ == "__main__":
