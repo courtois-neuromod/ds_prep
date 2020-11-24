@@ -15,7 +15,8 @@
         "formula": [-1, "subtract", "onset"]
       },
       "nbloc": {
-        "column": "HRun1",
+        "column": ["HRun*"],
+        "regex": "True",
         "type": "bloc"
       }
     },
@@ -33,88 +34,130 @@
         "formula": [-1, "subtract", "onset"]
       },
       "nbloc": {
-        "column": "HRun1",
+        "column": ["HRun*"],
+        "regex": "True",
         "type": "bloc"
       }
     },
     {
       "name": "response_shape",
       "ioi": {
-        "column": ["ShapeBlock1", "ShapeBlock2", "ShapeBlock3"]
+        "column": ["ShapeBlock*"],
+        "regex": "True"
       },
       "onset": {
         "column": "StimSlide.OnsetTime"
       },
       "duration": {
-        "column": "StimSlide.RT"
+        "column": "StimSlide.RT",
+        "rt": "True",
+        "when_zero": -1000
       },
       "nbloc": {
-        "column": "HRun1",
+        "column": ["HRun*"],
+        "regex": "True",
         "type": "bloc"
       },
       "ntrial": {
-        "column": ["ShapeBlock1", "ShapeBlock2", "ShapeBlock3"]
+        "column": ["ShapeBlock*"],
+        "regex": "True"
       },
-      "stim_top": {
+      "stim_file_top": {
         "column": "Top",
-        "type": "stim"
+        "type": "stim",
+        "task": "emotion"
       },
-      "stim_left": {
+      "stim_file_left": {
         "column": "Left",
-        "type": "stim"
+        "type": "stim",
+        "task": "emotion"
       },
-      "stim_right": {
+      "stim_file_right": {
         "column": "Right",
-        "type": "stim"
+        "type": "stim",
+        "task": "emotion"
+      },
+      "answer": {
+        "column": "StimSlide.RESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "left",
+          "b": "right"}
+      },
+      "correct_answer": {
+        "column": "StimSlide.CRESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "left",
+          "b": "right"}
       }
     },
     {
       "name": "response_face",
       "ioi": {
-        "column": ["FaceBlock1", "FaceBlock2", "FaceBlock3"]
+        "column": ["FaceBlock*"],
+        "regex": "True"
       },
       "onset": {
         "column": "StimSlide.OnsetTime"
       },
       "duration": {
-        "column": "StimSlide.RT"
+        "column": "StimSlide.RT",
+        "rt": "True"
       },
       "nbloc": {
-        "column": "HRun1",
+        "column": ["HRun*"],
+        "regex": "True",
         "type": "bloc"
       },
       "ntrial": {
-        "column": ["FaceBlock1", "FaceBlock2", "FaceBlock3"]
+        "column": ["FaceBlock*"],
+        "regex": "True"
       },
-      "stim_top": {
+      "stim_file_top": {
         "column": "Top",
-        "type": "stim"
+        "type": "stim",
+        "task": "emotion"
       },
-      "stim_left": {
+      "stim_file_left": {
         "column": "Left",
-        "type": "stim"
+        "type": "stim",
+        "task": "emotion"
       },
-      "stim_right": {
+      "stim_file_right": {
         "column": "Right",
-        "type": "stim"
+        "type": "stim",
+        "task": "emotion"
+      },
+      "answer": {
+        "column": "StimSlide.RESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "left",
+          "b": "right"}
+      },
+      "correct_answer": {
+        "column": "StimSlide.CRESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "left",
+          "b": "right"}
       }
     },
     {
-      "name": "cross_fixation",
+      "name": "countdown",
       "ioi": {
-        "column": "Fixation.OnsetTime"
+        "column": "Stimulus"
       },
       "onset": {
-        "column": "Fixation.OnsetTime"
+        "column": "SyncSlide.OnsetTime"
       },
-      "duration":{
-        "column": "StimSlide.OnsetTime",
-        "formula": [-1, "subtract", "onset"],
-        "when_no_value": "median"
+      "duration": {
+        "column": "SyncSlide.FinishTime",
+        "formula": [0, "subtract", "onset"]
       },
-      "nbloc": {
-        "column": "HRun1",
-        "type": "bloc"
+      "countdown_stim" : {
+        "column": "Stimulus"
       }
     }
   ]

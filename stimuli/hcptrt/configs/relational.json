@@ -28,7 +28,10 @@
       }
     },
     {
-      "name": "response",
+      "name": {
+        "column": "BlockType",
+        "value": ["Relational", "Control"]
+      },
       "ioi": {
         "column": "BlockType"
       },
@@ -36,29 +39,59 @@
         "column": ["RelationalSlide.OnsetTime", "ControlSlide.OnsetTime"]
       },
       "duration": {
-        "column": ["RelationalSlide.RT", "ControlSlide.RT"]
+        "column": ["RelationalSlide.RT", "ControlSlide.RT"],
+        "rt": "True"
       },
-      "stimulus": {
+      "stim_file": {
         "column": "Stimulus",
-        "type": "stim"
+        "type": "stim",
+        "task": "relational"
       },
       "instruction": {
-        "column": "Instruction"
-      },
-      "bloc_type" : {
-        "column": "BlockType"
+        "column": "Instruction",
+        "type": "convert",
+        "correspondance": {
+          "SHA": "Shape",
+          "TEX": "Texture"
+        }
       },
       "nbloc": {
-        "column": "BlockNumber"
+        "column": "BlockNumber",
+        "formula": ["sub", 3]
       },
       "trial": {
-        "column" : "RunTrialNumber"
+        "column" : "RunTrialNumber",
+        "formula": ["sub", 1]
       },
       "answer": {
-        "column": ["RelationalSlide.RESP", "ControlSlide.RESP"]
+        "column": ["RelationalSlide.RESP", "ControlSlide.RESP"],
+        "type": "convert",
+        "correspondance": {
+          "a": "yes",
+          "b": "no"}
       },
       "correct_answer": {
-        "column": ["RelationalSlide.CRESP", "ControlSlide.CRESP"]
+        "column": ["RelationalSlide.CRESP", "ControlSlide.CRESP"],
+        "type": "convert",
+        "correspondance": {
+          "a": "yes",
+          "b": "no"}
+      }
+    },
+    {
+      "name": "countdown",
+      "ioi": {
+        "column": "ReadyList"
+      },
+      "onset": {
+        "column": "SyncSlide.OnsetTime"
+      },
+      "duration": {
+        "column": "SyncSlide.OffsetTime",
+        "formula": [0, "subtract", "onset"]
+      },
+      "countdown_stim" : {
+        "column": "Stimulus"
       }
     }
   ]

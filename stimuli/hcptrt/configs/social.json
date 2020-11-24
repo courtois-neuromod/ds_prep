@@ -2,7 +2,9 @@
   "TTL": "CountDownSlide.OnsetTime",
   "events":[
     {
-      "name": "show_movie",
+      "name": {
+        "column": "Type"
+      },
       "ioi": {
         "column": "Procedure",
         "value": "SOCIALrunPROC"
@@ -11,37 +13,43 @@
         "column": "MovieSlide.OnsetTime"
       },
       "duration": {
-        "column": "MovieSlide.OnsetToOnsetTime"
+        "column": "ResponseSlide.RTTime",
+        "rt": "True",
+        "formula": [0, "subtract", "onset"]
       },
-      "stimuli": {
+      "stim_file": {
         "column": "Movie",
-        "type": "stim"
+        "type": "stim",
+        "task": "social"
       },
-      "stim_type": {
-        "column": "Type"
+      "response": {
+        "column": "ResponseSlide.RESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "mental",
+          "b": "random",
+          "c": "not_sure"}
+      },
+      "duration_stim": {
+        "column": "ResponseSlide.OnsetTime",
+        "type": "duration",
+        "formula": [0, "subtract", "onset"]
       }
     },
     {
-      "name": "response",
+      "name": "countdown",
       "ioi": {
-        "column": "Procedure",
-        "value": "SOCIALrunPROC"
+        "column": "Stimulus"
       },
       "onset": {
-        "column": "ResponseSlide.OnsetTime"
+        "column": "CountDownSlide.OnsetTime"
       },
       "duration": {
-        "column": "ResponseSlide.RT"
+        "column": "CountDownSlide.FinishTime",
+        "formula": [0, "subtract", "onset"]
       },
-      "stimuli": {
-        "column": "Movie",
-        "type": "stim"
-      },
-      "stim_type": {
-        "column": "Type"
-      },
-      "response": {
-        "column": "ResponseSlide.RESP"
+      "countdown_stim" : {
+        "column": "Stimulus"
       }
     }
   ]

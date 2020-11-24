@@ -12,12 +12,11 @@
       },
       "duration": {
         "column": "CrossLeft.OnsetTime",
-        "type": "rt",
         "formula": [-1, "subtract", "onset"]
       },
       "nbloc": {
-        "column": "MotorRun1List",
-        "type": "bloc"
+        "column": ["^MotorRun[1-9]List$"],
+        "regex": "True"
       }
     },
     {
@@ -34,8 +33,8 @@
         "formula": [-1, "subtract", "onset"]
       },
       "nbloc": {
-        "column": "MotorRun1List",
-        "type": "bloc"
+        "column": ["^MotorRun[1-9]List$"],
+        "regex": "True"
       }
     },
     {
@@ -50,12 +49,11 @@
       },
       "duration": {
         "column": "CrossRight.OnsetTime",
-        "type": "rt",
         "formula": [-1, "subtract", "onset"]
       },
       "nbloc": {
-        "column": "MotorRun1List",
-        "type": "bloc"
+        "column": ["^MotorRun[1-9]List$"],
+        "regex": "True"
       }
     },
     {
@@ -72,8 +70,8 @@
         "formula": [-1, "subtract", "onset"]
       },
       "nbloc": {
-        "column": "MotorRun1List",
-        "type": "bloc"
+        "column": ["^MotorRun[1-9]List$"],
+        "regex": "True"
       }
     },
     {
@@ -90,7 +88,8 @@
         "formula": [-1, "subtract", "onset"]
       },
       "nbloc": {
-        "column": "MotorRun1List"
+        "column": ["^MotorRun[1-9]List$"],
+        "regex": "True"
       }
     },
     {
@@ -107,31 +106,27 @@
         "column": "CrossLeft.OnsetToOnsetTime"
       },
       "nbloc": {
-        "column": "MotorRun1List"
-      },
-      "trial":{
-        "column": "MotorRun1List.Sample"
+        "column": ["^MotorRun[1-9]List$"],
+        "regex": "True"
       }
     },
     {
-        "name": "response_right_hand",
-        "ioi": {
-          "column": ["Procedure", "BlockType"],
-          "value": ["CrossRightPROC", "Right Hand"],
-          "formula": "intersection"
-        },
-        "onset": {
-          "column": "CrossRight.OnsetTime"
-        },
-        "duration": {
-          "column": "CrossRight.OnsetToOnsetTime"
-        },
-        "nbloc": {
-          "column": "MotorRun1List"
-        },
-        "trial":{
-          "column": "MotorRun1List.Sample"
-        }
+      "name": "response_right_hand",
+      "ioi": {
+        "column": ["Procedure", "BlockType"],
+        "value": ["CrossRightPROC", "Right Hand"],
+        "formula": "intersection"
+      },
+      "onset": {
+        "column": "CrossRight.OnsetTime"
+      },
+      "duration": {
+        "column": "CrossRight.OnsetToOnsetTime"
+      },
+      "nbloc": {
+        "column": ["^MotorRun[1-9]List$"],
+        "regex": "True"
+      }
     },
     {
       "name": "response_left_foot",
@@ -147,11 +142,8 @@
         "column": "CrossLeft.OnsetToOnsetTime"
       },
       "nbloc": {
-        "column": "MotorRun1List",
-        "type": "bloc"
-      },
-      "trial":{
-        "column": "MotorRun1List.Sample"
+        "column": ["^MotorRun[1-9]List$"],
+        "regex": "True"
       }
     },
     {
@@ -168,11 +160,8 @@
         "column": "CrossRight.OnsetToOnsetTime"
       },
       "nbloc": {
-        "column": "MotorRun1List",
-        "type": "bloc"
-      },
-      "trial":{
-        "column": "MotorRun1List.Sample"
+        "column": ["^MotorRun[1-9]List$"],
+        "regex": "True"
       }
     },
     {
@@ -189,11 +178,41 @@
         "column": "CrossCenter.OnsetToOnsetTime"
       },
       "nbloc": {
-        "column": "MotorRun1List",
-        "type": "bloc"
+        "column": ["^MotorRun[1-9]List$"],
+        "regex": "True"
+      }
+    },
+    {
+      "name": "countdown",
+      "ioi": {
+        "column": "Stimulus"
       },
-      "trial":{
-        "column": "MotorRun1List.Sample"
+      "onset": {
+        "column": "CountDownSlide.OnsetTime"
+      },
+      "duration": {
+        "column": "CountDownSlide.FinishTime",
+        "formula": [0, "subtract", "onset"]
+      },
+      "countdown_stim" : {
+        "column": "Stimulus"
+      }
+    },
+    {
+      "name": "cross_fixation",
+      "ioi": {
+        "column": "Procedure",
+        "value": "FixPROC"
+      },
+      "onset": {
+        "column": "Fixdot.OnsetTime"
+      },
+      "nbloc": {
+        "column": ["^MotorRun[1-9]List$"],
+        "regex": "True"
+      },
+      "duration": {
+        "value": "15000"
       }
     }
   ]

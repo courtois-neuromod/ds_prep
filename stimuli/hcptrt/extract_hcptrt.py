@@ -15,6 +15,7 @@ import json
 import logging
 import numpy as np
 import os
+import re
 
 from convert_eprime.convert import _text_to_df
 import pandas as pd
@@ -22,9 +23,13 @@ import pandas as pd
 column = "column"
 value = "value"
 formula = "formula"
+regex = "regex"
 when_no_value = "when_no_value"
+when_zero = "when_zero"
 type = "type"
-
+rt = "rt"
+task = "task"
+correspondance = "correspondance"
 
 def _build_args_parser():
     p = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
@@ -66,9 +71,15 @@ def assert_task_exists(in_task):
 
     if in_task_extension == ".json":
         fullpath = in_task
+    elif in_task_extension == "":
+        script_dir = os.path.dirname(__file__)
+        config_dir = os.path.join(script_dir, "configs")
+        fullpath = os.path.join(config_dir, in_task + '.json')
+        if not os.path.exists(fullpath):
+            raise IOError('Task {} doesnt not exists'.format(fullpath))
     else:
         raise IOError('Task has to be a json file or choose one from config'
-                      ' folder.')
+                      ' folder. Wrong task {}'.format(in_task))
 
     if os.path.exists(fullpath):
         with open(fullpath, 'r') as json_file:
@@ -103,16 +114,18 @@ def assert_task_df(df_columns, json_dict):
             if isinstance(curr_event[curr_key], list):
                 for element in curr_event[curr_key]:
                     if column in element:
-                        if isinstance(element[column], list):
-                            allColumns = allColumns + element[column]
-                        else:
-                            allColumns.append(element[column])
+                        if regex in element:
+                            if isinstance(element[column], list):
+                                allColumns = allColumns + element[column]
+                            else:
+                                allColumns.append(element[column])
             else:
                 if column in curr_event[curr_key]:
-                    if isinstance(curr_event[curr_key][column], list):
-                        allColumns = allColumns + curr_event[curr_key][column]
-                    else:
-                        allColumns.append(curr_event[curr_key][column])
+                    if regex not in curr_event[curr_key]:
+                        if isinstance(curr_event[curr_key][column], list):
+                            allColumns = allColumns + curr_event[curr_key][column]
+                        else:
+                            allColumns.append(curr_event[curr_key][column])
 
     allColumns = list(dict.fromkeys(allColumns))
 
@@ -189,7 +202,9 @@ def get_durations(df, onset, duration_dict):
         Series of Index with durations.
     """
 
-    if isinstance(duration_dict[column], list):
+    if not column in duration_dict:
+        duration_serie = pd.Series(data=[duration_dict[value]] * df.shape[0])
+    elif isinstance(duration_dict[column], list):
         duration_serie = merge_columns(df, duration_dict)
     elif isinstance(duration_dict[column], str):
         duration_serie = df[duration_dict[column]]
@@ -197,7 +212,6 @@ def get_durations(df, onset, duration_dict):
             curr_formula = duration_dict[formula]
             if len(curr_formula) == 3:
                 duration_serie = duration_serie.shift(periods=curr_formula[0])
-
             if curr_formula[1] == 'subtract':
                 duration_serie = duration_serie.astype(np.float) - \
                                     onset.astype(np.float)
@@ -205,6 +219,7 @@ def get_durations(df, onset, duration_dict):
                 duration_serie = duration_serie.astype(np.float) + \
                                     onset.astype(np.float)
 
+    # Replace NaN with Median or Mean
     if when_no_value in duration_dict:
         if duration_dict[when_no_value] == 'median':
             duration_serie[np.isnan(duration_serie.astype(np.float))] = \
@@ -213,8 +228,18 @@ def get_durations(df, onset, duration_dict):
             duration_serie[np.isnan(duration_serie.astype(np.float))] = \
                 np.nanmean(duration_serie.astype(np.float))
 
+    if when_zero in duration_dict:
+        #  Replace zeros with when_zero value
+        duration_serie[duration_serie.astype(np.float) == 0.0] = duration_dict[when_zero]
+
+    rt_serie = None
+    if rt in duration_dict:
+        if duration_dict[rt]:
+            rt_serie = duration_serie.rename('response_time')
+
     duration_serie = duration_serie.rename('duration')
-    return duration_serie
+
+    return duration_serie, rt_serie
 
 
 def intersection_columns(df, curr_dict):
@@ -294,14 +319,24 @@ def merge_columns(df, curr_dict):
                 new_serie = new_serie.combine_first(new_serie)
 
     else:  # Value does not exist
-        listColumns = curr_dict[column][1::]
+        if regex in curr_dict and len(curr_dict[column]) == 1:
+            curr_dict[column] = [i for i in list(df.columns) if re.search(curr_dict[column][0], i)]
+
+            if len(curr_dict[column]) > 1:
+                listColumns = curr_dict[column][1::]
+            else:
+                listColumns = []
+        else:
+            listColumns = curr_dict[column][1::]
+
         new_serie = df[curr_dict[column][0]]
         index_wo_nan = new_serie.astype(str) != "nan"
 
         for curr_column in listColumns:
             new_index = df[curr_column].astype(str) != "nan"
             if np.any(new_index & index_wo_nan):
-                raise IOError('Columns contain values at the same index')
+                logging.info('{} won\'t be merge for because it contains values'
+                             ' at the same index'.format(curr_column))
             else:
                 index_wo_nan = index_wo_nan | new_index
                 new_serie = new_serie.combine_first(df[curr_column])
@@ -309,7 +344,7 @@ def merge_columns(df, curr_dict):
     return new_serie
 
 
-def get_key(df, columnName, key_dict):
+def get_key(df, columnName, key_dict, ttl, onsets=None):
     """
     Get Key from event dict.
 
@@ -329,29 +364,65 @@ def get_key(df, columnName, key_dict):
     key_serie: pandas.core.DataFrame
         Series from specific key.
     """
-
-    if isinstance(key_dict[column], str):
-        key_serie = df[key_dict[column]]
-    elif isinstance(key_dict[column], list):
-        key_serie = merge_columns(df, key_dict)
-    else:
-        logging.error('not coded yet - get_key')
+    if column in key_dict:
+        if isinstance(key_dict[column], str):
+            key_serie = df[key_dict[column]]
+        elif isinstance(key_dict[column], list):
+            key_serie = merge_columns(df, key_dict)
+        else:
+            logging.error('not coded yet - get_key')
+    elif value in key_dict:
+        key_serie = pd.Series(data=[key_dict[value]] * df.shape[0])
 
     if type in key_dict:
         if key_dict[type] == 'stim':
-            key_serie = '../../stimulis/' + key_serie
+
+            key_serie = key_serie.str.replace(' ','_')
+            key_serie = key_serie.str.replace('\\','/')
+            key_serie = key_serie.str.split('/', expand=True)
+            if len(key_serie.columns)>1:
+                key_serie = key_serie[len(key_serie.columns)-1]
+            else:
+                key_serie = key_serie[0]
+
+            key_serie = key_dict[task] + os.path.sep + key_serie
 
         if key_dict[type] == "bloc":
             key_serie = key_serie.astype(np.float) - \
                             np.floor(key_serie.astype(np.float)/2)
 
-    if when_no_value in key_serie:
-        if key_serie[when_no_value] == 'median':
+        if key_dict[type] == "convert":
+            for nConversion in key_dict[correspondance].keys():
+                key_serie = key_serie.str.replace(nConversion,
+                                                  key_dict[correspondance][nConversion])
+
+        if key_dict[type] == "subTTL":
+            key_serie = key_serie.astype(np.float).apply(_subTTL, var=ttl)
+
+        if key_dict[type] == "duration":
+            key_serie, _ = get_durations(df, onsets, key_dict)
+            key_serie = key_serie.astype(np.float).apply(_divide)
+
+        #if key_dict[type] == "trial" or key_dict[type] == "bloc":
+        #    key_serie = key_serie.astype(np.float).apply(_subTTL, var=1)
+
+    if formula in key_dict:
+        if key_dict[formula][0] == 'sub':
+            key_serie = key_serie.astype(np.float).apply(_sub, var=key_dict[formula][1])
+        if key_dict[formula][0] == 'add':
+            key_serie = key_serie.astype(np.float).apply(_add, var=key_dict[formula][1])
+
+    if when_no_value in key_dict:
+        if key_dict[when_no_value] == 'median':
             key_serie[np.isnan(key_serie.astype(np.float))] = \
                 np.nanmedian(key_serie.astype(np.float))
-        elif key_serie[when_no_value] == 'mean':
+        elif key_dict[when_no_value] == 'mean':
             key_serie[np.isnan(key_serie.astype(np.float))] = \
                 np.nanmean(key_serie.astype(np.float))
+        else:
+            key_serie.fillna(key_dict[when_no_value], inplace=True)
+
+
 
     key_serie = key_serie.rename(columnName)
 
@@ -364,12 +435,17 @@ def extract_event(df, curr_event, new_df, ttl):
     ioi = get_ioi(df, curr_event['ioi'])
 
     # Get onsets and durations
-    onsets = get_key(df, 'onset', curr_event['onset'])
-    durations = get_durations(df, onsets, curr_event['duration'])
+    onsets = get_key(df, 'onset', curr_event['onset'], ttl)
+    durations, rts = get_durations(df, onsets, curr_event['duration'])
 
     # Creation of the event dataframe
-    listOfType = [curr_event['name']] * len(ioi)
-    curr_event_df = pd.DataFrame(np.asarray(listOfType), columns=['type'])
+    if isinstance(curr_event['name'], str):
+        listOfType = [curr_event['name']] * len(ioi)
+        curr_event_df = pd.DataFrame(np.asarray(listOfType), columns=['trial_type'])
+    elif isinstance(curr_event['name'], dict):
+        curr_key = get_key(df, 'name', curr_event['name'], ttl)
+        curr_List = curr_key.tolist()
+        curr_event_df = pd.DataFrame(np.asarray(curr_List), columns=['trial_type'])
 
     # Delete already used keys
     del curr_event['onset']
@@ -380,7 +456,8 @@ def extract_event(df, curr_event, new_df, ttl):
     # Loop over all keys
     for curr_key in curr_event.keys():
         curr_event_df = curr_event_df.join(get_key(df, curr_key,
-                                                   curr_event[curr_key]))
+                                                   curr_event[curr_key], ttl,
+                                                   onsets))
 
     # Reduce all df to index of interest
     curr_event_df = curr_event_df[ioi]
@@ -394,6 +471,11 @@ def extract_event(df, curr_event, new_df, ttl):
     # Join all df into one
     curr_event_df = curr_event_df.join(onsets)
     curr_event_df = curr_event_df.join(durations)
+
+    if isinstance(rts, pd.core.series.Series):
+        rts = rts[ioi]
+        rts = rts.astype(np.float).apply(_divide)
+        curr_event_df = curr_event_df.join(rts)
 
     # Concat each event_df into one
     new_df = pd.concat([new_df, curr_event_df])
@@ -412,6 +494,11 @@ def _divide(val):
 def _subTTL(val, var):
     return (val - var) / 1000
 
+def _sub(val, var):
+    return (val - var)
+
+def _add(val, var):
+    return (val + var)
 
 def convert_event_file(in_file, in_task, out_file,
                        extract_eprime=False,
@@ -467,12 +554,12 @@ def convert_event_file(in_file, in_task, out_file,
     TTL = get_TTL(df, task['TTL'])
 
     for curr_event in task["events"]:
-        logging.info('Current event: {}'.format(curr_event['name']))
+        #logging.info('Current event: {}'.format(curr_event['name']))
         new_df = extract_event(df, curr_event, new_df, TTL)
 
     # Sort new_df by onset
     new_df = new_df.sort_values('onset')
-    logging.info(new_df)
+    #logging.info(new_df)
     # Extract new_df into tsv file
     new_df.to_csv(out_file, index=False, sep='\t')
 

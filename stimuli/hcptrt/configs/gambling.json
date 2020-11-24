@@ -2,22 +2,159 @@
   "TTL": "SyncSlide.OnsetTime",
   "events":[
     {
-      "name": "response",
+      "name": {
+        "column": "TrialType"
+      },
       "ioi": {
-        "column": "Procedure",
-        "value": "GamblingTrialPROC"
+        "column": ["R*MostlyReward*"],
+        "regex": "True"
       },
       "onset": {
         "column": "QuestionMark.OnsetTime"
       },
       "duration": {
-        "column": "QuestionMark.RT"
+        "column": "QuestionMark.RT",
+        "rt": "True"
       },
       "answer": {
-        "column": "QuestionMark.RESP"
+        "column": "QuestionMark.RESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "lower_than_five",
+          "b": "higher_than_five"}
       },
-      "trial_type": {
+      "block_type": {
+        "value": "MostlyReward"
+      },
+      "nbloc": {
+        "column": ["^Run[1-9]List$"],
+        "regex": "True",
+        "type": "bloc"
+      },
+      "ntrial": {
+        "column": "RunTrialNumber",
+        "type": "trial",
+        "formula": ["sub", 1]
+      }
+    },
+    {
+      "name": "Feedback",
+      "ioi": {
+        "column": ["R*MostlyReward*"],
+        "regex": "True"
+      },
+      "onset":{
+          "column": "Feedback.OnsetTime"
+      },
+      "duration":{
+        "column": "Feedback.OnsetToOnsetTime"
+      },
+      "stim_file_feedback": {
+        "column": "FeedbackImage",
+        "type": "stim",
+        "task": "gambling"
+      },
+      "feedback_number": {
+        "column": "FeedbackNumber"
+      },
+      "block_type": {
+        "value": "MostlyReward"
+      },
+      "nbloc": {
+        "column": ["^Run[1-9]List$"],
+        "type": "bloc",
+        "regex": "True"
+      },
+      "ntrial": {
+        "column": "RunTrialNumber",
+        "type": "trial",
+        "formula": ["sub", 1]
+      }
+    },
+    {
+      "name": {
         "column": "TrialType"
+      },
+      "ioi": {
+        "column": ["R*MostlyPunishment*"],
+        "regex": "True"
+      },
+      "onset": {
+        "column": "QuestionMark.OnsetTime"
+      },
+      "duration": {
+        "column": "QuestionMark.RT",
+        "rt": "True"
+      },
+      "answer": {
+        "column": "QuestionMark.RESP",
+        "type": "convert",
+        "correspondance": {
+          "a": "lower_than_five",
+          "b": "higher_than_five"}
+      },
+      "block_type": {
+        "value": "MostlyPunishment"
+      },
+      "nbloc": {
+        "column": ["^Run[1-9]List$"],
+        "type": "bloc",
+        "regex": "True"
+      },
+      "ntrial": {
+        "column": "RunTrialNumber",
+        "type": "trial",
+        "formula": ["sub", 1]
+      }
+    },
+    {
+      "name": "Feedback",
+      "ioi": {
+        "column": ["R*MostlyPunishment*"],
+        "regex": "True"
+      },
+      "onset":{
+          "column": "Feedback.OnsetTime"
+      },
+      "duration":{
+        "column": "Feedback.OnsetToOnsetTime"
+      },
+      "stim_file_feedback": {
+        "column": "FeedbackImage",
+        "type": "stim",
+        "task": "gambling"
+      },
+      "feedback_number": {
+        "column": "FeedbackNumber"
+      },
+      "block_type": {
+        "value": "MostlyPunishment"
+      },
+      "nbloc": {
+        "column": ["^Run[1-9]List$"],
+        "type": "bloc",
+        "regex": "True"
+      },
+      "ntrial": {
+        "column": "RunTrialNumber",
+        "type": "trial",
+        "formula": ["sub", 1]
+      }
+    },
+    {
+      "name": "countdown",
+      "ioi": {
+        "column": "Stimulus"
+      },
+      "onset": {
+        "column": "SyncSlide.OnsetTime"
+      },
+      "duration": {
+        "column": "SyncSlide.FinishTime",
+        "formula": [0, "subtract", "onset"]
+      },
+      "countdown_stim" : {
+        "column": "Stimulus"
       }
     }
   ]
