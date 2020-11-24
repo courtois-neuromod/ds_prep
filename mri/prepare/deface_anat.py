@@ -155,11 +155,16 @@ def main():
 
     subject_list = args.participant_label if args.participant_label else bids.layout.Query.ANY
     session_list = args.session_label if args.session_label else bids.layout.Query.ANY
-    deface_ref_images = layout.get(
+    filters = dict(
         subject=subject_list,
         session=session_list,
         **args.ref_bids_filters,
         extension=['nii','nii.gz'])
+    deface_ref_images = layout.get(**filters)
+
+    if not len(deface_ref_images):
+        logging.info(f"no reference image found with condition {filters}")
+        return
 
     new_files, modified_files = [], []
 
