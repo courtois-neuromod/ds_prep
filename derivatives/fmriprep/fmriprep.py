@@ -34,7 +34,7 @@ SINGULARITY_CMD_BASE = " ".join([
     ])
 
 slurm_preamble = """#!/bin/bash
-#SBATCH --account=rrg-pbellec
+#SBATCH --account={slurm_account}
 #SBATCH --job-name={jobname}.job
 #SBATCH --output={bids_root}/.slurm/{jobname}.out
 #SBATCH --error={bids_root}/.slurm/{jobname}.err
@@ -70,9 +70,10 @@ def write_job_footer(fd, jobname):
 
 def write_fmriprep_job(layout, subject, args, anat_only=True):
     job_specs = dict(
+        slurm_account = args.slurm_account,
         jobname = f"smriprep_sub-{subject}",
-        email=args.email,
-        bids_root=layout.root)
+        email = args.email,
+        bids_root = layout.root)
     job_specs.update(SMRIPREP_REQ)
     job_path = os.path.join(
         layout.root,
@@ -167,6 +168,7 @@ def write_func_job(layout, subject, session, args):
     #run_lengths = [rs[-1] for rs in run_shapes]
 
     job_specs = dict(
+        slurm_account = args.slurm_account,
         jobname = f"fmriprep_study-{study}_sub-{subject}_ses-{session}",
         email = args.email,
         bids_root=layout.root)
@@ -241,6 +243,9 @@ def parse_args():
     parser.add_argument(
         'preproc',
         help='anat or func')
+    parser.add_argument(
+        '--slurm-account', action='store', default='rrg-pbellec',
+        help='SLURM account for job submission')
     parser.add_argument(
         '--email', action='store',
         help='email for SLURM notifications')
