@@ -9,7 +9,7 @@ import datetime
 from operator import itemgetter
 from heudiconv.utils import json_dumps_pretty
 
-PYBIDS_CACHE_PATH = ".pybids_cache_withmeta"
+PYBIDS_CACHE_PATH = ".pybids_cache"
 
 
 def fill_intended_for(args):
