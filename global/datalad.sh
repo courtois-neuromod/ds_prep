@@ -5,7 +5,7 @@ local_ip='10.10.10.20'
 
 function init_remote_s3(){
   bucket_name=$1
-  git annex config --set annex.security.allowed-ip-addresses $local_ip
+  git config --add annex.security.allowed-ip-addresses $local_ip
   git-annex initremote \
     -d ${bucket_name} \
     type=S3 \
