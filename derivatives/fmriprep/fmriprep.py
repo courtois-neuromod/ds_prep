@@ -197,9 +197,8 @@ def write_func_job(layout, subject, session, args):
             )
             + "_bold.dtseries.nii",
         )
-        bold_deriv = os.path.lexists(preproc_path) and os.path.lexists(
-            dtseries_path
-        )  # test if file or symlink (even broken if git-annex and not pulled)
+        # test if file or symlink (even broken if git-annex and not pulled)
+        bold_deriv = os.path.lexists(preproc_path) and os.path.lexists(dtseries_path) 
         if bold_deriv:
             print(
                 f"found existing derivatives for {bold_run.path} : {preproc_path}, {dtseries_path}"
@@ -376,7 +375,7 @@ def main():
             re.compile(r"^\."),
         ) + load_bidsignore(args.bids_path),
     ))
-    
+
     layout = bids.BIDSLayout(
         args.bids_path,
         database_path=pybids_cache_path,
