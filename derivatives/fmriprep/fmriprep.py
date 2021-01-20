@@ -221,7 +221,7 @@ def write_func_job(layout, subject, session, args):
     bids_filters_path = os.path.join(
         layout.root,
         SLURM_JOB_DIR,
-        f"{job_specs['jobname']}_bids_filters.json")
+        f"{job_specs['jobname']}_bids_filters.json"
     )
 
     pybids_cache_path = os.path.join(layout.root, PYBIDS_CACHE_PATH)
