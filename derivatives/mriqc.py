@@ -62,9 +62,10 @@ def load_bidsignore(bids_root):
     return tuple()
 
 def write_mriqc_job(layout, subject, session, args, type='func'):
+    study = os.path.basename(layout.root)
     job_specs = dict(
         slurm_account=args.slurm_account,
-        jobname=f"mriqc_sub-{subject}_ses-{session}",
+        jobname=f"mriqc_study-{study}_sub-{subject}_ses-{session}",
         email=args.email,
         bids_root=layout.root,
     )
