@@ -13,11 +13,11 @@ script_dir = os.path.dirname(__file__)
 PYBIDS_CACHE_PATH = ".pybids_cache"
 SLURM_JOB_DIR = ".slurm"
 
-MRIQC_REQ = {"cpus": 8, "mem_per_cpu": 4, "time": "4:00:00", "omp_nthreads": 8}
+MRIQC_REQ = {"cpus": 8, "mem_per_cpu": 4, "time": "8:00:00", "omp_nthreads": 8}
 
 MRIQC_DEFAULT_VERSION = "mriqc-0.16"
 MRIQC_DEFAULT_SINGULARITY_PATH = os.path.abspath(
-    os.path.join(script_dir, f"../../containers/{MRIQC_DEFAULT_VERSION}.sif")
+    os.path.join(script_dir, f"../containers/{MRIQC_DEFAULT_VERSION}.sif")
 )
 SINGULARITY_CMD_BASE = " ".join(
     [
@@ -41,6 +41,8 @@ slurm_preamble = """#!/bin/bash
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user={email}
 
+
+export SINGULARITYENV_TEMPLATEFLOW_HOME=/home/bidsapp/.cache/templateflow/
 """
 
 
@@ -79,7 +81,7 @@ def write_mriqc_job(layout, subject, session, args, type='func'):
     mriqc_singularity_path = args.container or MRIQC_DEFAULT_SINGULARITY_PATH
 
     if type == 'anat':
-        acqs = ['T1w', 'T2w']
+        acqs = ['T1w']
     else:
         acqs = ['bold']
 
