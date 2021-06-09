@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import retro
 
 stop_tags = ["VideoGame", "stopped at"]
 rep_tag = "level step: 0"
@@ -24,7 +25,7 @@ def logs2event_files(in_files, out_file_tpl):
         )
         for e in log:
             if record_tag in e[2]:
-                record = e
+                record = "/".join(e[2].split(" ")[-1].split("/")[-4:])
             elif e[2] == TTL_tag:
                 if not TTL:
                     run += 1  # only increment if the previous scan was not aborted
@@ -35,14 +36,23 @@ def logs2event_files(in_files, out_file_tpl):
             elif all(stt in e[2] for stt in stop_tags):
                 stop = e
                 if TTL:
-                    repetition[-1].append(
-                        (
-                            "gym-retro_game",
-                            rep[0] - TTL,
-                            stop[0] - rep[0],
-                            "/".join(record[2].split(" ")[-1].split("/")[-4:]),
+                    bk2 = retro.Movie(record)
+                    bk2_dur  = 0
+                    while bk2.step():
+                        bk2_dur += 1
+
+                    duration_log = stop[0] - rep[0]
+                    if np.abs(duration_log-bk2_dur/60.) > 1:
+                        print(f"error : run-{len(repetition)+1} {onset} {record} {duration_log} - {bk2_dur}={duration_log-bk2_du}")
+                    else:
+                        repetition[-1].append(
+                            (
+                                "gym-retro_game",
+                                rep[0] - TTL,
+                                duration_log,
+                                record,
+                            )
                         )
-                    )
             elif all(cpt in e[2] for cpt in complete_tags) or all(
                 abt in e[2] for abt in abort_tags
             ):
