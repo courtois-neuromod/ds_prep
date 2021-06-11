@@ -14,7 +14,7 @@ def logs2event_files(in_files, out_file_tpl):
     repetition = []
     run = 0
     TTL = None
-    last_rep = None
+    last_rep_last_run = 'aaa'
     for in_file in in_files:
         log = np.loadtxt(
             in_file,
@@ -43,13 +43,14 @@ def logs2event_files(in_files, out_file_tpl):
                         bk2_dur += 1
 
                     duration_log = stop[0] - rep[0]
-                    if np.abs(duration_log-bk2_dur/60.) > 3:
+                    if np.abs(duration_log-bk2_dur/60.) > 1 or record == last_rep_last_run:
                         print(f"error : run-{len(repetition)} {rep[0]} {record} {duration_log} - {bk2_dur/60.}={duration_log-(bk2_dur/60.)}")
                         repetition[-1].append(
                             (
                                 "gym-retro_game",
                                 rep[0] - TTL,
                                 duration_log,
+                                bk2_dur/60.,
                                 record.split('Level')[-1][:3],
                                 None,
                             )
@@ -60,14 +61,19 @@ def logs2event_files(in_files, out_file_tpl):
                                 "gym-retro_game",
                                 rep[0] - TTL,
                                 duration_log,
+                                bk2_dur/60.,
                                 record.split('Level')[-1][:3],
                                 record,
                             )
                         )
-            elif all(cpt in e[2] for cpt in complete_tags) or all(
-                abt in e[2] for abt in abort_tags
-            ):
+            elif all(cpt in e[2] for cpt in complete_tags):
                 TTL = None
+                last_rep_last_run = repetition[-1][-1]
+            elif all(abt in e[2] for abt in abort_tags):
+                TTL = None
+                if len(repetition): # only if TTL was received
+                    del repetition[-1]
+
         TTL = None  # reset the TTL
     run = 0
     for reps in repetition:
@@ -76,7 +82,6 @@ def logs2event_files(in_files, out_file_tpl):
         run += 1
         out_file = out_file_tpl % run
         df = pd.DataFrame(
-            reps, columns=["trial_type", "onset", "duration", "level", "stim_file"]
+            reps, columns=["trial_type", "onset", "duration", "duration_bk2", "level", "stim_file"]
         )
         df.to_csv(out_file, sep="\t", index=False)
-        last_rep = reps[-1][-1]
