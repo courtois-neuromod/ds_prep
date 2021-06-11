@@ -43,8 +43,17 @@ def logs2event_files(in_files, out_file_tpl):
                         bk2_dur += 1
 
                     duration_log = stop[0] - rep[0]
-                    if np.abs(duration_log-(bk2_dur/60.)) > 1:
-                        print(f"error : run-{len(repetition)+1} {onset} {record} {duration_log} - {bk2_dur}={duration_log-bk2_dur}")
+                    if np.abs(duration_log-bk2_dur/60.) > 3:
+                        print(f"error : run-{len(repetition)} {rep[0]} {record} {duration_log} - {bk2_dur/60.}={duration_log-(bk2_dur/60.)}")
+                        repetition[-1].append(
+                            (
+                                "gym-retro_game",
+                                rep[0] - TTL,
+                                duration_log,
+                                record.split('Level')[-1][:3],
+                                None,
+                            )
+                        )
                     else:
                         repetition[-1].append(
                             (
