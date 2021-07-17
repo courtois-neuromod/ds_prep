@@ -43,7 +43,7 @@ def fill_intended_for(args):
             extension=".nii.gz",
             acquisition="sbref",
             subject=bold.entities["subject"],
-            session=bold.entities["session"],
+            session=bold.entities.get("session", None),
         )
 
         shim_settings = bold.tags["ShimSetting"].value
