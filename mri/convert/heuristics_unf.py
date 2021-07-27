@@ -90,7 +90,7 @@ def get_seq_bids_info(s, ex_dcm):
         if it not in rec_exclude:
             seq_extra["rec"] = it.lower()
     seq_extra["part"] = "mag" if "M" in s.image_type else ("phase" if "P" in s.image_type else None)
-
+    
     try:
         pedir = ex_dcm.dcm_data.InPlanePhaseEncodingDirection
         if "COL" in pedir:
@@ -250,9 +250,6 @@ def infotodict(seqinfo):
 
     lgr.info("Processing %d seqinfo entries", len(seqinfo))
 
-    # for s in seqinfo:
-    #    print(s)
-
     info = OrderedDict()
     skipped, skipped_unknown = [], []
     current_run = 0
@@ -265,15 +262,14 @@ def infotodict(seqinfo):
     prefix = ""
 
     fieldmap_runs = {}
-    all_suffixes = {}
+    all_bids_infos = {}
 
     for s in seqinfo:
 
         ex_dcm = nb_dw.wrapper_from_file(s.example_dcm_file_path)
 
         bids_info, bids_extra = get_seq_bids_info(s, ex_dcm)
-        print(s)
-        print(bids_info)
+        all_bids_infos[s.series_id] = (bids_info, bids_extra)
 
         # XXX: skip derived sequences, we don't store them to avoid polluting
         # the directory, unless it is the motion corrected ones
@@ -320,44 +316,8 @@ def infotodict(seqinfo):
 
         template = generate_bids_key(seq_type, seq_label, prefix, bids_info, show_dir, outtype)
 
-        if template in info:
-            print('duplicate??')
-            print(bids_extra)
-            for extra in ["rec", "part"]:
-                if bids_extra.get(extra):
-                    print(extra)
-                    # modify previous entry to add rec
-                    template2 = generate_bids_key(
-                        seq_type,
-                        seq_label,
-                        prefix,
-                        all_suffixes[template][0],
-                        show_dir,
-                        outtype,
-                        **{extra : all_suffixes[template][1][extra]})
-
-                    if template2 not in info:
-                        info[template2] = []
-                    info[template2].append(all_suffixes[template][2])
-                    del info[template]
-                    all_suffixes[template2] = all_suffixes[template]
-                
-                    #create new entry
-                    template = generate_bids_key(
-                        seq_type,
-                        seq_label,
-                        prefix,
-                        bids_info,
-                        show_dir,
-                        outtype,
-                        **{extra: bids_extra[extra]})
-                    if template not in info:
-                        break
-
-
         if template not in info:
             info[template] = []
-        all_suffixes[template] = bids_info, bids_extra, s.series_id
         info[template].append(s.series_id)
         
 
@@ -369,6 +329,7 @@ def infotodict(seqinfo):
             % (len(skipped_unknown), skipped_unknown)
         )
 
+    info = dedup_bids_extra(info, all_bids_infos)
     info = get_dups_marked(info)  # mark duplicate ones with __dup-0x suffix
 
     info = dict(
@@ -377,4 +338,46 @@ def infotodict(seqinfo):
 
     for k, i in info.items():
         print(k, i)
+    return info
+
+
+def dedup_bids_extra(info, bids_infos):
+    # add `rec-` or `part-` to dedup series originating from the same acquisition
+    info = info.copy()
+    for template, series_ids in list(info.items()):
+        if len(series_ids) > 1:
+            lgr.warning("Detected %d run(s) for template %s: %s",
+                        len(series_ids), template[0], series_ids)
+            # copy the duplicate ones into separate ones
+            dup_id = 0  # reset since declared per series
+
+            for extra in ["rec", "part"]:
+                
+                bids_extra_values = [bids_infos[sid][1].get(extra) for sid in series_ids]
+
+                if len(set(bids_extra_values)) < 2:
+                    continue #does not differentiate series
+
+                lgr.info(f"dedup series using {extra}")
+
+                for sid in list(series_ids): #need a copy of list because we are removing elements in that loop
+
+                    series_bids_info, series_bids_extra = bids_infos[sid]
+
+                    new_template = generate_bids_key(
+                        series_bids_info["type"],
+                        series_bids_info["label"],
+                        "",
+                        series_bids_info,
+                        show_dir=series_bids_info["type"] in ["fmap", "dwi"],
+                        outtype=("nii.gz",),
+                        **{extra: series_bids_extra.get(extra)})
+
+                    if new_template not in info:
+                        info[new_template] = []
+                    info[new_template].append(sid)
+                    info[template].remove(sid)
+                    if not len(info[template]):
+                        del info[template]
+                break
     return info
