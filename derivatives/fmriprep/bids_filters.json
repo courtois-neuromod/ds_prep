@@ -10,5 +10,12 @@
     "session":["001", "002"]
   },
   "bold" : {
-  }
+     "part": ["mag", null]
+  },
+  "sbref" : {
+     "part": ["mag", null]
+  },
+  "fmap" : {
+     "part": ["mag", null]
+  } 
 }
