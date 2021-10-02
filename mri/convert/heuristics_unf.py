@@ -28,6 +28,8 @@ def infotoids(seqinfos, outdir):
     study_path = study_name.split("^")
 
     rema = re.match("(([^_]*)_)?(([^_]*)_)?p([0-9]*)_([a-z]*)([0-9]*)", patient_name)
+    if rema is None:
+        rema = re.match("(([^_]*)_)?(([^_]*)_)?(dev)_([a-z]*)([0-9]*)", patient_name)
 
     locator = os.path.join(pi, *study_path)
 
@@ -227,7 +229,7 @@ def generate_bids_key(seq_type, seq_label, prefix, bids_info, show_dir=False, ou
         None if not bids_info.get("run") else "run-%02d" % int(bids_info["run"]),
         None if not bids_info.get("bp") else "bp-%s" % bids_info["bp"],
         None if not bids_info.get("echo") else "echo-%d" % int(bids_info["echo"]),
-        None if not (bids_info.get("part")) else "part-%s" % bids_info["part"],
+        None if not bids_info.get("part") else "part-%s" % bids_info["part"],
         seq_label,
     ]
     # filter those which are None, and join with _
@@ -287,9 +289,9 @@ def infotodict(seqinfo):
         seq_type = bids_info["type"]
         seq_label = bids_info["label"]
 
-        if (seq_type == "fmap" and seq_label == "epi") or (
+        if ((seq_type == "fmap" and seq_label == "epi") or (
             sbref_as_fieldmap and seq_label == "sbref"
-        ):
+        )) and bids_info["part"] in ["mag", None]:
             pe_dir = bids_info.get("dir", None)
             if not pe_dir in fieldmap_runs:
                 fieldmap_runs[pe_dir] = 0
