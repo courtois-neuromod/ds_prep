@@ -4,13 +4,13 @@
     "mp4": "/home/labopb/Documents/Marie/neuromod/test_data/pupil/THINGS_eye_tracking/ses-001/sub-03_ses-001_20210421-131339.pupil/EyeTracker-Calibration/001/eye0.mp4",
 
     "online_pupils": "/home/labopb/Documents/Marie/neuromod/test_data/pupil/THINGS_eye_tracking/ses-001/sub-03_ses-001_20210421-131339.pupil/EyeTracker-Calibration/001",
-    "offline_pupils2D" : "/home/labopb/Documents/Marie/neuromod/test_data/pupil/dev_output2/calib_pupils2D.npz",
-    "offline_pupils3D" : "/home/labopb/Documents/Marie/neuromod/test_data/pupil/dev_output2/calib_pupils3D.npz",
+    "offline_pupils2D": "/home/labopb/Documents/Marie/neuromod/test_data/pupil/dev_output2/calib_pupils2D.npz",
+    "offline_pupils3D": "/home/labopb/Documents/Marie/neuromod/test_data/pupil/dev_output2/calib_pupils3D.npz",
 
     "out_dir": "/home/labopb/Documents/Marie/neuromod/test_data/pupil/dev_output2",
 
     "online_gaze": "/home/labopb/Documents/Marie/neuromod/test_data/pupil/THINGS_eye_tracking/ses-001/sub-03_ses-001_20210421-131339.pupil/EyeTracker-Calibration/001",
-    "offline_gaze2D": "/placeholder.npz",
-    "offline_gaze3D": "/placeholder.npz",
+    "offline_gaze2D": "/home/labopb/Documents/Marie/neuromod/test_data/pupil/dev_output2/2d_gaze.npz",
+    "offline_gaze3D": "/home/labopb/Documents/Marie/neuromod/test_data/pupil/dev_output2/3d_gaze.npz"
 
 }

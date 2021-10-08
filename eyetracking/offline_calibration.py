@@ -14,17 +14,17 @@ from tqdm import tqdm
 import numpy as np
 from types import SimpleNamespace
 
-sys.path.append(os.path.join("/home/labopb/Documents/Marie/neuromod/pupil", "pupil_src", "shared_modules"))
-from video_capture.file_backend import File_Source
-from file_methods import PLData_Writer, load_pldata_file, load_object, save_object
-from gaze_producer.worker.fake_gpool import FakeGPool, FakeIPC
-
 import argparse
 
 parser = argparse.ArgumentParser(description='Perform off-line gaze mapping with 2D and 3D pupil detectors ')
 parser.add_argument('--run_dir', default='', type=str, help='absolute path to main code directory')
 parser.add_argument('--config', default='config.json', type=str, help='absolute path to config file')
 args = parser.parse_args()
+
+sys.path.append(os.path.join(args.run_dir, "pupil", "pupil_src", "shared_modules"))
+from video_capture.file_backend import File_Source
+from file_methods import PLData_Writer, load_pldata_file, load_object, save_object
+from gaze_producer.worker.fake_gpool import FakeGPool, FakeIPC
 
 from pupil_detector_plugins.detector_2d_plugin import Detector2DPlugin
 from gaze_mapping.gazer_2d import Gazer2D
