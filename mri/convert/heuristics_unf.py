@@ -289,9 +289,12 @@ def infotodict(seqinfo):
         seq_type = bids_info["type"]
         seq_label = bids_info["label"]
 
+        if (seq_type == "fmap" and seq_label == "epi" and bids_extra['part']=='phase'):
+            continue
+        
         if ((seq_type == "fmap" and seq_label == "epi") or (
             sbref_as_fieldmap and seq_label == "sbref"
-        )) and bids_info["part"] in ["mag", None]:
+        )) and bids_info.get("part") in ["mag", None]:
             pe_dir = bids_info.get("dir", None)
             if not pe_dir in fieldmap_runs:
                 fieldmap_runs[pe_dir] = 0
@@ -310,6 +313,7 @@ def infotodict(seqinfo):
                 ]
                 suffix = "_".join(filter(bool, suffix_parts))
                 template = create_key("fmap", suffix, prefix=prefix, outtype=outtype)
+                print( template)
                 if template not in info:
                     info[template] = []
                 info[template].append(s.series_id)
