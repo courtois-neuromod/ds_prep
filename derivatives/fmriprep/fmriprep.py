@@ -28,7 +28,7 @@ REQUIRED_TEMPLATES = ["MNI152NLin2009cAsym", "OASIS30ANTs", "fsLR", "fsaverage",
 SINGULARITY_CMD_BASE = " ".join(
     [
         "datalad containers-run "
-        "-m 'fMRIPrep_sub-{subject}_ses-{session}'",
+        "-m 'fMRIPrep_{subject_session}'",
         "-n containers/bids-fmriprep",
         "--input sourcedata/{study}/{subject_session}/fmap/",
         "--input sourcedata/{study}/{subject_session}/func/",
@@ -60,11 +60,11 @@ export SINGULARITYENV_TEMPLATEFLOW_HOME="sourcedata/templateflow/"
 
 
 datalad_pre = """
-export LOCAL_DATASET=$SLURM_TMPDIR/$SLURM_JOB_NAME/
+export LOCAL_DATASET=$SLURM_TMPDIR/${{SLURM_JOB_NAME//-/}}/
 flock --verbose {ds_lockfile} datalad clone {derivatives_path} $LOCAL_DATASET
 cd $LOCAL_DATASET
 datalad get -n -r -R1 . # get sourcedata/*
-datalad get -r sourcedata/templateflow/tpl-{{{templates}}}
+datalad get -s ria-beluga-storage -r sourcedata/templateflow/tpl-{{{templates}}}
 if [ -d sourcedata/smriprep ] ; then
     datalad get -n sourcedata/smriprep sourcedata/smriprep/sourcedata/freesurfer
 fi
@@ -79,7 +79,7 @@ fi
 
 datalad_post = """
 flock --verbose {ds_lockfile} datalad push -d ./ --to origin
-if [ -d sourcedata/freesurfer] ; then
+if [ -d sourcedata/freesurfer ] ; then
     flock --verbose {ds_lockfile} datalad push -d sourcedata/freesurfer $LOCAL_DATASET --to origin
 fi 
 """
@@ -112,10 +112,10 @@ def load_bidsignore(bids_root, mode="python"):
 def write_job_footer(fd, jobname):
     # TODO: copy resource monitor output
     fd.write(
-        f"cp $SLURM_TMPDIR/{jobname}/resource_monitor.json /scratch/{os.environ['USER']}/{jobname}_resource_monitor.json \n"
+        f"if [ -e $LOCAL_DATASET/resource_monitor.json ] ; then cp $LOCAL_DATASET/resource_monitor.json /scratch/{os.environ['USER']}/{jobname}_resource_monitor.json ; fi \n"
     )
     fd.write(
-        f"if [ $fmriprep_exitcode -ne 0 ] ; then cp -R $SLURM_TMPDIR/{jobname} /scratch/{os.environ['USER']}/{jobname} ; fi \n"
+        f"if [ $fmriprep_exitcode -ne 0 ] ; then cp -R $LOCAL_DATASET /scratch/{os.environ['USER']}/{jobname} ; fi \n"
     )
     fd.write("exit $fmriprep_exitcode \n")
 
@@ -269,9 +269,9 @@ def write_func_job(layout, subject, session, args):
         study=study,
         subject=subject,
         session=session,
-        subject_session=f"sub-{subject}" + (f"/ses-{session}" if session else ""),
+        subject_session=f"sub-{subject}" + (f"/ses-{session}" if session not in [None,'*'] else ""),
         slurm_account=args.slurm_account,
-        jobname=f"fmriprep_study-{study}_sub-{subject}"+ (f"_ses-{session}" if session else ""),
+        jobname=f"fmriprep_study-{study}_sub-{subject}"+ (f"_ses-{session}" if session not in [None, '*'] else ""),
         email=args.email,
         bids_root=layout.root,
         derivatives_path=derivatives_path,
@@ -292,7 +292,7 @@ def write_func_job(layout, subject, session, args):
     # filter for session
     bids_filters = json.load(open(BIDS_FILTERS_FILE))
     for acq in ["bold","sbref","fmap"]:
-        bids_filters[acq].update({"session": session})
+        bids_filters[acq].update({"session": [session]})
     with open(bids_filters_path, "w") as f:
         json.dump(bids_filters, f)
 

@@ -15,7 +15,5 @@
   "sbref" : {
      "part": ["mag", null]
   },
-  "fmap" : {
-     "part": ["mag", null]
-  } 
+  "fmap" : {}
 }
