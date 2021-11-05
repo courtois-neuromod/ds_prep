@@ -289,7 +289,7 @@ def infotodict(seqinfo):
         seq_type = bids_info["type"]
         seq_label = bids_info["label"]
 
-        if (seq_type == "fmap" and seq_label == "epi" and bids_extra['part']=='phase'):
+        if (seq_type == "fmap" and seq_label == "epi" and bids_extra['part']=='phase' and seq_label=='bold'):
             continue
         
         if ((seq_type == "fmap" and seq_label == "epi") or (
