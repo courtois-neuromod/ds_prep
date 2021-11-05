@@ -43,7 +43,6 @@ def fill_intended_for(args):
             suffix="epi",
             extension=".nii.gz",
             acquisition="sbref",
-            part=['mag', Query.NONE],
             subject=bold.entities["subject"],
             session=bold.entities.get("session", None),
         )
