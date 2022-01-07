@@ -1,0 +1,31 @@
+{
+
+    "time_threshold": 0.00416,
+    "pupil_confidence_threshold": 0.6,
+    "gaze_confidence_threshold": 0.85,
+
+    "mp4": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-01/ses-039/sub-01_ses-039_20211020-180629.pupil/task-friends-s2e4a/000/eye0.mp4",
+
+    "pupils1": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-01/ses-039/sub-01_ses-039_20211020-180629.pupil/task-friends-s2e4a/000",
+    "isOnline_pupils1": true,
+    "is3D_pupils1": false,
+    "pupils1_name": "s01_ses39_online_pupil_run",
+    "gaze1": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-01/ses-039/sub-01_ses-039_20211020-180629.pupil/task-friends-s2e4a/000",
+    "isOnline_gaze1": true,
+    "is3D_gaze1": false,
+    "gaze1_name": "s01_ses39_online_gaze_run",
+
+    "pupils2": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-01/ses-039/run_s2e04a_pupils2D.npz",
+    "isOnline_pupils2": false,
+    "is3D_pupils2": false,
+    "pupils2_name": "s01_ses39_offline2d_pupil_run",
+    "gaze2": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-01/ses-039/2d_gaze.npz",
+    "isOnline_gaze2": false,
+    "is3D_gaze2": false,
+    "gaze2_name": "s01_ses39_offline2d_gaze_run",
+
+    "out_dir": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/QC_tests",
+    "out_name": "s01_sess39_online_offline_run"
+
+
+}

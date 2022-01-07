@@ -1,13 +1,3 @@
-'''
-Script 1: Offline 2D and 3D Calibration
-
-Purpose:
-    Use PsychoPy calibration markers (saved as .npz) to do offline calibration and output offline .plcal calibration file
-
-Note: Might require using mock g_pool. It is apparently also used in some parts of pupil
-https://github.com/pupil-labs/pupil/blob/master/pupil_src/shared_modules/gaze_producer/worker/fake_gpool.py
-'''
-
 import os, sys, platform, json
 from time import time
 from tqdm import tqdm
@@ -16,22 +6,15 @@ from types import SimpleNamespace
 
 import argparse
 
-parser = argparse.ArgumentParser(description='Perform off-line gaze mapping with 2D and 3D pupil detectors ')
-parser.add_argument('--run_dir', default='', type=str, help='absolute path to main code directory')
-parser.add_argument('--config', default='config.json', type=str, help='absolute path to config file')
-args = parser.parse_args()
 
-sys.path.append(os.path.join(args.run_dir, "pupil", "pupil_src", "shared_modules"))
-from video_capture.file_backend import File_Source
-from file_methods import PLData_Writer, load_pldata_file, load_object, save_object
-from gaze_producer.worker.fake_gpool import FakeGPool, FakeIPC
+def get_arguments():
 
-from pupil_detector_plugins.detector_2d_plugin import Detector2DPlugin
-from gaze_mapping.gazer_2d import Gazer2D
+    parser = argparse.ArgumentParser(description='Perform off-line gaze mapping with 2D and 3D pupil detectors ')
+    parser.add_argument('--run_dir', default='', type=str, help='absolute path to main code directory')
+    parser.add_argument('--config', default='config.json', type=str, help='absolute path to config file')
+    args = parser.parse_args()
 
-from pupil_detector_plugins.pye3d_plugin import Pye3DPlugin
-from gaze_mapping.gazer_3d.gazer_headset import Gazer3D
-
+    return args
 
 
 def make_intrinsics(file_path):
@@ -67,7 +50,7 @@ def make_detection_gpool():
     return g_pool
 
 
-def predict_all_those_pupils(g_pool, config, pd_2d, pd_3d, eye_file, label):
+def predict_all_those_pupils(config, pd_2d, eye_file, pd_3d=None, label='test'):
 
     num_frames = len(eye_file.timestamps)
 
@@ -92,7 +75,8 @@ def predict_all_those_pupils(g_pool, config, pd_2d, pd_3d, eye_file, label):
     np.savez(os.path.join(config['out_dir'], label+'_pupils2D.npz'), pupils2d = pupils_2d_np)
 
     try:
-        p2d_writer = PLData_Writer(directory=config['out_dir'], name='offline_pupil2d')
+        # TODO: specify if calibration or run's pupils in name of saved file
+        p2d_writer = PLData_Writer(directory=config['out_dir'], name=label+'_offline_pupil2d')
         p2d_writer.extend(pupils_2d)
         p2d_writer.close()
     except:
@@ -102,7 +86,8 @@ def predict_all_those_pupils(g_pool, config, pd_2d, pd_3d, eye_file, label):
         pupils_3d_np = np.array(pupils_3d)
         np.savez(os.path.join(config['out_dir'], label+'_pupils3D.npz'), pupils3d = pupils_3d_np)
         try:
-            p3d_writer = PLData_Writer(directory=config['out_dir'], name='offline_pupil3d')
+            # TODO: specify if calibration or run's pupils in name of saved file
+            p3d_writer = PLData_Writer(directory=config['out_dir'], name=label+'_offline_pupil3d')
             p3d_writer.extend(pupils_3d)
             p3d_writer.close()
         except:
@@ -136,7 +121,27 @@ def map_all_those_pupils_to_gaze(config, gm_2d, gm_3d, pupils_2d, pupils_3d):
     return gaze_2d, gaze_3d
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
+    '''
+    Script takes pupil outputs from Friends s2e04 (a and b; two runs) seen in the scanner while collecting
+    eyetracking data.
+
+    These gold standard gaze mappings can be contrasted with Deepgaze_MR predictions
+    Project repo here: https://github.com/courtois-neuromod/deepgaze_mr
+    '''
+    args = get_arguments()
+
+    sys.path.append(os.path.join(args.run_dir, "pupil", "pupil_src", "shared_modules"))
+    from video_capture.file_backend import File_Source
+    from file_methods import PLData_Writer, load_pldata_file, load_object, save_object
+    from gaze_producer.worker.fake_gpool import FakeGPool, FakeIPC
+
+    from pupil_detector_plugins.detector_2d_plugin import Detector2DPlugin
+    from gaze_mapping.gazer_2d import Gazer2D
+
+    from pupil_detector_plugins.pye3d_plugin import Pye3DPlugin
+    from gaze_mapping.gazer_3d.gazer_headset import Gazer3D
+
 
     with open(args.config, 'r') as f:
         cfg = json.load(f)
@@ -150,7 +155,7 @@ if __name__ == "__main__":
 
     '''
     Step 1. Detect calibration pupils offline with 2D and 3D pupil detectors
-    This step is optional: the pupil data calculated online can be used instead
+    This step is optional: the pupil data calculated online (during scan) can be used instead
     (those are exported as .npz file by psychopy;
     technically, pupil's own .pldata files could be used, but they won't load...)
     '''
@@ -171,7 +176,7 @@ if __name__ == "__main__":
             detect_3d = Pye3DPlugin(g_pool)
 
         # Predict pupils
-        calib_pupils_2d, calib_pupils_3d = predict_all_those_pupils(g_pool, cfg, detect_2d, detect_3d, calib_eye_file, 'calib')
+        calib_pupils_2d, calib_pupils_3d = predict_all_those_pupils(cfg, detect_2d, calib_eye_file, detect_3d, 'calib')
 
 
     '''
@@ -267,12 +272,21 @@ if __name__ == "__main__":
                 detect_3d.detector._ult_long_term_schedule.pause()
 
         # Predict run's pupils
-        run_pupils_2d, run_pupils_3d = predict_all_those_pupils(g_pool, cfg, detect_2d, detect_3d, run_eye_file, 'run'+cfg['run_num'])
+        run_pupils_2d, run_pupils_3d = predict_all_those_pupils(cfg, detect_2d, run_eye_file, detect_3d, 'run_'+cfg['run_num'])
 
-    # load online pupils
+    # load run's online pupils
     else:
-        # TODO: convert serialized file to list of dictionaries...
         run_pupils_2d = load_pldata_file(cfg['run_mp4'][:-9], 'pupil')
+        #run_gaze_2d = load_pldata_file(cfg['run_mp4'][:-9], 'gaze')
+
+        # Convert serialized file to list of dictionaries...
+        online_2d_pupils = []
+        for pup in run_pupils_2d[0]:
+            pupil_data = {}
+            for key in pup.keys():
+                pupil_data[key] = pup[key]
+            online_2d_pupils.append(pupil_data)
+
         # https://github.com/pupil-labs/pupil/blob/97a3d099c2ffe353d0d1534ebde45ac0e1145da0/pupil_src/shared_modules/file_methods.py#L143
 
         # Note: there are no 3d online pupils, cannot use cfg['detect_run_pupils']=True and cfg['use3D']=True

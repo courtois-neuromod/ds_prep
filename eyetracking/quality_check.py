@@ -28,16 +28,27 @@ from gaze_mapping.gazer_3d.gazer_headset import Gazer3D
 #from gaze_mapping.utils import _find_nearest_idx as find_idx
 
 '''
-Quality checks
+Quality checks: contrast two sets of pupils and gaze
 
-1. Flag missing frames based on gaps in timestamps
-2. Assess difference in position between online 2d pupil, offline 2d pupil and offline 3d pupil over time / course of run
-3. Assess difference in gaze position between online 2d pupil, offline 2d pupil and offline 3d pupil over time / course of run
-4. If calibration data, assess distance between gaze position and markers position
-5. Assess model drift over time: distance between gaze (median within sliding window) and center of the screen. Or just plot median position over time to estimate drift
+1. (Optional) Flag missing frames in eye movie (mp4) based on gaps in camera timestamps
+2. Assess difference in position between two sets of pupils over time / course of run
+3. Assess difference in position (mapping) between two sets of gaze over time / course of run
 '''
 
 
+def export_line_plot(y_val, out_name=None, x_val=None):
+    plt.clf()
+    if x_val is not None:
+        plt.plot(x_val, y_val)
+    else:
+        plt.plot(y_val)
+
+    if out_name is not None:
+        #plt.savefig('{}/correlation_histograms.png'.format(out_dir))
+        plt.savefig(out_name)
+
+
+'''
 def make_plot(rs, rois, out_dir=None, out_name=''):
 
     ncols = 4
@@ -107,11 +118,12 @@ def make_plot(rs, rois, out_dir=None, out_name=''):
         #plt.savefig('{}/correlation_histograms.png'.format(out_dir))
         plt.savefig(out_dir + '/' + out_name + 'correlation_histograms.png')
 
+'''
 
 
-def match_batch(pupils1, pupils2, max_dispersion=1 / 15.0):
-    """Get pupil positions closest in time to ref points.
-    Return list of dict with matching ref and pupil datum.
+def match_batch(dset1, dset2, max_dispersion=1 / 15.0):
+    """Get pupil or gaze positions closest in time to ref points.
+    Return list of dict with matching ref and pupil / gaze datum.
     """
     '''
     matched = [[], []]
@@ -131,25 +143,25 @@ def match_batch(pupils1, pupils2, max_dispersion=1 / 15.0):
     return matched
     '''
 
-    matched_pup1 = []
-    matched_pup2 = []
+    matched_set1 = []
+    matched_set2 = []
 
     i = 0
 
-    for pup in pupils1:
+    for dpoint in dset1:
         unfound = True
         while unfound:
-            if i == len(pupils2):
+            if i == len(dset2):
                 unfound = False
-            elif abs(pup['timestamp'] - pupils2[i]['timestamp']) < 0.001:
-                matched_pup1.append(pup)
-                matched_pup2.append(pupils2[i])
+            elif abs(dpoint['timestamp'] - dset2[i]['timestamp']) < 0.001:
+                matched_set1.append(dpoint)
+                matched_set2.append(dset2[i])
                 i += 1
                 unfound = False
             else:
                 i += 1
 
-    return matched_pup1, matched_pup2
+    return matched_set1, matched_set2
 
 
 def assess_timegaps(t_stamps, threshold = 0.004016):
@@ -169,81 +181,195 @@ def assess_timegaps(t_stamps, threshold = 0.004016):
         time_diff.append(diff)
 
         if diff > threshold:
-            skip_idx.append(i-1, diff, t_stamps[i-1])
+            skip_idx.append([i-1, diff, t_stamps[i-1]])
 
     return time_diff, skip_idx
 
 
-def assess_pupil_freezes(pupils, thresh = 0.004016):
+def qc_report(list_data, output_name, data_type, cf_thresh=0.6, tg_thresh = 0.004016):
     '''
     Input:
-        pupils (list of dict): list of pupil data per frames
-        thresh (float): time gap (in ms) between frames above which a "freeze" is reported,
+        list_data (list of dict): list of pupil or gaze data per frames
+        output_name (string): path and name of output file
+        cf_thresh (float): confidence threshold
+        tg_thresh (float): time gap (in ms) between frames above which a "freeze" is reported,
     Output:
         tuple (time_diff, skip_idx): time differences and frame indices where above threshold time gaps
     '''
+
     t_stamps = []
+    confidences = []
+    positions = []
 
-    for i in range(len(c_pupils)):
-        t_stamps.append(c_pupils[i]['timestamp'])
+    for i in range(len(list_data)):
+        tstamp = list_data[i]['timestamp']
+        t_stamps.append(tstamp)
+        cf = list_data[i]['confidence']
+        confidences.append(cf)
+        if cf > cf_thresh:
+            if data_type == 'pupils':
+                x, y = list_data[i]['ellipse']['center']
+            elif data_type == 'gaze':
+                x, y = list_data[i]['norm_pos']
+                x = 1.0 if x > 1.0 else x
+                x = 0.0 if x < 0.0 else x
+                y = 1.0 if y > 1.0 else y
+                y = 0.0 if y < 0.0 else y
+            positions.append([x, y, tstamp])
 
-    return assess_timegaps(t_stamps, thresh)
+    print(os.path.basename(output_name) + ' has ' + str(100*(1 - len(positions)/len(list_data))) + '% of frames below confidence threshold')
 
+    time_diff, skip_idx = assess_timegaps(t_stamps, tg_thresh)
 
-def assess_distance(pupils1, pupils2):
+    x = np.array(positions)[:, 0].tolist()
+    y = np.array(positions)[:, 1].tolist()
+    times = np.array(positions)[:, 2].tolist()
+
+    export_line_plot(confidences, output_name + '_confidence.png')
+    export_line_plot(x, output_name + '_Xposition.png', times)
+    export_line_plot(y, output_name + '_Yposition.png', times)
+    #export_line_plot(time_diff, output_name + '_timediff.png')
+
+    if data_type == 'gaze':
+        w_size = 100
+        extra = len(positions) % w_size
+        x_medians = np.median(np.reshape(x[:-extra], (-1, w_size)), axis=0)
+        y_medians = np.median(np.reshape(y[:-extra], (-1, w_size)), axis=0)
+        export_line_plot(x_medians, output_name + '_Xmedians.png')
+        export_line_plot(x_medians, output_name + '_Ymedians.png')
     '''
-    Distance in pixels, assumes square pixels
+    if len(skip_idx) > 0:
+        print(os.path.basename(output_name) + ' has ' + str(len(skip_idx)) + ' time gaps')
+        np.savez(output_name + '_QCrep.npz', confidence = np.array(confidences), position = np.array(positions), time_diff = np.array(time_diff), time_gaps = np.array(skip_idx))
+    else:
+        np.savez(output_name + '_QCrep.npz', confidence = np.array(confidences), position = np.array(positions), time_diff = np.array(time_diff))
     '''
+
+def assess_distance(out_name, dtype, dset1, dset2, cf_thresh=0.6):
+    '''
+    Distance in pixels between center of pupil's position on eye movie frames;
+    Assumes square pixels
+
+    Or distance in normalized space between gaze positions
+    '''
+    out_name = out_name + '_' + dtype
+
     dist_list = []
+    time_list = []
 
-    print(len(pupils1), len(pupils2))
+    print(len(dset1), len(dset2))
     # match time stamps between files;
     # offline pupils start and stop later, for some odd reason...
-    if pupils1[0]['timestamp'] < pupils2[0]['timestamp']:
-        pupils2, pupils1 = match_batch(pupils2, pupils1)
+    if dset1[0]['timestamp'] < dset2[0]['timestamp']:
+        dset2, dset1 = match_batch(dset2, dset1)
     else:
-        pupils1, pupils2 = match_batch(pupils1, pupils2)
+        dset1, dset2 = match_batch(dset1, dset2)
 
-    assert len(pupils1) == len(pupils2)
-    print(len(pupils1), len(pupils2))
+    assert len(dset1) == len(dset2)
+    print(len(dset1), len(dset2))
 
-    for i in range(len(pupils1)):
-        assert abs(pupils1[i]['timestamp'] - pupils2[i]['timestamp']) < 0.001
-        x_1, y_1 = pupils1[i]['ellipse']['center'] # norm_pos (in % screen), center (in pixels)
-        x_2, y_2 = pupils2[i]['ellipse']['center']
+    for i in range(len(dset1)):
+        assert abs(dset1[i]['timestamp'] - dset2[i]['timestamp']) < 0.001
+        tstamp = dset1[i]['timestamp']
+        c1 = dset1[i]['confidence']
+        c2 = dset2[i]['confidence']
+        if (c1 > cf_thresh) and (c2 > cf_thresh):
+            if dtype == 'pupils':
+                x_1, y_1 = dset1[i]['ellipse']['center'] # norm_pos (in % screen), center (in pixels)
+                x_2, y_2 = dset2[i]['ellipse']['center']
+            elif dtype == 'gaze':
+                x_1, y_1 = dset1[i]['norm_pos'] # norm_pos (in % screen), center (in pixels)
+                x_2, y_2 = dset2[i]['norm_pos']
+            dist = np.sqrt((x_2 - x_1)**2 + (y_2 - y_1)**2)
+            dist_list.append(dist)
+            time_list.append(tstamp)
 
-        dist = np.sqrt((x_2 - x_1)**2 + (y_2 - y_1)**2)
-        dist_list.append(dist)
+    # Export lists of difference as dictionary (.npz file w 3 entries)
+    #np.savez(os.path.join(cfg['out_dir'], cfg['out_name'] + 'pupil_differences.npz'), diff_on2d_off2d = np.array(diff_on2d_off2d),diff_off2d_off3d = np.array(diff_off2d_off3d),diff_on2d_off3d = np.array(diff_on2d_off3d))
 
-    return dist_list
+    # Export lists of difference as dictionary (.npz file w single entry)
+    '''
+    np.savez(out_name + '_distance.npz', distance = np.array(dist_list), t_stamps = np.array(time_list))
+    '''
+    export_line_plot(dist_list, out_name + '_distance.png', time_list)
 
 
 if __name__ == "__main__":
+    '''
+    Performs Quality Check and comparisons between two different sets of pupils and their corresponding gaze
+    for a certain analysis (run)
+    '''
 
     with open(args.config, 'r') as f:
         cfg = json.load(f)
 
-    g_pool = SimpleNamespace()
+    '''
+    Step 1. Assess eye camera freezing: any time gaps in in-scan eye capture? (from in-scan eye mp4)
+    '''
+    if 'mp4' in cfg:
+        g_pool = SimpleNamespace()
+        eye_file = File_Source(g_pool, cfg['mp4'])
+        t_stamps = eye_file.timestamps
 
-    eye_file = File_Source(g_pool, cfg['mp4'])
-    t_stamps = eye_file.timestamps
+        diff_list, gap_idx = assess_timegaps(t_stamps, cfg['time_threshold'])
 
-    diff_list, gap_idx = assess_timegaps(t_stamps, cfg['time_threshold'])
+        if len(gap_idx) > 0:
+            #export as .tsv
+            np.savetxt(os.path.join(cfg['out_dir'], cfg['out_name'] + '_frame_gaps.tsv'), np.array(gap_idx), delimiter="\t")
 
-    if len(gap_idx) > 0:
-        #export as .tsv
-        np.savetxt(os.path.join(cfg['out_dir'], 'frame_gaps.tsv'), np.array(gap_idx), delimiter="\t")
+    '''
+    Step 2. QC on pupils
+    For each set (separately)
+        Assess number of missing pupils (based on intervals in time stamps)
+        Plot confidence and position in x and y over time
+    Contrast the two sets to one another: difference in pupil positions (in pixels)
+    '''
+    # Load first set of pupils
+    # Note that online pupils are always captured w a 2D model in our set up
+    if 'pupils1' in cfg:
+        if cfg['isOnline_pupils1']:
+            pupils1 = load_pldata_file(cfg['pupils1'], 'pupil')[0]
+        else:
+            p1_tag = 'pupils3d' if cfg['is3D_pupils1'] else 'pupils2d'
+            pupils1 = np.load(cfg['pupils1'], allow_pickle=True)[p1_tag]
 
+        qc_report(pupils1, os.path.join(cfg['out_dir'], cfg['pupils1_name']), 'pupils', cfg['pupil_confidence_threshold'])
 
-    online_pupils = load_pldata_file(cfg['online_pupils'], 'pupil')[0]
-    offline_pupils2d = np.load(cfg['offline_pupils2D'], allow_pickle=True)['pupils2d']
-    offline_pupils3d = np.load(cfg['offline_pupils3D'], allow_pickle=True)['pupils3d']
+    # Load second set of pupils
+    if 'pupils1' in cfg:
+        if cfg['isOnline_pupils2']:
+            pupils2 = load_pldata_file(cfg['pupils2'], 'pupil')[0]
+        else:
+            p2_tag = 'pupils3d' if cfg['is3D_pupils2'] else 'pupils2d'
+            pupils2 = np.load(cfg['pupils2'], allow_pickle=True)[p2_tag]
 
-    diff_on2d_off2d = assess_distance(online_pupils, offline_pupils2d)
-    diff_off2d_off3d = assess_distance(offline_pupils2d, offline_pupils3d)
-    diff_on2d_off3d = assess_distance(online_pupils, offline_pupils3d)
+        qc_report(pupils2, os.path.join(cfg['out_dir'], cfg['pupils2_name']), 'pupils', cfg['pupil_confidence_threshold'])
 
-    # Export lists of difference as dictionary (.npz file w 3 entries)
-    np.savez(os.path.join(cfg['out_dir'], 'pupil_differences.npz'), diff_on2d_off2d = np.array(diff_on2d_off2d),diff_off2d_off3d = np.array(diff_off2d_off3d),diff_on2d_off3d = np.array(diff_on2d_off3d))
+    # Contrast two sets of pupils to one another
+    if 'pupils1' in cfg and 'pupils2' in cfg:
+        assess_distance(os.path.join(cfg['out_dir'], cfg['out_name']), 'pupils', pupils1, pupils2, cfg['pupil_confidence_threshold'])
 
-    # Make and export plots
+    '''
+    Step 3. Contrast gaze positions
+    '''
+    if 'gaze1' in cfg:
+        if cfg['isOnline_gaze1']:
+            gaze1 = load_pldata_file(cfg['gaze1'], 'gaze')[0]
+        else:
+            g1_tag = 'gaze3d' if cfg['is3D_gaze1'] else 'gaze2d'
+            gaze1 = np.load(cfg['gaze1'], allow_pickle=True)[g1_tag]
+
+        qc_report(gaze1, os.path.join(cfg['out_dir'], cfg['gaze1_name']), 'gaze', cfg['gaze_confidence_threshold'])
+
+    if 'gaze2' in cfg:
+        if cfg['isOnline_gaze2']:
+            gaze2 = load_pldata_file(cfg['gaze2'], 'gaze')[0]
+        else:
+            g2_tag = 'gaze3d' if cfg['is3D_gaze2'] else 'gaze2d'
+            gaze2 = np.load(cfg['gaze2'], allow_pickle=True)[g2_tag]
+
+        qc_report(gaze2, os.path.join(cfg['out_dir'], cfg['gaze2_name']), 'gaze', cfg['gaze_confidence_threshold'])
+
+    # Contrast two sets of gaze to one another
+    if 'gaze1' in cfg and 'gaze2' in cfg:
+        assess_distance(os.path.join(cfg['out_dir'], cfg['out_name']), 'gaze', gaze1, gaze2, cfg['gaze_confidence_threshold'])
