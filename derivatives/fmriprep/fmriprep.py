@@ -15,10 +15,11 @@ script_dir = os.path.dirname(__file__)
 PYBIDS_CACHE_PATH = ".pybids_cache"
 SLURM_JOB_DIR = "code"
 
-SMRIPREP_REQ = {"cpus": 16, "mem_per_cpu": 4096, "time": "24:00:00", "omp_nthreads": 8}
-FMRIPREP_REQ = {"cpus": 16, "mem_per_cpu": 4096, "time": "12:00:00", "omp_nthreads": 8}
+SMRIPREP_REQ = {"cpus": 8, "mem_per_cpu": 4096, "time": "24:00:00", "omp_nthreads": 8}
+FMRIPREP_REQ = {"cpus": 12, "mem_per_cpu": 4096, "time": "8:00:00", "omp_nthreads": 8}
 
 BIDS_FILTERS_FILE = os.path.join(script_dir, "bids_filters.json")
+
 TEMPLATEFLOW_HOME = os.path.join(
     os.environ.get("SCRATCH", os.path.join(os.environ["HOME"], ".cache")),
     "templateflow",
@@ -61,9 +62,9 @@ export SINGULARITYENV_TEMPLATEFLOW_HOME="sourcedata/templateflow/"
 
 datalad_pre = """
 export LOCAL_DATASET=$SLURM_TMPDIR/${{SLURM_JOB_NAME//-/}}/
-flock --verbose {ds_lockfile} datalad clone {derivatives_path} $LOCAL_DATASET
+flock --verbose {ds_lockfile} datalad clone {output_repo} $LOCAL_DATASET
 cd $LOCAL_DATASET
-datalad get -n -r -R1 . # get sourcedata/*
+datalad get -s ria-beluga-storage -n -r -R1 . # get sourcedata/* containers
 datalad get -s ria-beluga-storage -r sourcedata/templateflow/tpl-{{{templates}}}
 if [ -d sourcedata/smriprep ] ; then
     datalad get -n sourcedata/smriprep sourcedata/smriprep/sourcedata/freesurfer
@@ -112,7 +113,7 @@ def load_bidsignore(bids_root, mode="python"):
 def write_job_footer(fd, jobname):
     # TODO: copy resource monitor output
     fd.write(
-        f"if [ -e $LOCAL_DATASET/resource_monitor.json ] ; then cp $LOCAL_DATASET/resource_monitor.json /scratch/{os.environ['USER']}/{jobname}_resource_monitor.json ; fi \n"
+        f"if [ -e $LOCAL_DATASET/workdir/fmriprep_wf/resource_monitor.json ] ; then cp $LOCAL_DATASET/workdir/fmriprep_wf/resource_monitor.json /scratch/{os.environ['USER']}/{jobname}_resource_monitor.json ; fi \n"
     )
     fd.write(
         f"if [ $fmriprep_exitcode -ne 0 ] ; then cp -R $LOCAL_DATASET /scratch/{os.environ['USER']}/{jobname} ; fi \n"
@@ -208,6 +209,17 @@ def write_func_job(layout, subject, session, args):
         extension=[".nii", ".nii.gz"],
         suffix="bold",
     )
+    contains_phase_data = False
+    if any([b.entities.get('part')=='phase' for b in bold_runs]):
+        contains_phase_data = True
+        print("Dataset contains phase bold(s), selecting only part-mag bolds.")
+        bold_runs = layout.get(
+            subject=subject,
+            session=session if session else bids.layout.Query.NONE,
+            extension=[".nii", ".nii.gz"],
+            suffix="bold",
+            part='mag',
+        )
     if len(bold_runs) == 0:
         print(f"No bold runs found for {subject} {session}")
 
@@ -275,7 +287,8 @@ def write_func_job(layout, subject, session, args):
         email=args.email,
         bids_root=layout.root,
         derivatives_path=derivatives_path,
-        ds_lockfile=os.path.join(derivatives_path, '.datalad_lock'),
+        output_repo=args.output_repo,
+        ds_lockfile=os.path.join(args.output_repo.replace('ria+file://','').replace('#~','/alias/'), '.datalad_lock'),
         TEMPLATEFLOW_HOME=TEMPLATEFLOW_HOME,
         templates=",".join(REQUIRED_TEMPLATES),
     )
@@ -293,6 +306,9 @@ def write_func_job(layout, subject, session, args):
     bids_filters = json.load(open(BIDS_FILTERS_FILE))
     for acq in ["bold","sbref","fmap"]:
         bids_filters[acq].update({"session": [session]})
+    if contains_phase_data:
+        for acq in ["bold","sbref"]:
+            bids_filters[acq].update({"part": "mag"})
     with open(bids_filters_path, "w") as f:
         json.dump(bids_filters, f)
 
@@ -316,7 +332,7 @@ def write_func_job(layout, subject, session, args):
 #                    f"--bids-database-dir {pybids_cache_path}",
                     f"--bids-filter-file {bids_filters_path}",
                     "--output-layout bids",
-                    "--ignore slicetiming",
+                    "--ignore slicetiming" if not args.slicetiming else "",
                     "--use-syn-sdc",
                     "--output-spaces",
                     *OUTPUT_TEMPLATES,
@@ -362,6 +378,12 @@ def parse_args():
         type=pathlib.Path,
         help="name of the output folder in derivatives.",
     )
+
+    parser.add_argument(
+        "--output-repo",
+        help="path to the ria-store dataset.",
+    )
+
     parser.add_argument("preproc", help="anat or func")
     parser.add_argument(
         "--slurm-account",
@@ -387,6 +409,13 @@ def parse_args():
         help="a space delimited list of session identifiers or a single "
         "identifier (the ses- prefix can be removed)",
     )
+
+    parser.add_argument(
+        "--slicetiming",
+        action="store_true",
+        help="Activate slicetiming correction",
+    )
+
     parser.add_argument(
         "--force-reindex",
         action="store_true",
@@ -485,17 +514,13 @@ def main():
     license_path = os.path.join(job_path, 'freesurfer.license')
     if not os.path.exists(license_path):
         shutil.copyfile(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'freesurfer.license'), license_path)
-#    # prefectch templateflow templates
-#    os.environ["TEMPLATEFLOW_HOME"] = TEMPLATEFLOW_HOME
-#    import templateflow.api as tf_api
-
-#    tf_api.get(OUTPUT_TEMPLATES + ["OASIS30ANTs", "fsLR", "fsaverage"])
 
     for job_file in run_fmriprep(layout, args, args.preproc):
         if not args.no_submit:
             submit_slurm_job(job_file)
 
     datalad.api.save(glob.glob('code/*mriprep*.sh')+glob.glob('code/*bids_filters.json'))
+    datalad.api.push(to='ria-beluga')
 
 if __name__ == "__main__":
     main()
