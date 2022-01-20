@@ -1,0 +1,29 @@
+{
+
+    "time_threshold": 0.00416,
+    "pupil_confidence_threshold": 0.6,
+    "gaze_confidence_threshold": 0.85,
+
+    "mp4": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-03/ses-069/sub-03_ses-069_20211027-141144.pupil/eyeTrackercalibration-1/000/eye0.mp4",
+
+    "pupils1": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-03/ses-069/sub-03_ses-069_20211027-141144.pupil/eyeTrackercalibration-1/000",
+    "isOnline_pupils1": true,
+    "is3D_pupils1": false,
+    "pupils1_name": "CAL_s03_ses69_online_pupil",
+    "gaze1": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-03/ses-069/sub-03_ses-069_20211027-141144.pupil/eyeTrackercalibration-1/000",
+    "isOnline_gaze1": true,
+    "is3D_gaze1": false,
+    "gaze1_name": "CAL_s03_ses69_online_gaze",
+
+    "isOnline_pupils2": true,
+    "is3D_pupils2": false,
+    "gaze2": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-03/ses-069_allpupils/calib_gaze2D.npz",
+    "isOnline_gaze2": false,
+    "is3D_gaze2": false,
+    "gaze2_name": "CAL_03_ses69_allpupils_gaze",
+
+    "out_dir": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-03/QC/online_vs_allpups_3",
+    "out_name": "CAL_s03_sess69_online_allpupils"
+
+
+}

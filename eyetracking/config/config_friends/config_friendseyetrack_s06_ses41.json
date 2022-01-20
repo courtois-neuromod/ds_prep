@@ -1,18 +1,19 @@
 {
 
-    "run_num": "s2e04a",
+    "run_num": "s2e04b",
     "focal_length": 256.0,
     "min_calibration_confidence": 0.6,
     "use3D": true,
 
     "detect_calib_pupils": true,
     "use_online_calib_params": false,
+    "export_calib_gaze": true,
     "detect_run_pupils": true,
     "freeze_3d_at_test": false,
     "overwrite_camera_intrinsics": false,
 
-    "calib_mp4": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-01/ses-039/sub-01_ses-039_20211020-180629.pupil/eyeTrackercalibration-1/000/eye0.mp4",
-    "run_mp4": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-01/ses-039/sub-01_ses-039_20211020-180629.pupil/task-friends-s2e4a/000/eye0.mp4",
+    "calib_mp4": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-06/ses-041/sub-06_ses-041_20211027-160734.pupil/eyeTrackercalibration-1/000/eye0.mp4",
+    "run_mp4": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-06/ses-041/sub-06_ses-041_20211027-160734.pupil/task-friends-s2e4b/000/eye0.mp4",
 
     "properties": {"coarse_detection": true,
                     "coarse_filter_min": 128,
@@ -36,11 +37,11 @@
                     "ellipse_true_support_min_dist": 2.5,
                     "support_pixel_ratio_exponent": 2.0},
 
-    "out_dir": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-01/ses-039",
+    "out_dir": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-06/ses-041",
 
     "calibration_parameters_2d": "/placeholder.plcal",
     "calibration_parameters_3d": "/placeholder.plcal",
 
-    "calibration_data": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-01/ses-039/sub-01_ses-039_20211020-180629_eyeTrackercalibration-1_calib-data.npz"
+    "calibration_data": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-06/ses-041/sub-06_ses-041_20211027-160734_eyeTrackercalibration-1_calib-data.npz"
 
 }

@@ -2,10 +2,12 @@ import os, sys, platform, json
 from time import time
 from tqdm import tqdm
 import numpy as np
+import pandas as pd
 from types import SimpleNamespace
 
 import argparse
 
+from quality_check_THINGS import assess_timegaps, qc_report
 
 def get_arguments():
 
@@ -121,30 +123,15 @@ def map_all_those_pupils_to_gaze(config, gm_2d, gm_3d, pupils_2d, pupils_3d, lab
     return gaze_2d, gaze_3d
 
 
-if __name__ == '__main__':
-    '''
-    Script takes pupil outputs from Friends s2e04 (a and b; two runs) seen in the scanner while collecting
-    eyetracking data.
+def map_run_gaze(cfg, run):
+    if cfg['apply_qc']:
+        gct = str(cfg['gaze_confidence_threshold'])
+        pct = str(cfg['pupil_confidence_threshold'])
 
-    These gold standard gaze mappings can be contrasted with Deepgaze_MR predictions
-    Project repo here: https://github.com/courtois-neuromod/deepgaze_mr
-    '''
-    args = get_arguments()
+        gaze_report = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + gct + ' Confidence Threshold', 'Outside Screen Area'])
+        pupil_report = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + pct + ' Confidence Threshold'])
 
-    sys.path.append(os.path.join(args.run_dir, "pupil", "pupil_src", "shared_modules"))
-    from video_capture.file_backend import File_Source
-    from file_methods import PLData_Writer, load_pldata_file, load_object, save_object
-    from gaze_producer.worker.fake_gpool import FakeGPool, FakeIPC
-
-    from pupil_detector_plugins.detector_2d_plugin import Detector2DPlugin
-    from gaze_mapping.gazer_2d import Gazer2D
-
-    from pupil_detector_plugins.pye3d_plugin import Pye3DPlugin
-    from gaze_mapping.gazer_3d.gazer_headset import Gazer3D
-
-
-    with open(args.config, 'r') as f:
-        cfg = json.load(f)
+        run_report = open(os.path.join(cfg['out_dir'], 'qc', 'run' + run + '_report.txt'), 'w+')
 
     detect_2d = None
     detect_3d = None
@@ -171,18 +158,46 @@ if __name__ == '__main__':
         pass
 
     # Instantiate pupil detectors
-    # This step is needed for gpool ReGARDLESS of whether pupil detection
+    # This step is needed to initialize a valid gpool file ReGARDLESS of whether pupil detection
     # is re-done offline or not
-    calib_eye_file = File_Source(g_pool, source_path=cfg['calib_mp4'])
+    calib_eye_file = File_Source(g_pool, source_path=cfg['run' + run + '_calib_mp4'])
 
+    # run QC to detect missing frames in eye movie (e.g., camera freeze)
+    if cfg['apply_qc']:
+        calib_t_stamps = calib_eye_file.timestamps
+        diff_list, gap_idx = assess_timegaps(calib_t_stamps, cfg['time_threshold'])
+        if len(gap_idx) > 0:
+            #export as .tsv
+            np.savetxt(os.path.join(cfg['out_dir'], 'qc', 'run' + run + '_calib_framegaps.tsv'), np.array(gap_idx), delimiter="\t")
+
+    # Initialize 2d pupil detector
     detect_2d = Detector2DPlugin(g_pool, cfg['properties'])
     if cfg['use3D']:
         detect_3d = Pye3DPlugin(g_pool)
 
     # Predict pupils offline
     if cfg['detect_calib_pupils']:
-        calib_pupils_2d, calib_pupils_3d = predict_all_those_pupils(cfg, detect_2d, calib_eye_file, detect_3d, 'calib')
+        calib_pupils_2d, calib_pupils_3d = predict_all_those_pupils(cfg, detect_2d, calib_eye_file, detect_3d, 'run' + run + '_calib')
 
+        # QC the offline pupils
+        if cfg['apply_qc']:
+            cp_off2d_s, cp_off2d_d = qc_report(calib_pupils_2d, cfg['out_dir'] + '/qc', 'pupil_calib_offline2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+            run_report.write(cp_off2d_s + '\n')
+            cp_off2d_d = [cp_off2d_d[0], 'Calib', 'Offline2D', 'Run' + run, cp_off2d_d[1]]
+            pupil_report = pupil_report.append(pd.Series(cp_off2d_d, index=pupil_report.columns), ignore_index=True)
+            if cfg['use3D']:
+                cp_off3d_s, cp_off3d_d  = qc_report(calib_pupils_3d, cfg['out_dir'] + '/qc', 'pupil_calib_offline3D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+                run_report.write(cp_off3d_s + '\n')
+                cp_off3d_d = [cp_off3d_d[0], 'Calib', 'Offline3D', 'Run' + run, cp_off3d_d[1]]
+                pupil_report = pupil_report.append(pd.Series(cp_off3d_d, index=pupil_report.columns), ignore_index=True)
+
+    # QC the online pupils
+    if cfg['apply_qc']:
+        calib_online_pupils = load_pldata_file(cfg['run' + run + '_calib_mp4'][:-9], 'pupil')[0]
+        cp_on2d_s, cp_on2d_d = qc_report(calib_online_pupils, cfg['out_dir'] + '/qc', 'pupil_calib_online2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+        run_report.write(cp_on2d_s + '\n')
+        cp_on2d_d = [cp_on2d_d[0], 'Calib', 'Online2D', 'Run' + run, cp_on2d_d[1]]
+        pupil_report = pupil_report.append(pd.Series(cp_on2d_d, index=pupil_report.columns), ignore_index=True)
 
     '''
     Step 2. Initialize the 2d and 3d Gazer models
@@ -195,16 +210,18 @@ if __name__ == '__main__':
     # Option A: use existing calibration parameters (.plcal file)
     if cfg['use_online_calib_params']:
 
-        cal_path_2d = cfg['calibration_parameters_2d']
+        cal_path_2d = cfg['run' + run + '_calibration_parameters_2d']
         cal_params_2d  = load_object(cal_path_2d, allow_legacy=True)['data']['calib_params']
         gazemap_2d = Gazer2D(g_pool, params=cal_params_2d)
 
+        # Instantiate a separate gaze mapper for the calibration pupil,
+        # different from the one applied to run pupils (in case they interfere?)
         if cfg['export_calib_gaze']:
             cal_gazemap_2d = Gazer2D(g_pool, params=cal_params_2d)
         # Note: in our set up, online calibration is always w 2D model
         # but if 3d offline calibration params are saved, they can be uploaded like this
         if cfg['use3D']:
-            cal_path_3d = cfg['calibration_parameters_3d']
+            cal_path_3d = cfg['run' + run + '_calibration_parameters_3d']
             cal_params_3d  = load_object(cal_path_3d, allow_legacy=True)['data']['calib_params']
             gazemap_3d = Gazer3D(g_pool, params=cal_params_3d)
 
@@ -215,7 +232,7 @@ if __name__ == '__main__':
     # Pupil data predicted online during calibration can be used from saved .pnz file,
     # or the pupils predicted with the optional step above can be used instead
     else:
-        cal_path = cfg['calibration_data']
+        cal_path = cfg['run' + run + '_calibration_data']
         cal_file = np.load(cal_path, allow_pickle=True)
 
         cal_data = {}
@@ -249,7 +266,7 @@ if __name__ == '__main__':
 
             if cfg['use3D']:
                 # Convert serialized file to list of dictionaries...
-                seri_calib_pupils_3d = load_pldata_file(cfg['previous_cal_3dpupils'], cfg['prev_cal_pup3D_name'])
+                seri_calib_pupils_3d = load_pldata_file(cfg['run' + run + '_previous_cal_3dpupils'], cfg['run' + run + '_prev_cal_pup3D_name'])
                 for pup in seri_calib_pupils_3d[0]:
                     pupil_data = {}
                     for key in pup.keys():
@@ -278,7 +295,7 @@ if __name__ == '__main__':
         cal_params = {}
         cal_params['data'] = {}
         cal_params['data']['calib_params'] = gazemap_2d.get_params()
-        save_object(cal_params, os.path.join(cfg['out_dir'], 'Offline_Calibration2D.plcal'))
+        save_object(cal_params, os.path.join(cfg['out_dir'], 'Offline_Calibration2D_run' + run + '.plcal'))
 
         if cfg['use3D']:
             cal_data['pupil_list'] = calib_pupils_3d
@@ -296,11 +313,31 @@ if __name__ == '__main__':
             cal_params = {}
             cal_params['data'] = {}
             cal_params['data']['calib_params'] = gazemap_3d.get_params()
-            save_object(cal_params, os.path.join(cfg['out_dir'], 'Offline_Calibration3D.plcal'))
+            save_object(cal_params, os.path.join(cfg['out_dir'], 'Offline_Calibration3D_run' + run + '.plcal'))
 
     if cfg['export_calib_gaze']:
         # map calibration pupils to gaze
-        calib_gaze_2d, calib_gaze_3d = map_all_those_pupils_to_gaze(cfg, cal_gazemap_2d, cal_gazemap_3d, calib_pupils_2d, calib_pupils_3d, 'calib')
+        calib_gaze_2d, calib_gaze_3d = map_all_those_pupils_to_gaze(cfg, cal_gazemap_2d, cal_gazemap_3d, calib_pupils_2d, calib_pupils_3d, 'run' + run + '_calib')
+
+        # QC offline gaze
+        if cfg['apply_qc']:
+            cg_off2d_s, cg_off2d_d = qc_report(calib_gaze_2d, cfg['out_dir'] + '/qc', 'gaze_calib_offline2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+            run_report.write(cg_off2d_s + '\n')
+            cg_off2d_d = [cg_off2d_d[0], 'Calib', 'Offline2D', 'Run' + run, cg_off2d_d[1], cg_off2d_d[2]]
+            gaze_report = gaze_report.append(pd.Series(cg_off2d_d, index=gaze_report.columns), ignore_index=True)
+            if cfg['use3D']:
+                cg_off3d_s, cg_off3d_d = qc_report(calib_gaze_3d, cfg['out_dir'] + '/qc', 'gaze_calib_offline3D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+                run_report.write(cg_off3d_s + '\n')
+                cg_off3d_d = [cg_off3d_d[0], 'Calib', 'Offline3D', 'Run' + run, cg_off3d_d[1], cg_off3d_d[2]]
+                gaze_report = gaze_report.append(pd.Series(cg_off3d_d, index=gaze_report.columns), ignore_index=True)
+
+    # QC online gaze
+    if cfg['apply_qc']:
+        calib_online_gaze = load_pldata_file(cfg['run' + run + '_calib_mp4'][:-9], 'gaze')[0]
+        cg_on2d_s, cg_on2d_d = qc_report(calib_online_gaze, cfg['out_dir'] + '/qc', 'gaze_calib_online2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+        run_report.write(cg_on2d_s + '\n')
+        cg_on2d_d = [cg_on2d_d[0], 'Calib', 'Online2D', 'Run' + run, cg_on2d_d[1], cg_on2d_d[2]]
+        gaze_report = gaze_report.append(pd.Series(cg_on2d_d, index=gaze_report.columns), ignore_index=True)
 
 
     '''
@@ -316,10 +353,16 @@ if __name__ == '__main__':
             '''
             pass
 
-        run_eye_file = File_Source(g_pool, source_path=cfg['run_mp4'])
+        run_eye_file = File_Source(g_pool, source_path=cfg['run' + run + '_run_mp4'])
         # overwrite dummy variable set when loading intrinsics file...
         #run_eye_file._intrinsics.focal_length = cfg['focal_length']
         #g_pool.capture.intrinsics.focal_length = cfg['focal_length']
+        if cfg['apply_qc']:
+            run_t_stamps = run_eye_file.timestamps
+            diff_list, gap_idx = assess_timegaps(run_t_stamps, cfg['time_threshold'])
+            if len(gap_idx) > 0:
+                #export as .tsv
+                np.savetxt(os.path.join(cfg['out_dir'], 'qc', 'run_framegaps_run' + run + '.tsv'), np.array(gap_idx), delimiter="\t")
 
         if cfg['use3D']:
 
@@ -328,11 +371,31 @@ if __name__ == '__main__':
                 detect_3d.detector._ult_long_term_schedule.pause()
 
         # Predict run's pupils
-        run_pupils_2d, run_pupils_3d = predict_all_those_pupils(cfg, detect_2d, run_eye_file, detect_3d, 'run_'+cfg['run_num'])
+        run_pupils_2d, run_pupils_3d = predict_all_those_pupils(cfg, detect_2d, run_eye_file, detect_3d, 'run' + run + '_data')
+
+        # QC the offline pupils
+        if cfg['apply_qc']:
+            rp_off2d_s, rp_off2d_d = qc_report(run_pupils_2d, cfg['out_dir'] + '/qc', 'pupil_run_offline2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+            run_report.write(rp_off2d_s + '\n')
+            rp_off2d_d = [rp_off2d_d[0], 'Run', 'Offline2D', 'Run' + run, rp_off2d_d[1]]
+            pupil_report = pupil_report.append(pd.Series(rp_off2d_d, index=pupil_report.columns), ignore_index=True)
+            if cfg['use3D']:
+                rp_off3d_s, rp_off3d_d = qc_report(run_pupils_3d, cfg['out_dir'] + '/qc', 'pupil_run_offline3D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+                run_report.write(rp_off3d_s + '\n')
+                rp_off3d_d = [rp_off3d_d[0], 'Run', 'Offline3D', 'Run' + run, rp_off3d_d[1]]
+                pupil_report = pupil_report.append(pd.Series(rp_off3d_d, index=pupil_report.columns), ignore_index=True)
+
+    # QC the online pupils
+    if cfg['apply_qc']:
+        run_online_pupils = load_pldata_file(cfg['run' + run + '_run_mp4'][:-9], 'pupil')[0]
+        rp_on2d_s, rp_on2d_d = qc_report(run_online_pupils, cfg['out_dir'] + '/qc', 'pupil_run_online2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+        run_report.write(rp_on2d_s + '\n')
+        rp_on2d_d = [rp_on2d_d[0], 'Run', 'Online2D', 'Run' + run, rp_on2d_d[1]]
+        pupil_report = pupil_report.append(pd.Series(rp_on2d_d, index=pupil_report.columns), ignore_index=True)
 
     # load run's online pupils
     else:
-        seri_run_pupils_2d = load_pldata_file(cfg['previous_run_2dpupils'], cfg['prev_run_pup2D_name'])
+        seri_run_pupils_2d = load_pldata_file(cfg['run' + run + '_previous_run_2dpupils'], cfg['run' + run + '_prev_run_pup2D_name'])
         #seri_run_pupils_2d = load_pldata_file(cfg['run_mp4'][:-9], 'pupil')
         #run_gaze_2d = load_pldata_file(cfg['run_mp4'][:-9], 'gaze')
 
@@ -357,7 +420,7 @@ if __name__ == '__main__':
 
         if cfg['use3D']:
             # Convert serialized file to list of dictionaries...
-            seri_run_pupils_3d = load_pldata_file(cfg['previous_run_3dpupils'], cfg['prev_run_pup3D_name'])
+            seri_run_pupils_3d = load_pldata_file(cfg['run' + run + '_previous_run_3dpupils'], cfg['run' + run + '_prev_run_pup3D_name'])
             for pup in seri_run_pupils_3d[0]:
                 pupil_data = {}
                 for key in pup.keys():
@@ -371,4 +434,68 @@ if __name__ == '__main__':
                 run_pupils_3d.append(pupil_data)
 
     # map run pupils to gaze
-    gaze_data_2d, gaze_data_3d = map_all_those_pupils_to_gaze(cfg, gazemap_2d, gazemap_3d, run_pupils_2d, run_pupils_3d, 'run_'+cfg['run_num'])
+    gaze_data_2d, gaze_data_3d = map_all_those_pupils_to_gaze(cfg, gazemap_2d, gazemap_3d, run_pupils_2d, run_pupils_3d, 'run' + run + '_rundata')
+
+    if cfg['apply_qc']:
+        rg_off2d_s, rg_off2d_d = qc_report(gaze_data_2d, cfg['out_dir'] + '/qc', 'gaze_run_offline2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+        run_report.write(rg_off2d_s + '\n')
+        rg_off2d_d = [rg_off2d_d[0], 'Run', 'Offline2D', 'Run' + run, rg_off2d_d[1], rg_off2d_d[2]]
+        gaze_report = gaze_report.append(pd.Series(rg_off2d_d, index=gaze_report.columns), ignore_index=True)
+        if cfg['use3D']:
+            rg_off3d_s, rg_off3d_d = qc_report(gaze_data_3d, cfg['out_dir'] + '/qc', 'gaze_run_offline3D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+            run_report.write(rg_off3d_s + '\n')
+            rg_off3d_d = [rg_off3d_d[0], 'Run', 'Offline3D', 'Run' + run, rg_off3d_d[1], rg_off3d_d[2]]
+            gaze_report = gaze_report.append(pd.Series(rg_off3d_d, index=gaze_report.columns), ignore_index=True)
+    # QC online gaze
+    if cfg['apply_qc']:
+        run_online_gaze = load_pldata_file(cfg['run' + run + '_run_mp4'][:-9], 'gaze')[0]
+        rg_on2d_s, rg_on2d_d = qc_report(run_online_gaze, cfg['out_dir'] + '/qc', 'gaze_run_online2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+        run_report.write(rg_on2d_s + '\n')
+        rg_on2d_d = [rg_on2d_d[0], 'Run', 'Online2D', 'Run' + run, rg_on2d_d[1], rg_on2d_d[2]]
+        gaze_report = gaze_report.append(pd.Series(rg_on2d_d, index=gaze_report.columns), ignore_index=True)
+
+    run_report.close()
+    return pupil_report, gaze_report
+
+
+if __name__ == '__main__':
+    '''
+    Script outputs offline pupil and gaze outputs, and (optionally) performs quality checks on them,
+    based on functions from quality_check_THINGS.py (which can be ran only to QC online pupils and gaze)
+
+    Both scripts use the same config file, for convenience
+    '''
+    args = get_arguments()
+
+    sys.path.append(os.path.join(args.run_dir, "pupil", "pupil_src", "shared_modules"))
+    from video_capture.file_backend import File_Source
+    from file_methods import PLData_Writer, load_pldata_file, load_object, save_object
+    from gaze_producer.worker.fake_gpool import FakeGPool, FakeIPC
+
+    from pupil_detector_plugins.detector_2d_plugin import Detector2DPlugin
+    from gaze_mapping.gazer_2d import Gazer2D
+
+    from pupil_detector_plugins.pye3d_plugin import Pye3DPlugin
+    from gaze_mapping.gazer_3d.gazer_headset import Gazer3D
+
+
+    with open(args.config, 'r') as f:
+        cfg = json.load(f)
+
+    pct = str(cfg['pupil_confidence_threshold'])
+    gct = str(cfg['gaze_confidence_threshold'])
+
+    pupil_reports = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + pct + ' Confidence Threshold'])
+    gaze_reports = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + gct + ' Confidence Threshold', 'Outside Screen Area'])
+
+    for run in cfg['runs']:
+        print('Run ' + str(run))
+        try:
+            pupil_report, gaze_report = map_run_gaze(cfg, run)
+            pupil_reports = pd.concat((pupil_reports, pupil_report), ignore_index=True)
+            gaze_reports = pd.concat((gaze_reports, gaze_report), ignore_index=True)
+        except:
+            print('Something went wrong processing run ' + run)
+
+    pupil_reports.to_csv(cfg['out_dir'] +'/qc/' + cfg['subject'] + '_ses' + cfg['session'] + '_pupil_report.tsv', sep='\t', header=True, index=False)
+    gaze_reports.to_csv(cfg['out_dir'] +'/qc/' + cfg['subject'] + '_ses' + cfg['session'] + '_gaze_report.tsv', sep='\t', header=True, index=False)

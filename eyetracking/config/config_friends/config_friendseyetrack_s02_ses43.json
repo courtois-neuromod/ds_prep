@@ -7,6 +7,7 @@
 
     "detect_calib_pupils": true,
     "use_online_calib_params": false,
+    "export_calib_gaze": true,    
     "detect_run_pupils": true,
     "freeze_3d_at_test": false,
     "overwrite_camera_intrinsics": false,

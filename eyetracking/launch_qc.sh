@@ -9,4 +9,4 @@ config_file=${1}
 
 python -m quality_check \
       --run_dir="${RUNDIR}" \
-      --config="${RUNDIR}/config/${config_file}"
+      --config="${RUNDIR}/config/config_friends/qc/${config_file}"

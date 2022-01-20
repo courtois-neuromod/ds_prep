@@ -1,5 +1,6 @@
 import os, sys, platform, json
 import numpy as np
+import pandas as pd
 from types import SimpleNamespace
 
 import math
@@ -31,17 +32,42 @@ from gaze_mapping.gazer_3d.gazer_headset import Gazer3D
 Quality checks: contrast two sets of pupils and gaze
 
 1. (Optional) Flag missing frames in eye movie (mp4) based on gaps in camera timestamps
-2. Assess difference in position between two sets of pupils over time / course of run
-3. Assess difference in position (mapping) between two sets of gaze over time / course of run
+2. Flag percentage of pupils and gaze under confidence threshold
+3. Flag percentage of gaze outside screen area
+4. Plot x and z pupil and gaze position over time
 '''
 
+def make_detection_gpool():
+    g_pool = SimpleNamespace()
 
-def export_line_plot(y_val, out_name=None, x_val=None):
+    rbounds = SimpleNamespace()
+    # TODO: optimize? Narrow down search window?
+    rbounds.bounds = (0, 0, 640, 480) # (minx, miny, maxx, maxy)
+    g_pool.roi = rbounds
+
+    g_pool.display_mode = "algorithm" # "roi" # for display; doesn't change much
+    g_pool.eye_id = 0 #'eye0'
+    g_pool.app = "player" # "capture"
+
+    return g_pool
+
+
+def export_line_plot(y_val, out_name=None, x_val=None, x_range=None, y_range=None):
+
     plt.clf()
     if x_val is not None:
+        x_val = np.array(x_val)
+        x_0 = x_val[0]
+        x_val -= x_0
         plt.plot(x_val, y_val)
     else:
         plt.plot(y_val)
+
+    if x_range is not None:
+        plt.xlim(x_range)
+
+    if y_range is not None:
+        plt.ylim(y_range)
 
     if out_name is not None:
         #plt.savefig('{}/correlation_histograms.png'.format(out_dir))
@@ -181,12 +207,14 @@ def assess_timegaps(t_stamps, threshold = 0.004016):
         time_diff.append(diff)
 
         if diff > threshold:
+            print('skipped frames')
+            print([i-1, diff, t_stamps[i-1]])
             skip_idx.append([i-1, diff, t_stamps[i-1]])
 
     return time_diff, skip_idx
 
 
-def qc_report(list_data, output_name, data_type, cf_thresh=0.6, tg_thresh = 0.004016):
+def qc_report(list_data, output_path, output_name, data_type, cf_thresh=0.6, tg_thresh = 0.004016):
     '''
     Input:
         list_data (list of dict): list of pupil or gaze data per frames
@@ -201,6 +229,8 @@ def qc_report(list_data, output_name, data_type, cf_thresh=0.6, tg_thresh = 0.00
     confidences = []
     positions = []
 
+    off_bounds = 0
+
     for i in range(len(list_data)):
         tstamp = list_data[i]['timestamp']
         t_stamps.append(tstamp)
@@ -211,32 +241,59 @@ def qc_report(list_data, output_name, data_type, cf_thresh=0.6, tg_thresh = 0.00
                 x, y = list_data[i]['ellipse']['center']
             elif data_type == 'gaze':
                 x, y = list_data[i]['norm_pos']
-                x = 1.0 if x > 1.0 else x
-                x = 0.0 if x < 0.0 else x
-                y = 1.0 if y > 1.0 else y
-                y = 0.0 if y < 0.0 else y
+
+                is_off = 0
+                if x > 1.0:
+                    x = 1.0
+                    is_off = 1
+                elif x < 0.0:
+                    x = 0.0
+                    is_off = 1
+                if y > 1.0:
+                    y = 1.0
+                    is_off = 1
+                elif y < 0.0:
+                    y = 0.0
+                    is_off = 1
+                off_bounds += is_off
+                #x = 1.0 if x > 1.0 else x
+                #x = 0.0 if x < 0.0 else x
+                #y = 1.0 if y > 1.0 else y
+                #y = 0.0 if y < 0.0 else y
             positions.append([x, y, tstamp])
 
-    print(os.path.basename(output_name) + ' has ' + str(100*(1 - len(positions)/len(list_data))) + '% of frames below confidence threshold')
+    #s1 = os.path.basename(output_name) + ' has ' + str(100*(1 - len(positions)/len(list_data))) + '% of ' + data_type + ' below' + str(cf_thresh) + 'confidence threshold'
+    d1 = [output_name, 100*(1 - len(positions)/len(list_data))]
+    s1 = output_name + ' has ' + str(d1[1]) + '% of ' + data_type + ' below ' + str(cf_thresh) + ' confidence threshold'
+    if data_type == 'gaze':
+        #s1 += '\n' + os.path.basename(output_name) + ' has ' + str(100*(off_bounds/len(list_data))) + '% of gaze positions outside screen area'
+        d1.append(100*(off_bounds/len(list_data)))
+        s1 += '\n' + output_name + ' has ' + str(d1[2]) + '% of gaze positions outside screen area'
+    print(s1)
 
     time_diff, skip_idx = assess_timegaps(t_stamps, tg_thresh)
 
     x = np.array(positions)[:, 0].tolist()
     y = np.array(positions)[:, 1].tolist()
     times = np.array(positions)[:, 2].tolist()
-
-    export_line_plot(confidences, output_name + '_confidence.png')
-    export_line_plot(x, output_name + '_Xposition.png', times)
-    export_line_plot(y, output_name + '_Yposition.png', times)
+    export_line_plot(confidences, os.path.join(output_path, 'confidence_' + output_name + '.png'), y_range=[-0.05, 1.05])
     #export_line_plot(time_diff, output_name + '_timediff.png')
 
     if data_type == 'gaze':
+        export_line_plot(x, os.path.join(output_path, 'Xposition_' + output_name + '.png'), times, y_range=[-0.05, 1.05])
+        export_line_plot(y, os.path.join(output_path, 'Yposition_' + output_name + '.png'), times, y_range=[-0.05, 1.05])
+
         w_size = 100
         extra = len(positions) % w_size
-        x_medians = np.median(np.reshape(x[:-extra], (-1, w_size)), axis=0)
-        y_medians = np.median(np.reshape(y[:-extra], (-1, w_size)), axis=0)
-        export_line_plot(x_medians, output_name + '_Xmedians.png')
-        export_line_plot(y_medians, output_name + '_Ymedians.png')
+        #x_medians = np.median(np.reshape(x[:-extra], (-1, w_size)), axis=0)
+        #y_medians = np.median(np.reshape(y[:-extra], (-1, w_size)), axis=0)
+        #export_line_plot(x_medians, os.path.join(output_path, 'Xmedians_' + output_name + '.png'), y_range=[-0.05, 1.05])
+        #export_line_plot(y_medians, os.path.join(output_path, 'Ymedians_'+ output_name + '.png'), y_range=[-0.05, 1.05])
+
+    elif data_type == 'pupils':
+        export_line_plot(x, os.path.join(output_path, 'Xposition_' + output_name + '.png'), times, y_range=[-4.0, 644.0])
+        export_line_plot(y, os.path.join(output_path, 'Yposition_' + output_name + '.png'), times, y_range=[-4.0, 484.0])
+
     '''
     if len(skip_idx) > 0:
         print(os.path.basename(output_name) + ' has ' + str(len(skip_idx)) + ' time gaps')
@@ -244,6 +301,7 @@ def qc_report(list_data, output_name, data_type, cf_thresh=0.6, tg_thresh = 0.00
     else:
         np.savez(output_name + '_QCrep.npz', confidence = np.array(confidences), position = np.array(positions), time_diff = np.array(time_diff))
     '''
+    return s1, d1
 
 def assess_distance(out_name, dtype, dset1, dset2, cf_thresh=0.6):
     '''
@@ -291,10 +349,12 @@ def assess_distance(out_name, dtype, dset1, dset2, cf_thresh=0.6):
     '''
     np.savez(out_name + '_distance.npz', distance = np.array(dist_list), t_stamps = np.array(time_list))
     '''
+    #export_line_plot(dist_list, out_name + '_distance.png', time_list)
     export_line_plot(dist_list, out_name + '_distance.png', time_list)
 
 
-if __name__ == "__main__":
+def old_main():
+
     '''
     Performs Quality Check and comparisons between two different sets of pupils and their corresponding gaze
     for a certain analysis (run)
@@ -333,7 +393,7 @@ if __name__ == "__main__":
             p1_tag = 'pupils3d' if cfg['is3D_pupils1'] else 'pupils2d'
             pupils1 = np.load(cfg['pupils1'], allow_pickle=True)[p1_tag]
 
-        qc_report(pupils1, os.path.join(cfg['out_dir'], cfg['pupils1_name']), 'pupils', cfg['pupil_confidence_threshold'])
+        p1s, p1d = qc_report(pupils1, cfg['out_dir'], cfg['pupils1_name'], 'pupils', cfg['pupil_confidence_threshold'])
 
     # Load second set of pupils
     if 'pupils2' in cfg:
@@ -343,7 +403,7 @@ if __name__ == "__main__":
             p2_tag = 'pupils3d' if cfg['is3D_pupils2'] else 'pupils2d'
             pupils2 = np.load(cfg['pupils2'], allow_pickle=True)[p2_tag]
 
-        qc_report(pupils2, os.path.join(cfg['out_dir'], cfg['pupils2_name']), 'pupils', cfg['pupil_confidence_threshold'])
+        p2s, p2d = qc_report(pupils2, cfg['out_dir'], cfg['pupils2_name'], 'pupils', cfg['pupil_confidence_threshold'])
 
     # Contrast two sets of pupils to one another
     if 'pupils1' in cfg and 'pupils2' in cfg:
@@ -359,7 +419,7 @@ if __name__ == "__main__":
             g1_tag = 'gaze3d' if cfg['is3D_gaze1'] else 'gaze2d'
             gaze1 = np.load(cfg['gaze1'], allow_pickle=True)[g1_tag]
 
-        qc_report(gaze1, os.path.join(cfg['out_dir'], cfg['gaze1_name']), 'gaze', cfg['gaze_confidence_threshold'])
+        g1s, g1d = qc_report(gaze1, cfg['out_dir'], cfg['gaze1_name'], 'gaze', cfg['gaze_confidence_threshold'])
 
     if 'gaze2' in cfg:
         if cfg['isOnline_gaze2']:
@@ -368,8 +428,92 @@ if __name__ == "__main__":
             g2_tag = 'gaze3d' if cfg['is3D_gaze2'] else 'gaze2d'
             gaze2 = np.load(cfg['gaze2'], allow_pickle=True)[g2_tag]
 
-        qc_report(gaze2, os.path.join(cfg['out_dir'], cfg['gaze2_name']), 'gaze', cfg['gaze_confidence_threshold'])
+        p2s, p2d = qc_report(gaze2, cfg['out_dir'], cfg['gaze2_name'], 'gaze', cfg['gaze_confidence_threshold'])
 
     # Contrast two sets of gaze to one another
     if 'gaze1' in cfg and 'gaze2' in cfg:
         assess_distance(os.path.join(cfg['out_dir'], cfg['out_name']), 'gaze', gaze1, gaze2, cfg['gaze_confidence_threshold'])
+
+
+def map_run_gaze(cfg, run):
+
+    gct = str(cfg['gaze_confidence_threshold'])
+    pct = str(cfg['pupil_confidence_threshold'])
+
+    gaze_report = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + gct + ' Confidence Threshold', 'Outside Screen Area'])
+    pupil_report = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + pct + ' Confidence Threshold'])
+
+    run_report = open(os.path.join(cfg['out_dir'], 'qc', 'run' + run + '_report.txt'), 'w+')
+
+    # check for missing frames in calibration eye movie (mp4)
+    g_pool = make_detection_gpool()
+    calib_eye_file = File_Source(g_pool, source_path=cfg['run' + run + '_calib_mp4'])
+    calib_t_stamps = calib_eye_file.timestamps
+    diff_list, gap_idx = assess_timegaps(calib_t_stamps, cfg['time_threshold'])
+    if len(gap_idx) > 0:
+        #export as .tsv
+        np.savetxt(os.path.join(cfg['out_dir'], 'qc', 'run' + run + '_calib_framegaps.tsv'), np.array(gap_idx), delimiter="\t")
+
+    # QC online pupils from calibration sequence
+    calib_online_pupils = load_pldata_file(cfg['run' + run + '_calib_mp4'][:-9], 'pupil')[0]
+    cp_on2d_s, cp_on2d_d = qc_report(calib_online_pupils, cfg['out_dir'] + '/qc', 'pupil_calib_online2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+    run_report.write(cp_on2d_s + '\n')
+    cp_on2d_d = [cp_on2d_d[0], 'Calib', 'Online2D', 'Run' + run, cp_on2d_d[1]]
+    pupil_report = pupil_report.append(pd.Series(cp_on2d_d, index=pupil_report.columns), ignore_index=True)
+
+    # QC online gaze from calibration sequence
+    calib_online_gaze = load_pldata_file(cfg['run' + run + '_calib_mp4'][:-9], 'gaze')[0]
+    cg_on2d_s, cg_on2d_d = qc_report(calib_online_gaze, cfg['out_dir'] + '/qc', 'gaze_calib_online2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+    run_report.write(cg_on2d_s + '\n')
+    cg_on2d_d = [cg_on2d_d[0], 'Calib', 'Online2D', 'Run' + run, cg_on2d_d[1], cg_on2d_d[2]]
+    gaze_report = gaze_report.append(pd.Series(cg_on2d_d, index=gaze_report.columns), ignore_index=True)
+
+    # QC online pupils from main run (task)
+    run_online_pupils = load_pldata_file(cfg['run' + run + '_run_mp4'][:-9], 'pupil')[0]
+    rp_on2d_s, rp_on2d_d = qc_report(run_online_pupils, cfg['out_dir'] + '/qc', 'pupil_run_online2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+    run_report.write(rp_on2d_s + '\n')
+    rp_on2d_d = [rp_on2d_d[0], 'Run', 'Online2D', 'Run' + run, rp_on2d_d[1]]
+    pupil_report = pupil_report.append(pd.Series(rp_on2d_d, index=pupil_report.columns), ignore_index=True)
+
+    # QC online gaze from main run (task)
+    run_online_gaze = load_pldata_file(cfg['run' + run + '_run_mp4'][:-9], 'gaze')[0]
+    rg_on2d_s, rg_on2d_d = qc_report(run_online_gaze, cfg['out_dir'] + '/qc', 'gaze_run_online2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+    run_report.write(rg_on2d_s + '\n')
+    rg_on2d_d = [rg_on2d_d[0], 'Run', 'Online2D', 'Run' + run, rg_on2d_d[1], rg_on2d_d[2]]
+    gaze_report = gaze_report.append(pd.Series(rg_on2d_d, index=gaze_report.columns), ignore_index=True)
+
+    run_report.close()
+
+    return pupil_report, gaze_report
+
+
+
+if __name__ == "__main__":
+    '''
+    Script performs quality check for online pupil and gaze outputs for all runs
+    from a single THINGS session.
+
+    Note that the same config file can be used to run offline_calibration_THINGS.py, which
+    outputs offline pupil and gaze measures (in 2d and optionally in 3d)
+    '''
+
+    with open(args.config, 'r') as f:
+        cfg = json.load(f)
+
+    pct = str(cfg['pupil_confidence_threshold'])
+    gct = str(cfg['gaze_confidence_threshold'])
+
+    pupil_reports = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + pct + ' Confidence Threshold'])
+    gaze_reports = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + gct + ' Confidence Threshold', 'Outside Screen Area'])
+
+    for run in cfg['runs']:
+        print('Run ' + str(run))
+        try:
+            pupil_report, gaze_report = map_run_gaze(cfg, run)
+            pupil_reports = pd.concat((pupil_reports, pupil_report), ignore_index=True)
+            gaze_reports = pd.concat((gaze_reports, gaze_report), ignore_index=True)
+        except:
+            print('Something went wrong processing run ' + run)
+
+    pupil_reports.to_csv(cfg['out_dir'] +'/qc/' + cfg['subject'] + '_ses' + cfg['session'] + '_pupil_report.tsv', sep='\t', header=True, index=False)
+    gaze_reports.to_csv(cfg['out_dir'] +'/qc/' + cfg['subject'] + '_ses' + cfg['session'] + '_gaze_report.tsv', sep='\t', header=True, index=False)

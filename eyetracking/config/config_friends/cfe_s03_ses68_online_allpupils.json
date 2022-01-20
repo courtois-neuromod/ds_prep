@@ -3,11 +3,12 @@
     "run_num": "s2e04a",
     "focal_length": 256.0,
     "min_calibration_confidence": 0.6,
-    "use3D": true,
+    "use3D": false,
 
-    "detect_calib_pupils": true,
+    "detect_calib_pupils": false,
     "use_online_calib_params": false,
-    "detect_run_pupils": true,
+    "export_calib_gaze": true,
+    "detect_run_pupils": false,
     "freeze_3d_at_test": false,
     "overwrite_camera_intrinsics": false,
 
@@ -36,10 +37,22 @@
                     "ellipse_true_support_min_dist": 2.5,
                     "support_pixel_ratio_exponent": 2.0},
 
-    "out_dir": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-03/ses-068",
+    "out_dir": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-03/ses-068_allpupils",
 
-    "calibration_parameters_2d": "/placeholder.plcal",
-    "calibration_parameters_3d": "/placeholder.plcal",
+    "previous_cal_2dpupils": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-03/ses-068/sub-03_ses-068_20211013-140928.pupil/eyeTrackercalibration-1/000",
+    "prev_cal_pup2D_name": "pupil",
+
+    "previous_cal_3dpupils": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-03/ses-068_orig",
+    "prev_cal_pup3D_name": "calib_offline_pupil3d",
+
+    "previous_run_2dpupils": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-03/ses-068/sub-03_ses-068_20211013-140928.pupil/task-friends-s2e4a/000",
+    "prev_run_pup2D_name": "pupil",
+
+    "previous_run_3dpupils": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-03/ses-068_orig",
+    "prev_run_pup3D_name": "run_s2e04a_offline_pupil3d",
+
+    "calibration_parameters_2d": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-03/ses-068_orig/Offline_Calibration2D.plcal",
+    "calibration_parameters_3d": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-03/ses-068_orig/Offline_Calibration3D.plcal",
 
     "calibration_data": "/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-03/ses-068/sub-03_ses-068_20211013-140928_eyeTrackercalibration-1_calib-data.npz"
 
