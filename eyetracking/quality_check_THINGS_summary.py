@@ -53,6 +53,55 @@ def make_detection_gpool():
     return g_pool
 
 
+def make_frameskip_figure(good_runs, outdir=None):
+
+    calib_skips = pd.DataFrame(columns=['Run', 'Frame', 'Gap', 'Timestamp'])
+    run_skips = pd.DataFrame(columns=['Run', 'Frame', 'Gap', 'Timestamp'])
+    cx_runs = []
+    rx_runs = []
+    cx_labels = []
+    rx_labels = []
+
+    for i in range(len(good_runs)):
+        try:
+            calib_framegaps = pd.read_csv(os.path.join(outdir, 'run' + str(good_runs[i]) + '_calib_framegaps.tsv'), sep = '\t')
+            calib_framegaps.columns = ['Run', 'Frame', 'Gap', 'Timestamp']
+            calib_skips = pd.concat((calib_skips, calib_framegaps), ignore_index=True)
+            cx_runs.append(int(good_runs[i]))
+            cx_labels.append('Run ' + str(good_runs[i]) + ' (n=' + str(calib_framegaps.shape[0]) + ')')
+        except:
+            print('No calibration file for run ' + str(good_runs[i]))
+
+        try:
+            run_framegaps = pd.read_csv(os.path.join(outdir, 'run' + str(good_runs[i]) + '_run_framegaps.tsv'), sep = '\t')
+            run_framegaps.columns = ['Run', 'Frame', 'Gap', 'Timestamp']
+            run_skips = pd.concat((run_skips, run_framegaps), ignore_index=True)
+            rx_runs.append(int(good_runs[i]))
+            rx_labels.append('Run ' + str(good_runs[i]) + ' (n=' + str(run_framegaps.shape[0]) + ')')
+        except:
+            print('No run file for run ' + str(good_runs[i]))
+
+    if calib_skips.shape[0] > 0:
+        plt.clf()
+
+        x_val = calib_skips['Run'].to_numpy(dtype='float16')
+        y_val = calib_skips['Gap'].to_numpy(dtype='float16')
+        plt.scatter(x_val, y_val, alpha=0.4)
+        plt.xticks(cx_runs, cx_labels, rotation='horizontal')
+
+        plt.savefig(outdir + '/SkipFrames_online2D_calib.png')
+
+    if run_skips.shape[0] > 0:
+        plt.clf()
+
+        x_val = run_skips['Run'].to_numpy(dtype='float16')
+        y_val = run_skips['Gap'].to_numpy(dtype='float16')
+        plt.scatter(x_val, y_val)
+        plt.xticks(rx_runs, rx_labels, rotation='horizontal')
+
+        plt.savefig(outdir + '/SkipFrames_online2D_run.png')
+
+
 def make_composite_figure(good_runs, y_vals, x_vals, out_name=None, y_range=[-0.05, 1.05]):
 
         plt.clf()
@@ -182,7 +231,7 @@ def export_line_plot(y_val, out_name=None, x_val=None, mid_val=0.0, x_range=None
     return diff_to_mid, m, b
 
 
-def assess_timegaps(t_stamps, threshold = 0.004016):
+def assess_timegaps(run, t_stamps, threshold = 0.004016):
     '''
     Input:
         t_stamps (list of times): list of pupil time stamps per frames
@@ -201,7 +250,7 @@ def assess_timegaps(t_stamps, threshold = 0.004016):
         if diff > threshold:
             print('skipped frames')
             print([i-1, diff, t_stamps[i-1]])
-            skip_idx.append([i-1, diff, t_stamps[i-1]])
+            skip_idx.append([int(run), i-1, diff, t_stamps[i-1]])
 
     return time_diff, skip_idx
 
@@ -263,7 +312,7 @@ def qc_report_summary(list_data, output_path, output_name, data_type, cf_thresh=
         s1 += '\n' + output_name + ' has ' + str(d1[2]) + '% of gaze positions outside screen area'
     print(s1)
 
-    time_diff, skip_idx = assess_timegaps(t_stamps, tg_thresh)
+    #time_diff, skip_idx = assess_timegaps(t_stamps, tg_thresh)
 
     x = np.array(positions)[:, 0].tolist()
     y = np.array(positions)[:, 1].tolist()
@@ -306,7 +355,7 @@ def process_run(cfg, run):
     g_pool = make_detection_gpool()
     calib_eye_file = File_Source(g_pool, source_path=cfg['run' + run + '_calib_mp4'])
     calib_t_stamps = calib_eye_file.timestamps
-    diff_list, gap_idx = assess_timegaps(calib_t_stamps, cfg['time_threshold'])
+    diff_list, gap_idx = assess_timegaps(run, calib_t_stamps, cfg['time_threshold'])
     if len(gap_idx) > 0:
         #export as .tsv
         np.savetxt(os.path.join(cfg['out_dir'], 'qc', 'run' + run + '_calib_framegaps.tsv'), np.array(gap_idx), delimiter="\t")
@@ -315,7 +364,7 @@ def process_run(cfg, run):
     g_pool = make_detection_gpool()
     run_eye_file = File_Source(g_pool, source_path=cfg['run' + run + '_run_mp4'])
     run_t_stamps = run_eye_file.timestamps
-    diff_list, gap_idx = assess_timegaps(run_t_stamps, cfg['time_threshold'])
+    diff_list, gap_idx = assess_timegaps(run, run_t_stamps, cfg['time_threshold'])
     if len(gap_idx) > 0:
         #export as .tsv
         np.savetxt(os.path.join(cfg['out_dir'], 'qc', 'run' + run + '_run_framegaps.tsv'), np.array(gap_idx), delimiter="\t")
@@ -391,3 +440,4 @@ if __name__ == "__main__":
     # 1. load files for skipped frames and create figure
     # 2. create figure of X and Y positions over time, one global one for calinbration and for run
     make_gaze_figures(good_runs, calib_gaze_allruns, run_gaze_allruns, cfg['out_dir'] + '/qc/Gaze_online2D')
+    make_frameskip_figure(good_runs, cfg['out_dir'] + '/qc')
