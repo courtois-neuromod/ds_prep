@@ -128,8 +128,8 @@ def map_run_gaze(cfg, run):
         gct = str(cfg['gaze_confidence_threshold'])
         pct = str(cfg['pupil_confidence_threshold'])
 
-        gaze_report = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + gct + ' Confidence Threshold', 'Outside Screen Area'])
-        pupil_report = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + pct + ' Confidence Threshold'])
+        gaze_report = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + gct + ' Confidence Threshold', 'Outside Screen Area', 'X diff from mid', 'Y diff from mid', 'X slope', 'X intercept', 'Y slope', 'Y intercept'])
+        pupil_report = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + pct + ' Confidence Threshold', 'X diff from mid', 'Y diff from mid', 'X slope', 'X intercept', 'Y slope', 'Y intercept'])
 
         run_report = open(os.path.join(cfg['out_dir'], 'qc', 'run' + run + '_report.txt'), 'w+')
 
@@ -181,22 +181,22 @@ def map_run_gaze(cfg, run):
 
         # QC the offline pupils
         if cfg['apply_qc']:
-            cp_off2d_s, cp_off2d_d = qc_report(calib_pupils_2d, cfg['out_dir'] + '/qc', 'pupil_calib_offline2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+            cp_off2d_s, cp_off2d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b) = qc_report(calib_pupils_2d, cfg['out_dir'] + '/qc', 'pupil_calib_offline2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
             run_report.write(cp_off2d_s + '\n')
-            cp_off2d_d = [cp_off2d_d[0], 'Calib', 'Offline2D', 'Run' + run, cp_off2d_d[1]]
+            cp_off2d_d = [cp_off2d_d[0], 'Calib', 'Offline2D', 'Run' + run, cp_off2d_d[1], xdiff, ydiff, x_m, x_b, y_m, y_b]
             pupil_report = pupil_report.append(pd.Series(cp_off2d_d, index=pupil_report.columns), ignore_index=True)
             if cfg['use3D']:
-                cp_off3d_s, cp_off3d_d  = qc_report(calib_pupils_3d, cfg['out_dir'] + '/qc', 'pupil_calib_offline3D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+                cp_off3d_s, cp_off3d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b)  = qc_report(calib_pupils_3d, cfg['out_dir'] + '/qc', 'pupil_calib_offline3D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
                 run_report.write(cp_off3d_s + '\n')
-                cp_off3d_d = [cp_off3d_d[0], 'Calib', 'Offline3D', 'Run' + run, cp_off3d_d[1]]
+                cp_off3d_d = [cp_off3d_d[0], 'Calib', 'Offline3D', 'Run' + run, cp_off3d_d[1], xdiff, ydiff, x_m, x_b, y_m, y_b]
                 pupil_report = pupil_report.append(pd.Series(cp_off3d_d, index=pupil_report.columns), ignore_index=True)
 
     # QC the online pupils
     if cfg['apply_qc']:
         calib_online_pupils = load_pldata_file(cfg['run' + run + '_calib_mp4'][:-9], 'pupil')[0]
-        cp_on2d_s, cp_on2d_d = qc_report(calib_online_pupils, cfg['out_dir'] + '/qc', 'pupil_calib_online2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+        cp_on2d_s, cp_on2d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b) = qc_report(calib_online_pupils, cfg['out_dir'] + '/qc', 'pupil_calib_online2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
         run_report.write(cp_on2d_s + '\n')
-        cp_on2d_d = [cp_on2d_d[0], 'Calib', 'Online2D', 'Run' + run, cp_on2d_d[1]]
+        cp_on2d_d = [cp_on2d_d[0], 'Calib', 'Online2D', 'Run' + run, cp_on2d_d[1], xdiff, ydiff, x_m, x_b, y_m, y_b]
         pupil_report = pupil_report.append(pd.Series(cp_on2d_d, index=pupil_report.columns), ignore_index=True)
 
     '''
@@ -321,22 +321,22 @@ def map_run_gaze(cfg, run):
 
         # QC offline gaze
         if cfg['apply_qc']:
-            cg_off2d_s, cg_off2d_d = qc_report(calib_gaze_2d, cfg['out_dir'] + '/qc', 'gaze_calib_offline2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+            cg_off2d_s, cg_off2d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b) = qc_report(calib_gaze_2d, cfg['out_dir'] + '/qc', 'gaze_calib_offline2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
             run_report.write(cg_off2d_s + '\n')
-            cg_off2d_d = [cg_off2d_d[0], 'Calib', 'Offline2D', 'Run' + run, cg_off2d_d[1], cg_off2d_d[2]]
+            cg_off2d_d = [cg_off2d_d[0], 'Calib', 'Offline2D', 'Run' + run, cg_off2d_d[1], cg_off2d_d[2], xdiff, ydiff, x_m, x_b, y_m, y_b]
             gaze_report = gaze_report.append(pd.Series(cg_off2d_d, index=gaze_report.columns), ignore_index=True)
             if cfg['use3D']:
-                cg_off3d_s, cg_off3d_d = qc_report(calib_gaze_3d, cfg['out_dir'] + '/qc', 'gaze_calib_offline3D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+                cg_off3d_s, cg_off3d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b) = qc_report(calib_gaze_3d, cfg['out_dir'] + '/qc', 'gaze_calib_offline3D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
                 run_report.write(cg_off3d_s + '\n')
-                cg_off3d_d = [cg_off3d_d[0], 'Calib', 'Offline3D', 'Run' + run, cg_off3d_d[1], cg_off3d_d[2]]
+                cg_off3d_d = [cg_off3d_d[0], 'Calib', 'Offline3D', 'Run' + run, cg_off3d_d[1], cg_off3d_d[2], xdiff, ydiff, x_m, x_b, y_m, y_b]
                 gaze_report = gaze_report.append(pd.Series(cg_off3d_d, index=gaze_report.columns), ignore_index=True)
 
     # QC online gaze
     if cfg['apply_qc']:
         calib_online_gaze = load_pldata_file(cfg['run' + run + '_calib_mp4'][:-9], 'gaze')[0]
-        cg_on2d_s, cg_on2d_d = qc_report(calib_online_gaze, cfg['out_dir'] + '/qc', 'gaze_calib_online2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+        cg_on2d_s, cg_on2d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b) = qc_report(calib_online_gaze, cfg['out_dir'] + '/qc', 'gaze_calib_online2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
         run_report.write(cg_on2d_s + '\n')
-        cg_on2d_d = [cg_on2d_d[0], 'Calib', 'Online2D', 'Run' + run, cg_on2d_d[1], cg_on2d_d[2]]
+        cg_on2d_d = [cg_on2d_d[0], 'Calib', 'Online2D', 'Run' + run, cg_on2d_d[1], cg_on2d_d[2], xdiff, ydiff, x_m, x_b, y_m, y_b]
         gaze_report = gaze_report.append(pd.Series(cg_on2d_d, index=gaze_report.columns), ignore_index=True)
 
 
@@ -375,22 +375,22 @@ def map_run_gaze(cfg, run):
 
         # QC the offline pupils
         if cfg['apply_qc']:
-            rp_off2d_s, rp_off2d_d = qc_report(run_pupils_2d, cfg['out_dir'] + '/qc', 'pupil_run_offline2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+            rp_off2d_s, rp_off2d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b) = qc_report(run_pupils_2d, cfg['out_dir'] + '/qc', 'pupil_run_offline2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
             run_report.write(rp_off2d_s + '\n')
-            rp_off2d_d = [rp_off2d_d[0], 'Run', 'Offline2D', 'Run' + run, rp_off2d_d[1]]
+            rp_off2d_d = [rp_off2d_d[0], 'Run', 'Offline2D', 'Run' + run, rp_off2d_d[1], xdiff, ydiff, x_m, x_b, y_m, y_b]
             pupil_report = pupil_report.append(pd.Series(rp_off2d_d, index=pupil_report.columns), ignore_index=True)
             if cfg['use3D']:
-                rp_off3d_s, rp_off3d_d = qc_report(run_pupils_3d, cfg['out_dir'] + '/qc', 'pupil_run_offline3D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+                rp_off3d_s, rp_off3d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b) = qc_report(run_pupils_3d, cfg['out_dir'] + '/qc', 'pupil_run_offline3D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
                 run_report.write(rp_off3d_s + '\n')
-                rp_off3d_d = [rp_off3d_d[0], 'Run', 'Offline3D', 'Run' + run, rp_off3d_d[1]]
+                rp_off3d_d = [rp_off3d_d[0], 'Run', 'Offline3D', 'Run' + run, rp_off3d_d[1], xdiff, ydiff, x_m, x_b, y_m, y_b]
                 pupil_report = pupil_report.append(pd.Series(rp_off3d_d, index=pupil_report.columns), ignore_index=True)
 
     # QC the online pupils
     if cfg['apply_qc']:
         run_online_pupils = load_pldata_file(cfg['run' + run + '_run_mp4'][:-9], 'pupil')[0]
-        rp_on2d_s, rp_on2d_d = qc_report(run_online_pupils, cfg['out_dir'] + '/qc', 'pupil_run_online2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+        rp_on2d_s, rp_on2d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b) = qc_report(run_online_pupils, cfg['out_dir'] + '/qc', 'pupil_run_online2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
         run_report.write(rp_on2d_s + '\n')
-        rp_on2d_d = [rp_on2d_d[0], 'Run', 'Online2D', 'Run' + run, rp_on2d_d[1]]
+        rp_on2d_d = [rp_on2d_d[0], 'Run', 'Online2D', 'Run' + run, rp_on2d_d[1], xdiff, ydiff, x_m, x_b, y_m, y_b]
         pupil_report = pupil_report.append(pd.Series(rp_on2d_d, index=pupil_report.columns), ignore_index=True)
 
     # load run's online pupils
@@ -437,21 +437,21 @@ def map_run_gaze(cfg, run):
     gaze_data_2d, gaze_data_3d = map_all_those_pupils_to_gaze(cfg, gazemap_2d, gazemap_3d, run_pupils_2d, run_pupils_3d, 'run' + run + '_rundata')
 
     if cfg['apply_qc']:
-        rg_off2d_s, rg_off2d_d = qc_report(gaze_data_2d, cfg['out_dir'] + '/qc', 'gaze_run_offline2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+        rg_off2d_s, rg_off2d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b) = qc_report(gaze_data_2d, cfg['out_dir'] + '/qc', 'gaze_run_offline2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
         run_report.write(rg_off2d_s + '\n')
-        rg_off2d_d = [rg_off2d_d[0], 'Run', 'Offline2D', 'Run' + run, rg_off2d_d[1], rg_off2d_d[2]]
+        rg_off2d_d = [rg_off2d_d[0], 'Run', 'Offline2D', 'Run' + run, rg_off2d_d[1], rg_off2d_d[2], xdiff, ydiff, x_m, x_b, y_m, y_b]
         gaze_report = gaze_report.append(pd.Series(rg_off2d_d, index=gaze_report.columns), ignore_index=True)
         if cfg['use3D']:
-            rg_off3d_s, rg_off3d_d = qc_report(gaze_data_3d, cfg['out_dir'] + '/qc', 'gaze_run_offline3D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+            rg_off3d_s, rg_off3d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b) = qc_report(gaze_data_3d, cfg['out_dir'] + '/qc', 'gaze_run_offline3D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
             run_report.write(rg_off3d_s + '\n')
-            rg_off3d_d = [rg_off3d_d[0], 'Run', 'Offline3D', 'Run' + run, rg_off3d_d[1], rg_off3d_d[2]]
+            rg_off3d_d = [rg_off3d_d[0], 'Run', 'Offline3D', 'Run' + run, rg_off3d_d[1], rg_off3d_d[2], xdiff, ydiff, x_m, x_b, y_m, y_b]
             gaze_report = gaze_report.append(pd.Series(rg_off3d_d, index=gaze_report.columns), ignore_index=True)
     # QC online gaze
     if cfg['apply_qc']:
         run_online_gaze = load_pldata_file(cfg['run' + run + '_run_mp4'][:-9], 'gaze')[0]
-        rg_on2d_s, rg_on2d_d = qc_report(run_online_gaze, cfg['out_dir'] + '/qc', 'gaze_run_online2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+        rg_on2d_s, rg_on2d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b) = qc_report(run_online_gaze, cfg['out_dir'] + '/qc', 'gaze_run_online2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
         run_report.write(rg_on2d_s + '\n')
-        rg_on2d_d = [rg_on2d_d[0], 'Run', 'Online2D', 'Run' + run, rg_on2d_d[1], rg_on2d_d[2]]
+        rg_on2d_d = [rg_on2d_d[0], 'Run', 'Online2D', 'Run' + run, rg_on2d_d[1], rg_on2d_d[2], xdiff, ydiff, x_m, x_b, y_m, y_b]
         gaze_report = gaze_report.append(pd.Series(rg_on2d_d, index=gaze_report.columns), ignore_index=True)
 
     run_report.close()
@@ -485,8 +485,8 @@ if __name__ == '__main__':
     pct = str(cfg['pupil_confidence_threshold'])
     gct = str(cfg['gaze_confidence_threshold'])
 
-    pupil_reports = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + pct + ' Confidence Threshold'])
-    gaze_reports = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + gct + ' Confidence Threshold', 'Outside Screen Area'])
+    pupil_reports = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + pct + ' Confidence Threshold', 'X diff from mid', 'Y diff from mid', 'X slope', 'X intercept', 'Y slope', 'Y intercept'])
+    gaze_reports = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + gct + ' Confidence Threshold', 'Outside Screen Area', 'X diff from mid', 'Y diff from mid', 'X slope', 'X intercept', 'Y slope', 'Y intercept'])
 
     for run in cfg['runs']:
         print('Run ' + str(run))

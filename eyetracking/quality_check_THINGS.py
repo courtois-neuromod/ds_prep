@@ -52,15 +52,24 @@ def make_detection_gpool():
     return g_pool
 
 
-def export_line_plot(y_val, out_name=None, x_val=None, x_range=None, y_range=None):
+def export_line_plot(y_val, out_name=None, x_val=None, mid_val=0.0, x_range=None, y_range=None):
 
     plt.clf()
     if x_val is not None:
         x_val = np.array(x_val)
         x_0 = x_val[0]
         x_val -= x_0
+        m, b = np.polyfit(x_val, y_val, 1)
+        p3, p2, p1, p0 = np.polyfit(x_val, y_val, 3)
+        #p6, p5, p4, p3, p2, p1, p0 = np.polyfit(x_val, y_val, 6)
         plt.plot(x_val, y_val)
+        #plt.plot(x_val, m*x_val + b)
+        p_of_x = p3*(x_val**3) + p2*(x_val**2) + p1*(x_val) + p0
+        #p_of_x = p6*(x_val**6) + p5*(x_val**5) + p4*(x_val**4) + p3*(x_val**3) + p2*(x_val**2) + p1*(x_val) + p0
+        diff_to_mid = np.average((p_of_x - mid_val)**2)
+        plt.plot(x_val, p_of_x)
     else:
+        diff_to_mid = m = b = -1
         plt.plot(y_val)
 
     if x_range is not None:
@@ -73,6 +82,7 @@ def export_line_plot(y_val, out_name=None, x_val=None, x_range=None, y_range=Non
         #plt.savefig('{}/correlation_histograms.png'.format(out_dir))
         plt.savefig(out_name)
 
+    return diff_to_mid, m, b
 
 '''
 def make_plot(rs, rois, out_dir=None, out_name=''):
@@ -276,12 +286,12 @@ def qc_report(list_data, output_path, output_name, data_type, cf_thresh=0.6, tg_
     x = np.array(positions)[:, 0].tolist()
     y = np.array(positions)[:, 1].tolist()
     times = np.array(positions)[:, 2].tolist()
-    export_line_plot(confidences, os.path.join(output_path, 'confidence_' + output_name + '.png'), y_range=[-0.05, 1.05])
+    _, _, _ = export_line_plot(confidences, os.path.join(output_path, 'confidence_' + output_name + '.png'), y_range=[-0.05, 1.05])
     #export_line_plot(time_diff, output_name + '_timediff.png')
 
     if data_type == 'gaze':
-        export_line_plot(x, os.path.join(output_path, 'Xposition_' + output_name + '.png'), times, y_range=[-0.05, 1.05])
-        export_line_plot(y, os.path.join(output_path, 'Yposition_' + output_name + '.png'), times, y_range=[-0.05, 1.05])
+        xdiff, x_m, x_b = export_line_plot(x, os.path.join(output_path, 'Xposition_' + output_name + '.png'), times, mid_val=0.5, y_range=[-0.05, 1.05])
+        ydiff, y_m, y_b = export_line_plot(y, os.path.join(output_path, 'Yposition_' + output_name + '.png'), times, mid_val=0.5, y_range=[-0.05, 1.05])
 
         w_size = 100
         extra = len(positions) % w_size
@@ -291,8 +301,8 @@ def qc_report(list_data, output_path, output_name, data_type, cf_thresh=0.6, tg_
         #export_line_plot(y_medians, os.path.join(output_path, 'Ymedians_'+ output_name + '.png'), y_range=[-0.05, 1.05])
 
     elif data_type == 'pupils':
-        export_line_plot(x, os.path.join(output_path, 'Xposition_' + output_name + '.png'), times, y_range=[-4.0, 644.0])
-        export_line_plot(y, os.path.join(output_path, 'Yposition_' + output_name + '.png'), times, y_range=[-4.0, 484.0])
+        xdiff, x_m, x_b = export_line_plot(x, os.path.join(output_path, 'Xposition_' + output_name + '.png'), times, mid_val=320, y_range=[-4.0, 644.0])
+        ydiff, y_m, y_b = export_line_plot(y, os.path.join(output_path, 'Yposition_' + output_name + '.png'), times, mid_val=240, y_range=[-4.0, 484.0])
 
     '''
     if len(skip_idx) > 0:
@@ -301,7 +311,7 @@ def qc_report(list_data, output_path, output_name, data_type, cf_thresh=0.6, tg_
     else:
         np.savez(output_name + '_QCrep.npz', confidence = np.array(confidences), position = np.array(positions), time_diff = np.array(time_diff))
     '''
-    return s1, d1
+    return s1, d1, (xdiff, ydiff, x_m, x_b, y_m, y_b)
 
 def assess_distance(out_name, dtype, dset1, dset2, cf_thresh=0.6):
     '''
@@ -393,7 +403,7 @@ def old_main():
             p1_tag = 'pupils3d' if cfg['is3D_pupils1'] else 'pupils2d'
             pupils1 = np.load(cfg['pupils1'], allow_pickle=True)[p1_tag]
 
-        p1s, p1d = qc_report(pupils1, cfg['out_dir'], cfg['pupils1_name'], 'pupils', cfg['pupil_confidence_threshold'])
+        p1s, p1d, _ = qc_report(pupils1, cfg['out_dir'], cfg['pupils1_name'], 'pupils', cfg['pupil_confidence_threshold'])
 
     # Load second set of pupils
     if 'pupils2' in cfg:
@@ -403,7 +413,7 @@ def old_main():
             p2_tag = 'pupils3d' if cfg['is3D_pupils2'] else 'pupils2d'
             pupils2 = np.load(cfg['pupils2'], allow_pickle=True)[p2_tag]
 
-        p2s, p2d = qc_report(pupils2, cfg['out_dir'], cfg['pupils2_name'], 'pupils', cfg['pupil_confidence_threshold'])
+        p2s, p2d, _ = qc_report(pupils2, cfg['out_dir'], cfg['pupils2_name'], 'pupils', cfg['pupil_confidence_threshold'])
 
     # Contrast two sets of pupils to one another
     if 'pupils1' in cfg and 'pupils2' in cfg:
@@ -419,7 +429,7 @@ def old_main():
             g1_tag = 'gaze3d' if cfg['is3D_gaze1'] else 'gaze2d'
             gaze1 = np.load(cfg['gaze1'], allow_pickle=True)[g1_tag]
 
-        g1s, g1d = qc_report(gaze1, cfg['out_dir'], cfg['gaze1_name'], 'gaze', cfg['gaze_confidence_threshold'])
+        g1s, g1d, _ = qc_report(gaze1, cfg['out_dir'], cfg['gaze1_name'], 'gaze', cfg['gaze_confidence_threshold'])
 
     if 'gaze2' in cfg:
         if cfg['isOnline_gaze2']:
@@ -428,7 +438,7 @@ def old_main():
             g2_tag = 'gaze3d' if cfg['is3D_gaze2'] else 'gaze2d'
             gaze2 = np.load(cfg['gaze2'], allow_pickle=True)[g2_tag]
 
-        p2s, p2d = qc_report(gaze2, cfg['out_dir'], cfg['gaze2_name'], 'gaze', cfg['gaze_confidence_threshold'])
+        p2s, p2d, _ = qc_report(gaze2, cfg['out_dir'], cfg['gaze2_name'], 'gaze', cfg['gaze_confidence_threshold'])
 
     # Contrast two sets of gaze to one another
     if 'gaze1' in cfg and 'gaze2' in cfg:
@@ -440,8 +450,8 @@ def map_run_gaze(cfg, run):
     gct = str(cfg['gaze_confidence_threshold'])
     pct = str(cfg['pupil_confidence_threshold'])
 
-    gaze_report = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + gct + ' Confidence Threshold', 'Outside Screen Area'])
-    pupil_report = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + pct + ' Confidence Threshold'])
+    gaze_report = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + gct + ' Confidence Threshold', 'Outside Screen Area', 'X diff from mid', 'Y diff from mid', 'X slope', 'X intercept', 'Y slope', 'Y intercept'])
+    pupil_report = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + pct + ' Confidence Threshold', 'X diff from mid', 'Y diff from mid', 'X slope', 'X intercept', 'Y slope', 'Y intercept'])
 
     run_report = open(os.path.join(cfg['out_dir'], 'qc', 'run' + run + '_report.txt'), 'w+')
 
@@ -454,32 +464,41 @@ def map_run_gaze(cfg, run):
         #export as .tsv
         np.savetxt(os.path.join(cfg['out_dir'], 'qc', 'run' + run + '_calib_framegaps.tsv'), np.array(gap_idx), delimiter="\t")
 
+    # check for missing frames in main run eye movie (mp4)
+    g_pool = make_detection_gpool()
+    run_eye_file = File_Source(g_pool, source_path=cfg['run' + run + '_run_mp4'])
+    run_t_stamps = run_eye_file.timestamps
+    diff_list, gap_idx = assess_timegaps(run_t_stamps, cfg['time_threshold'])
+    if len(gap_idx) > 0:
+        #export as .tsv
+        np.savetxt(os.path.join(cfg['out_dir'], 'qc', 'run' + run + '_run_framegaps.tsv'), np.array(gap_idx), delimiter="\t")
+
     # QC online pupils from calibration sequence
     calib_online_pupils = load_pldata_file(cfg['run' + run + '_calib_mp4'][:-9], 'pupil')[0]
-    cp_on2d_s, cp_on2d_d = qc_report(calib_online_pupils, cfg['out_dir'] + '/qc', 'pupil_calib_online2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+    cp_on2d_s, cp_on2d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b) = qc_report(calib_online_pupils, cfg['out_dir'] + '/qc', 'pupil_calib_online2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
     run_report.write(cp_on2d_s + '\n')
-    cp_on2d_d = [cp_on2d_d[0], 'Calib', 'Online2D', 'Run' + run, cp_on2d_d[1]]
+    cp_on2d_d = [cp_on2d_d[0], 'Calib', 'Online2D', 'Run' + run, cp_on2d_d[1], xdiff, ydiff, x_m, x_b, y_m, y_b]
     pupil_report = pupil_report.append(pd.Series(cp_on2d_d, index=pupil_report.columns), ignore_index=True)
 
     # QC online gaze from calibration sequence
     calib_online_gaze = load_pldata_file(cfg['run' + run + '_calib_mp4'][:-9], 'gaze')[0]
-    cg_on2d_s, cg_on2d_d = qc_report(calib_online_gaze, cfg['out_dir'] + '/qc', 'gaze_calib_online2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+    cg_on2d_s, cg_on2d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b) = qc_report(calib_online_gaze, cfg['out_dir'] + '/qc', 'gaze_calib_online2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
     run_report.write(cg_on2d_s + '\n')
-    cg_on2d_d = [cg_on2d_d[0], 'Calib', 'Online2D', 'Run' + run, cg_on2d_d[1], cg_on2d_d[2]]
+    cg_on2d_d = [cg_on2d_d[0], 'Calib', 'Online2D', 'Run' + run, cg_on2d_d[1], cg_on2d_d[2], xdiff, ydiff, x_m, x_b, y_m, y_b]
     gaze_report = gaze_report.append(pd.Series(cg_on2d_d, index=gaze_report.columns), ignore_index=True)
 
     # QC online pupils from main run (task)
     run_online_pupils = load_pldata_file(cfg['run' + run + '_run_mp4'][:-9], 'pupil')[0]
-    rp_on2d_s, rp_on2d_d = qc_report(run_online_pupils, cfg['out_dir'] + '/qc', 'pupil_run_online2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
+    rp_on2d_s, rp_on2d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b) = qc_report(run_online_pupils, cfg['out_dir'] + '/qc', 'pupil_run_online2D_run' + run, 'pupils', cfg['pupil_confidence_threshold'])
     run_report.write(rp_on2d_s + '\n')
-    rp_on2d_d = [rp_on2d_d[0], 'Run', 'Online2D', 'Run' + run, rp_on2d_d[1]]
+    rp_on2d_d = [rp_on2d_d[0], 'Run', 'Online2D', 'Run' + run, rp_on2d_d[1], xdiff, ydiff, x_m, x_b, y_m, y_b]
     pupil_report = pupil_report.append(pd.Series(rp_on2d_d, index=pupil_report.columns), ignore_index=True)
 
     # QC online gaze from main run (task)
     run_online_gaze = load_pldata_file(cfg['run' + run + '_run_mp4'][:-9], 'gaze')[0]
-    rg_on2d_s, rg_on2d_d = qc_report(run_online_gaze, cfg['out_dir'] + '/qc', 'gaze_run_online2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
+    rg_on2d_s, rg_on2d_d, (xdiff, ydiff, x_m, x_b, y_m, y_b) = qc_report(run_online_gaze, cfg['out_dir'] + '/qc', 'gaze_run_online2D_run' + run, 'gaze', cfg['gaze_confidence_threshold'])
     run_report.write(rg_on2d_s + '\n')
-    rg_on2d_d = [rg_on2d_d[0], 'Run', 'Online2D', 'Run' + run, rg_on2d_d[1], rg_on2d_d[2]]
+    rg_on2d_d = [rg_on2d_d[0], 'Run', 'Online2D', 'Run' + run, rg_on2d_d[1], rg_on2d_d[2], xdiff, ydiff, x_m, x_b, y_m, y_b]
     gaze_report = gaze_report.append(pd.Series(rg_on2d_d, index=gaze_report.columns), ignore_index=True)
 
     run_report.close()
@@ -503,8 +522,8 @@ if __name__ == "__main__":
     pct = str(cfg['pupil_confidence_threshold'])
     gct = str(cfg['gaze_confidence_threshold'])
 
-    pupil_reports = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + pct + ' Confidence Threshold'])
-    gaze_reports = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + gct + ' Confidence Threshold', 'Outside Screen Area'])
+    pupil_reports = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + pct + ' Confidence Threshold', 'X diff from mid', 'Y diff from mid', 'X slope', 'X intercept', 'Y slope', 'Y intercept'])
+    gaze_reports = pd.DataFrame(columns=['Name', 'Type', 'Processing', 'Run', 'Below ' + gct + ' Confidence Threshold', 'Outside Screen Area', 'X diff from mid', 'Y diff from mid', 'X slope', 'X intercept', 'Y slope', 'Y intercept'])
 
     for run in cfg['runs']:
         print('Run ' + str(run))
