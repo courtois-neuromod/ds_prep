@@ -1,12 +1,6 @@
 import os, sys, platform, json, glob
 import numpy as np
-import pandas as pd
 from types import SimpleNamespace
-
-import math
-import matplotlib
-matplotlib.use('pdf')
-import matplotlib.pyplot as plt
 
 import argparse
 
