@@ -13,6 +13,7 @@ import argparse
 parser = argparse.ArgumentParser(description='Perform off-line gaze mapping with 2D and 3D pupil detectors ')
 parser.add_argument('--code_dir', default='', type=str, help='absolute path to main code directory')
 parser.add_argument('--data_dir', default='', type=str, help='absolute path to main data directory')
+parser.add_argument('--out_dir', default='', type=str, help='absolute path to QC output directory')
 parser.add_argument('--sub', default='config.json', type=str, help='subject number')
 parser.add_argument('--ses', default='config.json', type=str, help='session number')
 args = parser.parse_args()
@@ -147,9 +148,9 @@ if __name__ == "__main__":
 
     template_json['subject'] = sub_num
     template_json['session'] = ses_num[-3:]
-    template_json['out_dir'] = os.path.join(args.data_dir, 'offline_calibration', 's' + sub_num[-2:], ses_num)
+    template_json['out_dir'] = os.path.join(args.out_dir, 's' + sub_num[-2:], ses_num)
 
-    session_json = update_json(template_json, os.path.join(args.data_dir, 'pupil_data', sub_num, ses_num))
+    session_json = update_json(template_json, os.path.join(args.data_dir, sub_num, ses_num))
 
 
     out_path = os.path.join(args.code_dir, 'config', 'config_THINGS', 'config_THINGS_s' + sub_num[-2:] + '_ses' + ses_num[-3:] + '.json')
