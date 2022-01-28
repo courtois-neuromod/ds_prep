@@ -53,7 +53,7 @@ def make_detection_gpool():
     return g_pool
 
 
-def make_frameskip_figure(good_runs, outdir=None):
+def make_frameskip_figure(good_runs, outdir=None, time_thres=0.00416):
 
     calib_skips = pd.DataFrame(columns=['Run', 'Frame', 'Gap', 'Timestamp'])
     run_skips = pd.DataFrame(columns=['Run', 'Frame', 'Gap', 'Timestamp'])
@@ -84,20 +84,50 @@ def make_frameskip_figure(good_runs, outdir=None):
     if calib_skips.shape[0] > 0:
         plt.clf()
 
+        SMALL_SIZE = 8
+        MEDIUM_SIZE = 10
+        BIGGER_SIZE = 16
+
+        plt.rc('font', size=SMALL_SIZE)  # controls default text sizes
+        plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
+        plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
+        plt.rc('xtick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
+        plt.rc('ytick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+        plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
         x_val = calib_skips['Run'].to_numpy(dtype='float16')
         y_val = calib_skips['Gap'].to_numpy(dtype='float16')
-        plt.scatter(x_val, y_val, alpha=0.4)
+        plt.scatter(x_val, y_val, s = 100, alpha=0.2)
         plt.xticks(cx_runs, cx_labels, rotation='horizontal')
+
+        plt.xlabel("Inter-frame intervals > " + str(time_thres) + "s (250 frames/s)", labelpad=20)
+        plt.ylabel("Interval duration (s)", labelpad=20)
+        plt.title("Inter-frame gaps per run")
 
         plt.savefig(outdir + '/SkipFrames_online2D_calib.png')
 
     if run_skips.shape[0] > 0:
         plt.clf()
 
+        SMALL_SIZE = 8
+        MEDIUM_SIZE = 10
+        BIGGER_SIZE = 16
+
+        plt.rc('font', size=SMALL_SIZE)  # controls default text sizes
+        plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
+        plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
+        plt.rc('xtick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
+        plt.rc('ytick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+        plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
         x_val = run_skips['Run'].to_numpy(dtype='float16')
         y_val = run_skips['Gap'].to_numpy(dtype='float16')
-        plt.scatter(x_val, y_val)
+        plt.scatter(x_val, y_val, s = 100, alpha=0.2)
         plt.xticks(rx_runs, rx_labels, rotation='horizontal')
+
+        plt.xlabel("Inter-frame intervals > " + str(time_thres) + "s (250 frames/s)", labelpad=20)
+        plt.ylabel("Interval duration (s)", labelpad=20)
+        plt.title("Inter-frame gaps per run")
 
         plt.savefig(outdir + '/SkipFrames_online2D_run.png')
 
@@ -440,4 +470,4 @@ if __name__ == "__main__":
     # 1. load files for skipped frames and create figure
     # 2. create figure of X and Y positions over time, one global one for calinbration and for run
     make_gaze_figures(good_runs, calib_gaze_allruns, run_gaze_allruns, cfg['out_dir'] + '/qc/Gaze_online2D')
-    make_frameskip_figure(good_runs, cfg['out_dir'] + '/qc')
+    make_frameskip_figure(good_runs, cfg['out_dir'] + '/qc', cfg['time_threshold'])
