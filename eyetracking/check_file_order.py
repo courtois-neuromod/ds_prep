@@ -52,7 +52,7 @@ if __name__ == "__main__":
     list_filename = []
     list_len = []
 
-    data_path = '/home/labopb/Documents/Marie/neuromod/THINGS/Eye-tracking/pupil_data/' + args.sub + '/'+ args.ses
+    data_path = '/data/neuromod/DATA/fmri_tmp/things/sourcedata/' + args.sub + '/'+ args.ses
 
     # Obtain time stamp of first pupil of calibration param files in directory
     list_calibparam_files = glob.glob(data_path + '/*npz')

@@ -2,9 +2,9 @@
 
 #module load python/3.7 #?? on elm?
 
-source /home/labopb/Documents/Marie/neuromod/pupil_venv/bin/activate
+source /home/mariestl/my_envs/pupil_venv/bin/activate
 
-RUNDIR="/home/labopb/Documents/Marie/neuromod/ds_prep/eyetracking"
+RUNDIR="/home/mariestl/cneuromod/ds_prep/eyetracking"
 config_file=${1}
 
 python -m offline_calibration_THINGS \
