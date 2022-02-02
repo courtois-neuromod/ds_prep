@@ -28,7 +28,9 @@ def fill_intended_for(args):
         extra_filters["subject"] = args.participant_label
     if args.session_label:
         extra_filters["session"] = args.session_label
-    bolds = layout.get(suffix="bold", extension=".nii.gz", part=['mag', Query.NONE], **extra_filters)
+    bolds = layout.get(suffix="bold", extension=".nii.gz", part='mag', **extra_filters) + \
+            layout.get(suffix="bold", extension=".nii.gz", part=Query.NONE, **extra_filters)
+    logging.info(f"found {len(bolds)} runs")
     json_to_modify = dict()
 
     bolds_with_no_fmap = []
