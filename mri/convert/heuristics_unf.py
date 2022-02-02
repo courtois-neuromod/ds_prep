@@ -1,4 +1,4 @@
-import os, re
+import os, re, glob
 from collections import defaultdict
 import nibabel.nicom.dicomwrappers as nb_dw
 from heudiconv.heuristics import reproin
@@ -12,24 +12,25 @@ from heudiconv.heuristics.reproin import (
     series_spec_fields,
 )
 
+def load_example_dcm(seqinfo):
+    ex_dcm_path = glob.glob(os.path.join('/tmp', 'heudiconv*', '*', seqinfo.dcm_dir_name, seqinfo.example_dcm_file))[0]
+    return nb_dw.wrapper_from_file(ex_dcm_path)
 
 def infotoids(seqinfos, outdir):
 
     seqinfo = next(seqinfos.__iter__())
-    ex_dcm = nb_dw.wrapper_from_file(seqinfo.example_dcm_file_path)
 
-    # pi = str(ex_dcm.dcm_data.ReferringPhysicianName)
+    ex_dcm = load_example_dcm(seqinfo)
+
     pi = str(seqinfo.referring_physician_name)
-    # study_name = str(ex_dcm.dcm_data.StudyDescription)
     study_name = str(seqinfo.study_description)
-
     patient_name = str(ex_dcm.dcm_data.PatientName)
 
     study_path = study_name.split("^")
 
-    rema = re.match("(([^_]*)_)?(([^_]*)_)?p([0-9]*)_([a-z]*)([0-9]*)", patient_name)
+    rema = re.match("(([^_]*)_)?(([^_]*)_)?p([0-9]*)_([a-zA-Z]*)([0-9]*)", patient_name)
     if rema is None:
-        rema = re.match("(([^_]*)_)?(([^_]*)_)?(dev)_([a-z]*)([0-9]*)", patient_name)
+        rema = re.match("(([^_]*)_)?(([^_]*)_)?(dev)_([a-zA-Z]*)([0-9]*)", patient_name)
 
     locator = os.path.join(pi, *study_path)
 
@@ -49,6 +50,8 @@ def infotoids(seqinfos, outdir):
 
 def get_task(s):
     mtch = re.match(".*_task\-([^_]+).*", s.series_id)
+    if mtch is None:
+        mtch = re.match(".*\-task_([^_]+).*", s.series_id)# for floc messup
     if mtch is not None:
         task = mtch.group(1).split("-")
         if len(task) > 1:
@@ -190,6 +193,7 @@ def get_seq_bids_info(s, ex_dcm):
     # CMRR or Siemens functional sequences
     elif "epfid2d1" in s.sequence_name:
         seq["task"] = get_task(s)
+        print(seq)
         # if no task, this is a fieldmap
         if seq["task"]:
             seq["type"] = "func"
@@ -267,8 +271,8 @@ def infotodict(seqinfo):
     all_bids_infos = {}
 
     for s in seqinfo:
-
-        ex_dcm = nb_dw.wrapper_from_file(s.example_dcm_file_path)
+        
+        ex_dcm = load_example_dcm(s)
 
         bids_info, bids_extra = get_seq_bids_info(s, ex_dcm)
         all_bids_infos[s.series_id] = (bids_info, bids_extra)
