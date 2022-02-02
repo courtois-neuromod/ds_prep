@@ -1,6 +1,7 @@
 import sys, os
 import shutil, stat
 from bids import BIDSLayout
+from bids.layout import Query
 import json
 import logging
 import argparse
@@ -27,7 +28,9 @@ def fill_intended_for(args):
         extra_filters["subject"] = args.participant_label
     if args.session_label:
         extra_filters["session"] = args.session_label
-    bolds = layout.get(suffix="bold", extension=".nii.gz", **extra_filters)
+    bolds = layout.get(suffix="bold", extension=".nii.gz", part='mag', **extra_filters) + \
+            layout.get(suffix="bold", extension=".nii.gz", part=Query.NONE, **extra_filters)
+    logging.info(f"found {len(bolds)} runs")
     json_to_modify = dict()
 
     bolds_with_no_fmap = []
@@ -43,7 +46,7 @@ def fill_intended_for(args):
             extension=".nii.gz",
             acquisition="sbref",
             subject=bold.entities["subject"],
-            session=bold.entities["session"],
+            session=bold.entities.get("session", None),
         )
 
         shim_settings = bold.tags["ShimSetting"].value
