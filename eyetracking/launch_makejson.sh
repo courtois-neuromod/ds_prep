@@ -10,5 +10,5 @@ DATADIR="/home/labopb/Documents/Marie/neuromod/THINGS/Eye-tracking"
 python -m make_config_json \
       --code_dir="${CODEDIR}" \
       --data_dir="${DATADIR}" \
-      --sub="sub-06" \
-      --ses="ses-006"
+      --sub="sub-01" \
+      --ses="ses-010"
