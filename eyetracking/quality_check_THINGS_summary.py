@@ -453,15 +453,15 @@ if __name__ == "__main__":
 
     for run in cfg['runs']:
         print('Run ' + str(run))
-        try:
-            pupil_report, gaze_report, gaze_data = process_run(cfg, run)
-            pupil_reports = pd.concat((pupil_reports, pupil_report), ignore_index=True)
-            gaze_reports = pd.concat((gaze_reports, gaze_report), ignore_index=True)
-            calib_gaze_allruns.append(gaze_data[0])
-            run_gaze_allruns.append(gaze_data[1])
-            good_runs.append(run)
-        except:
-            print('Something went wrong processing run ' + run)
+        #try:
+        pupil_report, gaze_report, gaze_data = process_run(cfg, run)
+        pupil_reports = pd.concat((pupil_reports, pupil_report), ignore_index=True)
+        gaze_reports = pd.concat((gaze_reports, gaze_report), ignore_index=True)
+        calib_gaze_allruns.append(gaze_data[0])
+        run_gaze_allruns.append(gaze_data[1])
+        good_runs.append(run)
+        #except:
+        #    print('Something went wrong processing run ' + run)
 
     pupil_reports.to_csv(cfg['out_dir'] +'/qc/' + cfg['subject'] + '_ses' + cfg['session'] + '_pupil_report.tsv', sep='\t', header=True, index=False)
     gaze_reports.to_csv(cfg['out_dir'] +'/qc/' + cfg['subject'] + '_ses' + cfg['session'] + '_gaze_report.tsv', sep='\t', header=True, index=False)
