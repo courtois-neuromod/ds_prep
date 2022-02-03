@@ -13,7 +13,7 @@ OUTDIR="/home/mariestl/cneuromod/THINGS/Eye-tracking/offline_calibration"
 
 for SUBID in sub-01 sub-02 sub-03 sub-06
 do
-  for SESID in {1..9}
+  for SESID in {10..20}
   do
     python -m make_config_json \
         --code_dir="${CODEDIR}" \

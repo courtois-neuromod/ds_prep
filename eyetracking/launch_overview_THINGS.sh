@@ -2,9 +2,11 @@
 
 #module load python/3.7 #?? on elm?
 
-source /home/labopb/Documents/Marie/neuromod/pupil_venv/bin/activate
+source /data/neuromod/virtualenvs/eyetracking/bin/activate
 
-RUNDIR="/home/labopb/Documents/Marie/neuromod/THINGS/Eye-tracking/offline_calibration"
+export LD_LIBRARY_PATH=/data/neuromod/virtualenvs/eyetracking/lib
+
+RUNDIR="/home/mariestl/cneuromod/THINGS/Eye-tracking/offline_calibration"
 
 python -m quality_check_THINGS_overview \
       --idir="${RUNDIR}" \
