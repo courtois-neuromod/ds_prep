@@ -64,7 +64,7 @@ def make_frameskip_figure(good_runs, outdir=None, time_thres=0.00416):
 
     for i in range(len(good_runs)):
         try:
-            calib_framegaps = pd.read_csv(os.path.join(outdir, 'run' + str(good_runs[i]) + '_calib_framegaps.tsv'), sep = '\t')
+            calib_framegaps = pd.read_csv(os.path.join(outdir, 'run' + str(good_runs[i]) + '_calib_framegaps.tsv'), header=None, sep = '\t')
             calib_framegaps.columns = ['Run', 'Frame', 'Gap', 'Timestamp']
             calib_skips = pd.concat((calib_skips, calib_framegaps), ignore_index=True)
             cx_runs.append(int(good_runs[i]))
@@ -73,7 +73,7 @@ def make_frameskip_figure(good_runs, outdir=None, time_thres=0.00416):
             print('No calibration file for run ' + str(good_runs[i]))
 
         try:
-            run_framegaps = pd.read_csv(os.path.join(outdir, 'run' + str(good_runs[i]) + '_run_framegaps.tsv'), sep = '\t')
+            run_framegaps = pd.read_csv(os.path.join(outdir, 'run' + str(good_runs[i]) + '_run_framegaps.tsv'), header=None, sep = '\t')
             run_framegaps.columns = ['Run', 'Frame', 'Gap', 'Timestamp']
             run_skips = pd.concat((run_skips, run_framegaps), ignore_index=True)
             rx_runs.append(int(good_runs[i]))
