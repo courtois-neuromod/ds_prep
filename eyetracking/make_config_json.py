@@ -79,7 +79,7 @@ def update_json(template_json, data_path):
 
 
     # Obtain time stamp of first pupil of calibration pupils (detected online) in directory
-    list_calib_pupils = glob.glob(data_path + '/*pupil/EyeTracker-Calibration/*/pupil.pldata')
+    list_calib_pupils = glob.glob(data_path + '/*pupil/*yeTracker*alibration/*/pupil.pldata')
     for cpupils in list_calib_pupils:
         chunks = cpupils.split('/')[-4:]
         chunks = os.path.join(chunks[-4], chunks[-3], chunks[-2], chunks[-1])
