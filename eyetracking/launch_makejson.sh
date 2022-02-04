@@ -11,4 +11,4 @@ python -m make_config_json \
       --code_dir="${CODEDIR}" \
       --data_dir="${DATADIR}" \
       --sub="sub-01" \
-      --ses="ses-010"
+      --ses="ses-009"

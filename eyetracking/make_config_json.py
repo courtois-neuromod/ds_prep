@@ -29,6 +29,21 @@ from pupil_detector_plugins.pye3d_plugin import Pye3DPlugin
 from gaze_mapping.gazer_3d.gazer_headset import Gazer3D
 
 
+def make_detection_gpool():
+    g_pool = SimpleNamespace()
+
+    rbounds = SimpleNamespace()
+    # TODO: optimize? Narrow down search window?
+    rbounds.bounds = (0, 0, 640, 480) # (minx, miny, maxx, maxy)
+    g_pool.roi = rbounds
+
+    g_pool.display_mode = "algorithm" # "roi" # for display; doesn't change much
+    g_pool.eye_id = 0 #'eye0'
+    g_pool.app = "player" # "capture"
+
+    return g_pool
+
+
 def curate_list(template_json, ordered_file_list, ordered_file_type):
     '''
     For each run, file order should be: calin pupils, calib params, run pupils
@@ -44,6 +59,7 @@ def curate_list(template_json, ordered_file_list, ordered_file_type):
                     print('Run ' + run_num)
                     # calibration eye movie and online data (gaze and pupils)
                     template_json['run' + run_num + '_calib_mp4'] = ordered_file_list[idx][:-13] + '/eye0.mp4'
+                    #template_json['run' + run_num + '_calib_mp4'] = ordered_file_list[idx]
                     template_json['run' + run_num + '_run_mp4'] = ordered_file_list[idx+2][:-13] + '/eye0.mp4'
                     template_json['run' + run_num + '_calibration_data'] = ordered_file_list[idx+1]
 
@@ -84,7 +100,8 @@ def update_json(template_json, data_path):
 
 
     # Obtain time stamp of first pupil of calibration pupils (detected online) in directory
-    list_calib_pupils = glob.glob(data_path + '/*pupil/EyeTracker-Calibration/*/pupil.pldata')
+
+    list_calib_pupils = glob.glob(data_path + '/*pupil/*yeTracker*alibration*/*/pupil.pldata')
     for cpupils in list_calib_pupils:
         chunks = cpupils.split('/')[-4:]
         chunks = os.path.join(chunks[-4], chunks[-3], chunks[-2], chunks[-1])
@@ -96,8 +113,22 @@ def update_json(template_json, data_path):
             list_len.append(len(pupils))
         except:
             print('File ' + chunks + ' did not load.')
-
-
+    '''
+    list_calib_pupils = glob.glob(data_path + '/*pupil/EyeTracker-Calibration*/*/eye0.mp4')
+    for cpupils in list_calib_pupils:
+        chunks = cpupils.split('/')[-4:]
+        chunks = os.path.join(chunks[-4], chunks[-3], chunks[-2], chunks[-1])
+        try:
+            g_pool = make_detection_gpool()
+            calib_eye_file = File_Source(g_pool, source_path=cpupils).timestamps
+            #pupils = load_pldata_file(cpupils[:-13], 'pupil')[0]
+            list_firstTstamp.append(calib_eye_file[0])
+            list_filename.append(chunks)
+            list_filetype.append('CALIB PUPILS')
+            list_len.append(len(calib_eye_file))
+        except:
+            print('File ' + chunks + ' did not load.')
+    '''
     # Obtain time stamp of first pupil of main run pupils (detected online) in directory
     list_run_pupils = glob.glob(data_path + '/*pupil/task-thingsmemory*/*/pupil.pldata')
     for rpupils in list_run_pupils:

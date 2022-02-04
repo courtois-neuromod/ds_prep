@@ -463,11 +463,14 @@ if __name__ == "__main__":
         except:
             print('Something went wrong processing run ' + run)
 
-    pupil_reports.to_csv(cfg['out_dir'] +'/qc/' + cfg['subject'] + '_ses' + cfg['session'] + '_pupil_report.tsv', sep='\t', header=True, index=False)
-    gaze_reports.to_csv(cfg['out_dir'] +'/qc/' + cfg['subject'] + '_ses' + cfg['session'] + '_gaze_report.tsv', sep='\t', header=True, index=False)
+    try:
+        pupil_reports.to_csv(cfg['out_dir'] +'/qc/' + cfg['subject'] + '_ses' + cfg['session'] + '_pupil_report.tsv', sep='\t', header=True, index=False)
+        gaze_reports.to_csv(cfg['out_dir'] +'/qc/' + cfg['subject'] + '_ses' + cfg['session'] + '_gaze_report.tsv', sep='\t', header=True, index=False)
 
-    # # TODO
-    # 1. load files for skipped frames and create figure
-    # 2. create figure of X and Y positions over time, one global one for calinbration and for run
-    make_gaze_figures(good_runs, calib_gaze_allruns, run_gaze_allruns, cfg['out_dir'] + '/qc/Gaze_online2D')
-    make_frameskip_figure(good_runs, cfg['out_dir'] + '/qc', cfg['time_threshold'])
+        # # TODO
+        # 1. load files for skipped frames and create figure
+        # 2. create figure of X and Y positions over time, one global one for calinbration and for run
+        make_gaze_figures(good_runs, calib_gaze_allruns, run_gaze_allruns, cfg['out_dir'] + '/qc/Gaze_online2D')
+        make_frameskip_figure(good_runs, cfg['out_dir'] + '/qc', cfg['time_threshold'])
+    except:
+        print('Could not QC file ' + args.config)
