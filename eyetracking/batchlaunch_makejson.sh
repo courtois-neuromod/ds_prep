@@ -20,6 +20,6 @@ do
         --data_dir="${DATADIR}" \
         --out_dir="${OUTDIR}" \
         --sub=${SUBID} \
-        --ses="ses-00${SESID}"
+        --ses="ses-0${SESID}"
   done
 done

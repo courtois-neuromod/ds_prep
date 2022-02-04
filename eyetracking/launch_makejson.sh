@@ -16,4 +16,4 @@ python -m make_config_json \
       --data_dir="${DATADIR}" \
       --out_dir="${OUTDIR}" \
       --sub="sub-01" \
-      --ses="ses-005"
+      --ses="ses-004"
