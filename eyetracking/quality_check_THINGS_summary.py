@@ -425,6 +425,10 @@ def process_run(cfg, run):
 
     gaze_data = ((cg_x, cg_y, cg_times), (rg_x, rg_y, rg_times))
 
+    rg_times_from0 = np.array(rg_times) - rg_times[0]
+    run_gaze_df = pd.DataFrame(np.concatenate((np.reshape(rg_x, (-1, 1)), np.reshape(rg_y, (-1, 1)), np.reshape(rg_times_from0, (-1, 1))), axis=1), columns=['gaze_x', 'gaze_y', 'time_stamp'])
+    run_gaze_df.to_csv(cfg['out_dir'] +'/qc/' + cfg['subject'] + '_ses' + cfg['session'] + '_run' + run + '_gazecoord.tsv', sep='\t', header=True, index=False)
+
     return pupil_report, gaze_report, gaze_data
 
 
