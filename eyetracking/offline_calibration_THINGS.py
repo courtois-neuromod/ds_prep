@@ -454,7 +454,8 @@ def map_run_gaze(cfg, run):
         rg_on2d_d = [rg_on2d_d[0], 'Run', 'Online2D', 'Run' + run, rg_on2d_d[1], rg_on2d_d[2], xdiff, ydiff, x_m, x_b, y_m, y_b]
         gaze_report = gaze_report.append(pd.Series(rg_on2d_d, index=gaze_report.columns), ignore_index=True)
 
-    run_report.close()
+        run_report.close()
+
     return pupil_report, gaze_report
 
 

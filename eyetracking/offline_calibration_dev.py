@@ -92,6 +92,9 @@ if __name__ == "__main__":
     g_pool = SimpleNamespace()
 
     '''
+    Some pre-measured camera intrinsics (from Pupil)
+    https://github.com/pupil-labs/pupil/blob/74865d3ed5b6d2b462533abf09a9d485df4f551e/pupil_src/shared_modules/camera_models.py#L26-L152
+
     # UPDATE: all capture attributes are loaded from the camera attributes from eye0.intrinsics
     No need to specify them manually
 
