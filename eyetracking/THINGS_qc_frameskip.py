@@ -15,16 +15,7 @@ import matplotlib.pyplot as plt
 
 
 def crunch_ff(list_calib_ff, list_run_ff):
-    '''
-    For each subject, performance metrics are extracted per run, per session (scan) and per run
-    and overall (excluding session 1, which differs from the subsequent ones)
 
-    Input:
-        list_files: sorted list of str that correspond to session's .tsv file of gaze report
-        out_path: str path to output directory
-    Output:
-        None : exports .tsv files of computed scores saved in specified output directory (default is '/results')
-    '''
     c_count = 0
     r_count = 0
     s1_count = s2_count = s3_count = s6_count = 0
@@ -76,9 +67,21 @@ def crunch_ff(list_calib_ff, list_run_ff):
 
 
 def main():
+    '''
+    Quick and dirty QC script for the THINGS dataset that
+    can be ran after THINGS_qualitycheck_summary.py
+
+    Crunches up additional stats on skipped frames (eye camera) based on
+    run*_calib_framegaps.tsv and run*_run_framegaps.tsv files outputed by quality_check_THINGS_summary.py
+
+    Prints tally of the number of runs with at least one skip above a certain lenght (in s),
+    per subject and overall. The duraction of the gap threshold is specified on lines 32 and 52
+
+    No output
+    '''
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--idir', type=str, required=True, help='path to bids folder of .tsv behavioural output files')
+    parser.add_argument('-d', '--idir', type=str, default='/home/labopb/Documents/Marie/neuromod/THINGS/Eye-tracking/offline_calibration')
     args = parser.parse_args()
 
     in_path = args.idir

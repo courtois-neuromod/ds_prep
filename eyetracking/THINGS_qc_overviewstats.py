@@ -36,9 +36,11 @@ def make_gaze_figs(df_allruns, out_path):
 
     file_names = ['subtreshold', 'outarea', 'XfromMid', 'YfromMid', 'Xslope', 'Xintercept', 'Yslope', 'Yintercept']
 
+    # filter for rows that correspond to main run's metric, not calibration metrics
     df_allruns_nocalib = df_allruns[df_allruns['Type']=='Run']
     #df_allruns_calib = df_allruns[df_allruns['Type']=='Calib']
 
+    # Set up variables so Fig's x-axis is per subject
     x_val = df_allruns_nocalib['Sub'].to_numpy().astype('int')
     x_val[x_val > 5] = 4
 
@@ -72,20 +74,23 @@ def make_gaze_figs(df_allruns, out_path):
 
 def crunch_data(list_gazefiles, list_pupilfiles, out_path):
     '''
-    For each subject, performance metrics are extracted per run, per session (scan) and per run
-    and overall (excluding session 1, which differs from the subsequent ones)
+    QC metrics are compiled per run for each subject.
+    At the moment, only the gaze reports (list_gazefiles) are analyzed
 
     Input:
-        list_files: sorted list of str that correspond to session's .tsv file of gaze report
+        list_gazefiles: sorted list of str that correspond to each run's gaze report (.tsv file)
+        list_pupilfiles: sorted list of str that correspond to each run's pupil report (.tsv file)
         out_path: str path to output directory
     Output:
-        None : exports .tsv files of computed scores saved in specified output directory (default is '/results')
+        None : exports a single .tsv file of qc metrics for each run in dataset,
+        and figures to visualise range of metrices
     '''
+
     col_names = ['Name', 'Type', 'Processing', 'Sub', 'Sess', 'Run', 'Below 0.85 Confidence Threshold',
                  'Outside Screen Area', 'X diff from mid', 'Y diff from mid', 'X slope', 'X intercept',
                  'Y slope', 'Y intercept']
 
-    df_allruns = pd.DataFrame(columns=col_names)
+    df_gazeQC_allruns = pd.DataFrame(columns=col_names)
 
     for gazefile_path in list_gazefiles:
 
@@ -97,17 +102,23 @@ def crunch_data(list_gazefiles, list_pupilfiles, out_path):
         gaze_file.insert(loc=3, column='Sub', value=sub_id, allow_duplicates=True)
         gaze_file.insert(loc=4, column='Sess', value=ses_id, allow_duplicates=True)
 
-        df_allruns = pd.concat((df_allruns, gaze_file), ignore_index=True)
+        df_gazeQC_allruns = pd.concat((df_gazeQC_allruns, gaze_file), ignore_index=True)
 
-    df_allruns.to_csv(os.path.join(out_path, 'Allsessions_gaze_report.tsv'), sep='\t', header=True, index=False)
+    df_gazeQC_allruns.to_csv(os.path.join(out_path, 'Allsessions_gaze_report.tsv'), sep='\t', header=True, index=False)
 
-    make_gaze_figs(df_allruns, out_path)
+    make_gaze_figs(df_gazeQC_allruns, out_path)
 
 
 def main():
+    '''
+    QC script for the THINGS dataset that can be ran after THINGS_qualitycheck_summary.py
+
+    Script compiles overall statistics and exports figures for the whole dataset
+    (plotted per participant)
+    '''
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--idir', type=str, required=True, help='path to bids folder of .tsv behavioural output files')
+    parser.add_argument('-d', '--idir', type=str, required=True, help='path to qc output files')
     parser.add_argument('-o', '--odir', type=str, default='./results', help='path to output directory')
     args = parser.parse_args()
 
@@ -118,7 +129,7 @@ def main():
         os.mkdir(out_path)
 
     list_gazefiles = sorted(glob.glob(os.path.join(in_path, 's0*', 'ses-0*', 'qc', 'sub-*_gaze_report.tsv')))
-    list_pupilfiles = sorted(glob.glob(os.path.join(in_path, 's0*', 'ses-0*', 'qc', 'sub-*_gaze_report.tsv')))
+    list_pupilfiles = sorted(glob.glob(os.path.join(in_path, 's0*', 'ses-0*', 'qc', 'sub-*_pupil_report.tsv')))
 
     crunch_data(list_gazefiles, list_pupilfiles, out_path)
 

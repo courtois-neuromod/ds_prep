@@ -13,8 +13,8 @@ import argparse
 parser = argparse.ArgumentParser(description='Perform off-line gaze mapping with 2D and 3D pupil detectors ')
 parser.add_argument('--code_dir', default='', type=str, help='absolute path to main code directory')
 parser.add_argument('--data_dir', default='', type=str, help='absolute path to main data directory')
-parser.add_argument('--sub', default='config.json', type=str, help='subject number')
-parser.add_argument('--ses', default='config.json', type=str, help='session number')
+parser.add_argument('--sub', default='sub-01', type=str, help='subject number')
+parser.add_argument('--ses', default=1, type=int, help='session number')
 args = parser.parse_args()
 
 sys.path.append(os.path.join(args.code_dir, "pupil", "pupil_src", "shared_modules"))
@@ -174,7 +174,7 @@ if __name__ == "__main__":
         template_json = json.load(f)
 
     sub_num = args.sub
-    ses_num = args.ses
+    ses_num = 'ses-' + f'{args.ses:03d}'
 
     template_json['subject'] = sub_num
     template_json['session'] = ses_num[-3:]

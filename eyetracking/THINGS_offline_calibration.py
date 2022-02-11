@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import argparse
 
-from quality_check_THINGS import assess_timegaps, qc_report
+from THINGS_qualitycheck import assess_timegaps, qc_report
 
 def get_arguments():
 

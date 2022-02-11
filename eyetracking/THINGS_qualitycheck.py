@@ -11,11 +11,11 @@ import matplotlib.pyplot as plt
 import argparse
 
 parser = argparse.ArgumentParser(description='Perform off-line gaze mapping with 2D and 3D pupil detectors ')
-parser.add_argument('--run_dir', default='', type=str, help='absolute path to main code directory')
+parser.add_argument('--code_dir', default='', type=str, help='absolute path to main code directory')
 parser.add_argument('--config', default='config.json', type=str, help='absolute path to config file')
 args = parser.parse_args()
 
-sys.path.append(os.path.join(args.run_dir, "pupil", "pupil_src", "shared_modules"))
+sys.path.append(os.path.join(args.code_dir, "pupil", "pupil_src", "shared_modules"))
 #sys.path.append(os.path.join("/home/labopb/Documents/Marie/neuromod/ds_prep/eyetracking", "pupil", "pupil_src", "shared_modules"))
 from video_capture.file_backend import File_Source
 from file_methods import PLData_Writer, load_pldata_file, load_object, save_object
@@ -29,7 +29,9 @@ from gaze_mapping.gazer_3d.gazer_headset import Gazer3D
 #from gaze_mapping.utils import _find_nearest_idx as find_idx
 
 '''
-Quality checks: contrast two sets of pupils and gaze
+Quality checks for runs of THINGS data
+
+An early version, exports too many charts. Use THINGS_qualitycheck_summary for more concise output
 
 1. (Optional) Flag missing frames in eye movie (mp4) based on gaps in camera timestamps
 2. Flag percentage of pupils and gaze under confidence threshold
@@ -512,7 +514,7 @@ if __name__ == "__main__":
     Script performs quality check for online pupil and gaze outputs for all runs
     from a single THINGS session.
 
-    Note that the same config file can be used to run offline_calibration_THINGS.py, which
+    Note that the same config file can be used to run THINGS_offline_calibration.py, which
     outputs offline pupil and gaze measures (in 2d and optionally in 3d)
     '''
 

@@ -11,12 +11,12 @@ DATADIR="/home/labopb/Documents/Marie/neuromod/THINGS/Eye-tracking"
 
 for SUBID in sub-01 sub-02 sub-03 sub-06
 do
-  for SESID in {3..9}
+  for SESID in {3..20}
   do
-    python -m make_config_json \
+    python -m THINGS_make_config_json \
         --code_dir="${CODEDIR}" \
         --data_dir="${DATADIR}" \
         --sub=${SUBID} \
-        --ses="ses-00${SESID}"
+        --ses=${SESID}
   done
 done

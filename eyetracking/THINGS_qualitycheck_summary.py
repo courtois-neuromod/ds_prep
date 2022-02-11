@@ -10,9 +10,10 @@ import matplotlib.pyplot as plt
 
 import argparse
 
-parser = argparse.ArgumentParser(description='Perform off-line gaze mapping with 2D and 3D pupil detectors ')
+parser = argparse.ArgumentParser(description='Exports summary of QC measures for a single run of THINGS eyetracking data')
 parser.add_argument('--run_dir', default='', type=str, help='absolute path to main code directory')
 parser.add_argument('--config', default='config.json', type=str, help='absolute path to config file')
+#parser.add_argument('--driftcor', action='store_true', help='if true, apply crude drift correction to gaze over run')
 args = parser.parse_args()
 
 sys.path.append(os.path.join(args.run_dir, "pupil", "pupil_src", "shared_modules"))
@@ -132,7 +133,10 @@ def make_frameskip_figure(good_runs, outdir=None, time_thres=0.00416):
         plt.savefig(outdir + '/SkipFrames_online2D_run.png')
 
 
-def make_composite_figure(good_runs, y_vals, x_vals, out_name=None, y_range=[-0.05, 1.05]):
+def make_composite_figure(good_runs, y_vals, x_vals, out_name=None, y_range=[-0.05, 1.05], driftcorrect=False):
+
+        if driftcorrect:
+            out_name = out_name[:-4] + '_driftcorr.png'
 
         plt.clf()
         ncols = 3
@@ -164,12 +168,17 @@ def make_composite_figure(good_runs, y_vals, x_vals, out_name=None, y_range=[-0.
                 x_val -= x_0
 
                 y_val = y_vals[ct]
+
                 #m, b = np.polyfit(x_val, y_val, 1)
                 #p_of_x = m*(x_val) + b
                 p3, p2, p1, p0 = np.polyfit(x_val, y_val, 3)
                 p_of_x = p3*(x_val**3) + p2*(x_val**2) + p1*(x_val) + p0
                 #p6, p5, p4, p3, p2, p1, p0 = np.polyfit(x_val, y_val, 6)
                 #p_of_x = p6*(x_val**6) + p5*(x_val**5) + p4*(x_val**4) + p3*(x_val**3) + p2*(x_val**2) + p1*(x_val) + p0
+
+                if driftcorrect:
+                    y_val = y_val - (p_of_x - 0.5)
+                    p_of_x = np.repeat(0.5, len(y_val))
 
                 ax[r][c].plot(x_val, y_val)
                 ax[r][c].plot(x_val, p_of_x)
@@ -221,11 +230,14 @@ def make_gaze_figures(good_runs, calib_gaze_allruns, run_gaze_allruns, out_name=
         r_x.append(rgaze_x)
         r_y.append(rgaze_y)
 
-    make_composite_figure(good_runs, c_x, c_times, out_name=out_name + '_Xposition_calib.png')
-    make_composite_figure(good_runs, c_y, c_times, out_name=out_name + '_Yposition_calib.png')
-
-    make_composite_figure(good_runs, r_x, r_times, out_name=out_name + '_Xposition_run.png')
-    make_composite_figure(good_runs, r_y, r_times, out_name=out_name + '_Yposition_run.png')
+    # calib sequence, X and Y, without drift correction
+    make_composite_figure(good_runs, c_x, c_times, out_name=out_name + '_Xposition_calib.png', driftcorrect=False)
+    make_composite_figure(good_runs, c_y, c_times, out_name=out_name + '_Yposition_calib.png', driftcorrect=False)
+    # main run, X and Y, with and without drift correction
+    make_composite_figure(good_runs, r_x, r_times, out_name=out_name + '_Xposition_run.png', driftcorrect=False)
+    make_composite_figure(good_runs, r_y, r_times, out_name=out_name + '_Yposition_run.png', driftcorrect=False)
+    make_composite_figure(good_runs, r_x, r_times, out_name=out_name + '_Xposition_run.png', driftcorrect=True)
+    make_composite_figure(good_runs, r_y, r_times, out_name=out_name + '_Yposition_run.png', driftcorrect=True)
 
 
 def export_line_plot(y_val, out_name=None, x_val=None, mid_val=0.0, x_range=None, y_range=None):
@@ -362,13 +374,6 @@ def qc_report_summary(list_data, output_path, output_name, data_type, cf_thresh=
         xdiff, x_m, x_b = export_line_plot(x, None, times, mid_val=320, y_range=[-4.0, 644.0])
         ydiff, y_m, y_b = export_line_plot(y, None, times, mid_val=240, y_range=[-4.0, 484.0])
 
-    '''
-    if len(skip_idx) > 0:
-        print(os.path.basename(output_name) + ' has ' + str(len(skip_idx)) + ' time gaps')
-        np.savez(output_name + '_QCrep.npz', confidence = np.array(confidences), position = np.array(positions), time_diff = np.array(time_diff), time_gaps = np.array(skip_idx))
-    else:
-        np.savez(output_name + '_QCrep.npz', confidence = np.array(confidences), position = np.array(positions), time_diff = np.array(time_diff))
-    '''
     return (x, y, times), d1, (xdiff, ydiff, x_m, x_b, y_m, y_b)
 
 
@@ -425,9 +430,12 @@ def process_run(cfg, run):
 
     gaze_data = ((cg_x, cg_y, cg_times), (rg_x, rg_y, rg_times))
 
+    '''
+    # Option to export gaze coordinates
     rg_times_from0 = np.array(rg_times) - rg_times[0]
     run_gaze_df = pd.DataFrame(np.concatenate((np.reshape(rg_x, (-1, 1)), np.reshape(rg_y, (-1, 1)), np.reshape(rg_times_from0, (-1, 1))), axis=1), columns=['gaze_x', 'gaze_y', 'time_stamp'])
     run_gaze_df.to_csv(cfg['out_dir'] +'/qc/' + cfg['subject'] + '_ses' + cfg['session'] + '_run' + run + '_gazecoord.tsv', sep='\t', header=True, index=False)
+    '''
 
     return pupil_report, gaze_report, gaze_data
 
