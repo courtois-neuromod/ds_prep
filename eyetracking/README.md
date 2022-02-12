@@ -1,7 +1,7 @@
 Eye-tracking QC and offline processing
 ==============================
 
-THINGS dataset
+*THINGS dataset*
 
 **Step 1. Create one config.json file per session**
 
