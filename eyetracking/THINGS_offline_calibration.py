@@ -145,9 +145,9 @@ def map_run_gaze(cfg, run):
 
     '''
     Step 1. Detect calibration pupils offline with 2D and 3D pupil detectors
-    This step is optional: the pupil data calculated online (during scan) can be used instead
-    (those are exported as .npz file by psychopy;
-    technically, pupil's own .pldata files could be used, but they won't load...)
+    This step is optional: the pupil data calculated online (during scan) can be used instead.
+    Pupils can be accessed from the .npz file exported by psychopy.
+    Alternatively, Pupil's .pldata files can be used
     '''
 
     if cfg['overwrite_camera_intrinsics']:

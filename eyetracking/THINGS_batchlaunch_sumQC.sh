@@ -4,10 +4,10 @@
 
 source /home/labopb/Documents/Marie/neuromod/pupil_venv/bin/activate
 
-RUNDIR="/home/labopb/Documents/Marie/neuromod/ds_prep/eyetracking"
+CODEDIR="/home/labopb/Documents/Marie/neuromod/ds_prep/eyetracking"
 
-for cfile in ${RUNDIR}/config/config_THINGS/config_THINGS_s*.json; do
+for cfile in ${CODEDIR}/config/config_THINGS/config_THINGS_s*.json; do
   python -m THINGS_qualitycheck_summary \
-        --run_dir="${RUNDIR}" \
-        --config="${cfile}" \
+        --code_dir="${CODEDIR}" \
+        --config="${cfile}"
 done
