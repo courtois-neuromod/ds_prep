@@ -68,11 +68,9 @@ To compute these metrics, launch
 
 **Step 4. Perform offline processing for runs that need it**
 
-From the config file created in Step 1, problematic session can be re-processed offline
-(pupil detection, calibration and gaze mapping)
-
-As an option (specified in config file with the "apply_qc" argument),
-the script performs a QC on the offline and online gaze data
+From the config file created in Step 1, a problematic session can be re-processed offline
+(pupil detection, calibration and gaze mapping). As an option (specified in config file with the "apply_qc" argument),
+the script performs a QC on the offline and online gaze data.
 
 To process a session offline, launch (specify session's config file in argument)
 ```bash
