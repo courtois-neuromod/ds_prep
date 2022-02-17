@@ -8,6 +8,6 @@ export LD_LIBRARY_PATH=/data/neuromod/virtualenvs/eyetracking/lib
 
 RUNDIR="/home/mariestl/cneuromod/THINGS/Eye-tracking/offline_calibration"
 
-python -m quality_check_THINGS_overview \
+python -m THINGS_qc_overviewstats \
       --idir="${RUNDIR}" \
       --odir="${RUNDIR}/overview"

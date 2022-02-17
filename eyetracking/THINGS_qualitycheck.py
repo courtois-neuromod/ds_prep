@@ -11,11 +11,11 @@ import matplotlib.pyplot as plt
 import argparse
 
 parser = argparse.ArgumentParser(description='Perform off-line gaze mapping with 2D and 3D pupil detectors ')
-parser.add_argument('--run_dir', default='', type=str, help='absolute path to main code directory')
+parser.add_argument('--code_dir', default='', type=str, help='absolute path to main code directory')
 parser.add_argument('--config', default='config.json', type=str, help='absolute path to config file')
 args = parser.parse_args()
 
-sys.path.append(os.path.join(args.run_dir, "pupil", "pupil_src", "shared_modules"))
+sys.path.append(os.path.join(args.code_dir, "pupil", "pupil_src", "shared_modules"))
 #sys.path.append(os.path.join("/home/labopb/Documents/Marie/neuromod/ds_prep/eyetracking", "pupil", "pupil_src", "shared_modules"))
 from video_capture.file_backend import File_Source
 from file_methods import PLData_Writer, load_pldata_file, load_object, save_object
@@ -29,8 +29,8 @@ from gaze_mapping.gazer_3d.gazer_headset import Gazer3D
 #from gaze_mapping.utils import _find_nearest_idx as find_idx
 
 '''
-Quality checks: contrast two sets of pupils and gaze
-
+Quality checks for runs of THINGS data
+An early version, exports too many charts. Use THINGS_qualitycheck_summary for more concise output
 1. (Optional) Flag missing frames in eye movie (mp4) based on gaps in camera timestamps
 2. Flag percentage of pupils and gaze under confidence threshold
 3. Flag percentage of gaze outside screen area
@@ -86,14 +86,11 @@ def export_line_plot(y_val, out_name=None, x_val=None, mid_val=0.0, x_range=None
 
 '''
 def make_plot(rs, rois, out_dir=None, out_name=''):
-
     ncols = 4
     nrows = math.ceil(len(rois) / ncols)
-
     SMALL_SIZE = 8
     MEDIUM_SIZE = 10
     BIGGER_SIZE = 16
-
     plt.rc('font', size=SMALL_SIZE)  # controls default text sizes
     plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
     plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
@@ -101,59 +98,43 @@ def make_plot(rs, rois, out_dir=None, out_name=''):
     plt.rc('ytick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
     plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-
     fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=(24, nrows * 4))
-
     ct = 0
     for r in range(nrows):
         for c in range(ncols):
             if ct == len(rois):
                 break
-
             roi = rois[ct]
             ct += 1
-
             roi_rs = rs[roi][0]
-
             if np.isnan(roi_rs).any():
                 roi_rs = np.zeros(roi_rs.shape)
-
             n_bins = 30
             N, bins, patches = ax[r][c].hist(roi_rs, edgecolor='white', linewidth=1, bins=n_bins)
-
             insign_perc = min([(0.18 - np.array(roi_rs).min()) / (np.array(roi_rs).max() - np.array(roi_rs).min()), 1])
             try:
                 insign_bins = int(n_bins * insign_perc)
             except:
                 insign_bins = n_bins
-
             for i in range(0, insign_bins):
                 patches[i].set_facecolor('lightgray')
             for i in range(insign_bins, 30):
                 patches[i].set_facecolor('lightblue')
-
             ax[r][c].axvline(x=np.median([x for x in roi_rs if x >= 0.18]), color='red', linestyle='--')
-
             ax[r][c].set_title('{} (n={}, max={:.2f}, median={:.2f})'.format(roi, len(roi_rs), np.array(roi_rs).max(),
                                                                              np.median(
                                                                                  [x for x in roi_rs if x >= 0.18])), pad=30)
-
             ax[r][c].spines['top'].set_visible(False)
             ax[r][c].spines['right'].set_visible(False)
-
     fig.add_subplot(111, frameon=False)
-
     # hide tick and tick label of the big axis
     plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
     plt.xlabel("Pearson correlation", labelpad=20)
     plt.ylabel("Number of voxels", labelpad=20)
-
     fig.tight_layout(pad=6.0)
-
     if out_dir is not None:
         #plt.savefig('{}/correlation_histograms.png'.format(out_dir))
         plt.savefig(out_dir + '/' + out_name + 'correlation_histograms.png')
-
 '''
 
 
@@ -163,9 +144,7 @@ def match_batch(dset1, dset2, max_dispersion=1 / 15.0):
     """
     '''
     matched = [[], []]
-
     pupils1_ts = np.array([p["timestamp"] for p in pupils1])
-
     for pup in pupils2:
         closest_p_idx = find_idx(pupils1_ts, pup["timestamp"])
         closest_p = pupils1[closest_p_idx]
@@ -175,7 +154,6 @@ def match_batch(dset1, dset2, max_dispersion=1 / 15.0):
         if dispersion < max_dispersion:
             matched[0].append(pup)
             matched[1].append(closest_p)
-
     return matched
     '''
 
@@ -317,7 +295,6 @@ def assess_distance(out_name, dtype, dset1, dset2, cf_thresh=0.6):
     '''
     Distance in pixels between center of pupil's position on eye movie frames;
     Assumes square pixels
-
     Or distance in normalized space between gaze positions
     '''
     out_name = out_name + '_' + dtype
@@ -511,8 +488,7 @@ if __name__ == "__main__":
     '''
     Script performs quality check for online pupil and gaze outputs for all runs
     from a single THINGS session.
-
-    Note that the same config file can be used to run offline_calibration_THINGS.py, which
+    Note that the same config file can be used to run THINGS_offline_calibration.py, which
     outputs offline pupil and gaze measures (in 2d and optionally in 3d)
     '''
 

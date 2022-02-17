@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import argparse
 
-from quality_check_THINGS import assess_timegaps, qc_report
+from THINGS_qualitycheck import assess_timegaps, qc_report
 
 def get_arguments():
 
@@ -31,7 +31,6 @@ def make_intrinsics(file_path):
                 'dist_coefs': [[0.0, 0.0, 0.0, 0.0, 0.0]],
                 'focal_length': 256.0
     }
-
     save_object(int_dict, file_path)
     '''
     pass
@@ -145,9 +144,9 @@ def map_run_gaze(cfg, run):
 
     '''
     Step 1. Detect calibration pupils offline with 2D and 3D pupil detectors
-    This step is optional: the pupil data calculated online (during scan) can be used instead
-    (those are exported as .npz file by psychopy;
-    technically, pupil's own .pldata files could be used, but they won't load...)
+    This step is optional: the pupil data calculated online (during scan) can be used instead.
+    Pupils can be accessed from the .npz file exported by psychopy.
+    Alternatively, Pupil's .pldata files can be used
     '''
 
     if cfg['overwrite_camera_intrinsics']:
@@ -246,7 +245,6 @@ def map_run_gaze(cfg, run):
             '''
             # Alternatively, use software's own pupil file (.plcal), either outputed offline or online
             calib_pupils_2d = []
-
             # Convert serialized file to list of dictionaries...
             #seri_calib_pupils_2d = load_pldata_file(cfg['calib_mp4'][:-9], 'pupil')
             seri_calib_pupils_2d = load_pldata_file(cfg['previous_cal_2dpupils'], cfg['prev_cal_pup2D_name'])
@@ -260,7 +258,6 @@ def map_run_gaze(cfg, run):
                     else:
                         pupil_data[key] = pup[key]
                 calib_pupils_2d.append(pupil_data)
-
             '''
             calib_pupils_3d = []
 
@@ -454,7 +451,8 @@ def map_run_gaze(cfg, run):
         rg_on2d_d = [rg_on2d_d[0], 'Run', 'Online2D', 'Run' + run, rg_on2d_d[1], rg_on2d_d[2], xdiff, ydiff, x_m, x_b, y_m, y_b]
         gaze_report = gaze_report.append(pd.Series(rg_on2d_d, index=gaze_report.columns), ignore_index=True)
 
-    run_report.close()
+        run_report.close()
+
     return pupil_report, gaze_report
 
 
@@ -462,7 +460,6 @@ if __name__ == '__main__':
     '''
     Script outputs offline pupil and gaze outputs, and (optionally) performs quality checks on them,
     based on functions from quality_check_THINGS.py (which can be ran only to QC online pupils and gaze)
-
     Both scripts use the same config file, for convenience
     '''
     args = get_arguments()

@@ -7,6 +7,6 @@ source /home/mariestl/my_envs/pupil_venv/bin/activate
 RUNDIR="/home/mariestl/cneuromod/ds_prep/eyetracking"
 config_file=${1}
 
-python -m offline_calibration_THINGS \
-      --run_dir="${RUNDIR}" \
+python -m THINGS_qualitycheck \
+      --code_dir="${RUNDIR}" \
       --config="${RUNDIR}/config/config_THINGS/${config_file}"
