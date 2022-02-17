@@ -162,8 +162,8 @@ if __name__ == "__main__":
     '''
     Script generates config file for a subject's THINGS session
 
-    The config file is compatible with the offline calibration script (offline_calibration_THINGS.py)
-    and the two QC scripts (summary: quality_check_THINGS_summary.py, and more extensive: quality_check_THINGS.py)
+    The config file is compatible with the offline calibration script (THINGS_offline_calibration.py)
+    and the two QC scripts (summary: THINGS_qualitycheck_summary.py, and more extensive: THINGS_qualitycheck.py)
 
     '''
     # Load template file
