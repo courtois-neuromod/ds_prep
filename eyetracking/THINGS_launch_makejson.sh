@@ -11,15 +11,9 @@ CODEDIR="/home/mariestl/cneuromod/ds_prep/eyetracking"
 DATADIR="/data/neuromod/DATA/fmri_tmp/things/sourcedata"
 OUTDIR="/home/mariestl/cneuromod/THINGS/Eye-tracking/offline_calibration"
 
-for SUBID in sub-01 sub-02 sub-03 sub-06
-do
-  for SESID in {10..20}
-  do
-    python -m make_config_json \
-        --code_dir="${CODEDIR}" \
-        --data_dir="${DATADIR}" \
-        --out_dir="${OUTDIR}" \
-        --sub=${SUBID} \
-        --ses="ses-0${SESID}"
-  done
-done
+python -m THINGS_make_config_json \
+      --code_dir="${CODEDIR}" \
+      --data_dir="${DATADIR}" \
+      --out_dir="${OUTDIR}" \
+      --sub="sub-01" \
+      --ses=4
