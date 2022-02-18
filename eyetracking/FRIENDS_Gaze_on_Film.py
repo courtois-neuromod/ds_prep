@@ -5,6 +5,8 @@ import cv2
 import pandas as pd
 import numpy as np
 
+import argparse
+
 '''
 Script overlaps gaze stimuli onto movie frames and exports as .mp4
 
@@ -31,15 +33,15 @@ https://www.geeksforgeeks.org/python-opencv-cv2-circle-method/
 def get_arguments():
 
     parser = argparse.ArgumentParser(description='Perform off-line gaze mapping with 2D and 3D pupil detectors ')
-    parser.add_argument('--gaze', default='', type=str, help='absolute path to gaze file')
-    parser.add_argument('--config', default='config.json', type=str, help='absolute path to film .mkv file')
+    parser.add_argument('--gaze', default='run_s2e04a_online_gaze2D.npz', type=str, help='absolute path to gaze file')
+    parser.add_argument('--film', default='friends_s2e04a_copy.mkv', type=str, help='absolute path to film .mkv file')
     parser.add_argument('--out_path', type=str, default='./results', help='path to output directory')
-    parser.add_argument('--fps', type=float, default=29.97', help='frames per second')
-    parser.add_argument('--gaze_confthres', type=float, default=0.98', help='gaze confidence threshold')
+    parser.add_argument('--fps', type=float, default=29.97, help='frames per second')
+    parser.add_argument('--gaze_confthres', type=float, default=0.98, help='gaze confidence threshold')
     parser.add_argument('--deepgaze', action='store_true', help='if true, map gaze from deepgaze coordinates')
     parser.add_argument('--partial', action='store_true', help='if true, only process a portion of the movie')
-    parser.add_argument('--start_frame', type=int, default=0', help='first frame included in the segment')
-    parser.add_argument('--num_frames', type=int, default=1000', help='number of frames included in the segment')
+    parser.add_argument('--start_frame', type=int, default=0, help='first frame included in the segment')
+    parser.add_argument('--num_frames', type=int, default=1000, help='number of frames included in the segment')
     parser.add_argument('--outname', default='test', type=str, help='name of output movie')
     args = parser.parse_args()
 
@@ -272,10 +274,10 @@ def main():
         dg_coords = pd.read_csv(gaze_path, sep = '\t').to_numpy()
 
         if args.partial:
-            timeframes = np.arange(num_frames+1) / fps
+            timeframes = np.arange(num_frames+3) / fps
 
-            dg_x = dg_coords[start_frame:start_frame+num_frames+1, 1] # width
-            dg_y = dg_coords[start_frame:start_frame+num_frames+1, 0] # height
+            dg_x = dg_coords[start_frame:start_frame+num_frames+3, 1] # width
+            dg_y = dg_coords[start_frame:start_frame+num_frames+3, 0] # height
 
         else:
             timeframes = np.arange(dg_coords.shape[0]) / fps
@@ -293,9 +295,9 @@ def main():
     clip_gaze = clip.fx( drawgaze, f_xcoord, f_ycoord, 10)
 
     if args.partial:
-        clip_gaze.write_videofile(os.path.join(args.out_path, args.outname + str(int(start_time)) + '_' + str(int(end_time)) + '.mp4')
+        clip_gaze.write_videofile(os.path.join(args.out_path, args.outname + str(int(start_time)) + '_' + str(int(end_time)) + '.mp4'))
     else:
-        clip_gaze.write_videofile(os.path.join(args.out_path, args.outname + '.mp4')
+        clip_gaze.write_videofile(os.path.join(args.out_path, args.outname + '.mp4'))
 
 
 if __name__ == '__main__':

@@ -16,5 +16,4 @@ python -m FRIENDS_Gaze_on_Film \
       --start_frame=15000 \
       --num_frames=1000 \
       --gaze_confthres=0.98 \
-      --sub="s1_online" \
-      --ses="s2e04a"
+      --outname="s2e04a_s1_online" 

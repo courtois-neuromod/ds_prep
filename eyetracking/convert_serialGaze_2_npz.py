@@ -39,38 +39,44 @@ if __name__ == "__main__":
     s1 ses39
     IFILE="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-01/ses-039/sub-01_ses-039_20211020-180629.pupil/task-friends-s2e4a/000"
     OFILE="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-01/ses-039/run_s2e04a_online_gaze2D.npz"
-    python -m gz_convert --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
+    python -m convert_serialGaze_2_npz --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
 
     s1 ses40
     IFILE="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-01/ses-040/sub-01_ses-040_20211103-181444.pupil/task-friends-s2e4b/000"
     OFILE="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-01/ses-040/run_s2e04b_online_gaze2D.npz"
-    python -m gz_convert --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
+    python -m convert_serialGaze_2_npz --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
 
     s2 ses43
     IFILE="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-02/ses-043/sub-02_ses-043_20211020-114642.pupil/task-friends-s2e4a/000"
     OFILE="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-02/ses-043/run_s2e04a_online_gaze2D.npz"
-    python -m gz_convert --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
+    python -m convert_serialGaze_2_npz --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
 
     s3 ses68
     IFILE="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-03/ses-068/sub-03_ses-068_20211013-140928.pupil/task-friends-s2e4a/000"
     OFILE="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-03/ses-068_offline/run_s2e04a_online_gaze2D.npz"
-    python -m gz_convert --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
+    python -m convert_serialGaze_2_npz --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
 
     s3 ses69
     IFILE="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-03/ses-069/sub-03_ses-069_20211027-141144.pupil/task-friends-s2e4b/000"
     OFILE="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-03/ses-069/run_s2e04b_online_gaze2D.npz"
-    python -m gz_convert --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
+    python -m convert_serialGaze_2_npz --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
 
     s6 ses40
     IFILE="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-06/ses-040/sub-06_ses-040_20211020-155839.pupil/task-friends-s2e4a/000"
     OFILE="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-06/ses-040/run_s2e04a_online_gaze2D.npz"
-    python -m gz_convert --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
+    python -m convert_serialGaze_2_npz --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
 
     s6 ses41
     IFILE="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/pupil_data/sub-06/ses-041/sub-06_ses-041_20211027-160734.pupil/task-friends-s2e4b/000"
     OFILE="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-06/ses-041/run_s2e04b_online_gaze2D.npz"
-    python -m gz_convert --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
+    python -m convert_serialGaze_2_npz --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
 
+    # Mario
+    sub-01 ses-002 runs 1-3
+    RUNDIR="/home/labopb/Documents/Marie/neuromod/ds_prep/eyetracking"
+    IFILE="/home/labopb/Documents/Marie/neuromod/Mario/Eye-tracking/pupil_data/sub-01/ses-002/sub-01_ses-002_20210611-105659.pupil/task-mario_run-03/000"
+    OFILE="/home/labopb/Documents/Marie/neuromod/Mario/Eye-tracking/offline_calibration/sub-01/ses-002/run3_online_gaze2D.npz"
+    python -m convert_serialGaze_2_npz --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
 
     '''
     seri_gaze = load_pldata_file(args.infile, 'gaze')[0]
