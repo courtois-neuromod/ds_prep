@@ -2,8 +2,8 @@
 
 source_ds=$1
 ds_name=$2
-ria_store=ria+file:///project/rrg-pbellec/ria-beluga
-
+ria_store=ria+file:///lustre03/project/rrg-pbellec/ria-beluga
+ria_name=ria-beluga
 
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
@@ -27,7 +27,7 @@ datalad save -m 'setup dataset gitattribute gitignore and install freesurfer lic
 datalad install -d . -s $source_ds sourcedata/$ds_name
 
 datalad create-sibling-ria  --alias $ds_name.fmriprep -s ria-beluga $ria_store --shared 640
-datalad push --to ria-beluga
-
+datalad push --to $ria_name
+git -C $(git remote get-url $ria_name) symbolic-ref HEAD refs/heads/$(git branch --show-current)
 
 

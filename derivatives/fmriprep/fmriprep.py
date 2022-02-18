@@ -48,10 +48,12 @@ slurm_preamble = """#!/bin/bash
 #SBATCH --time={time}
 #SBATCH --cpus-per-task={cpus}
 #SBATCH --mem-per-cpu={mem_per_cpu}M
+#SBATCH --tmp=100G
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user={email}
+
  
 set -e -u -x
 
