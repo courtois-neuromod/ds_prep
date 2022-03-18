@@ -227,7 +227,11 @@ def load_movie(movie_file):
         duration += 1
     movie = retro.Movie(movie_file)
     movie.step()
-    emulator = retro.make(game=movie.get_game(), state=retro.State.NONE, use_restricted_actions=retro.Actions.ALL, players=movie.players)
+    emulator = retro.make(game=movie.get_game(),
+                          state=retro.State.NONE,
+                          use_restricted_actions=retro.Actions.ALL,
+                          players=movie.players,
+                          inttype=retro.data.Integrations.CUSTOM_ONLY)
     data = movie.get_state()
     emulator.initial_state = data
     emulator.reset()
