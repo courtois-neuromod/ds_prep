@@ -8,5 +8,5 @@ RUNDIR="/home/labopb/Documents/Marie/neuromod/ds_prep/eyetracking"
 config_file=${1}
 
 python -m THINGS_offline_calibration \
-      --run_dir="${RUNDIR}" \
+      --code_dir="${RUNDIR}" \
       --config="${RUNDIR}/config/config_THINGS/${config_file}"

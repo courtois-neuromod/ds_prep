@@ -78,6 +78,13 @@ if __name__ == "__main__":
     OFILE="/home/labopb/Documents/Marie/neuromod/Mario/Eye-tracking/offline_calibration/sub-01/ses-002/run3_online_gaze2D.npz"
     python -m convert_serialGaze_2_npz --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
 
+    sub-03 ses-003 runs 1-4
+    RUNDIR="/home/labopb/Documents/Marie/neuromod/ds_prep/eyetracking"
+    IFILE="/home/labopb/Documents/Marie/neuromod/Mario/Eye-tracking/pupil_data/sub-03/ses-003/sub-03_ses-003_20211104-173758.pupil/task-mario_run-01/000"
+    OFILE="/home/labopb/Documents/Marie/neuromod/Mario/Eye-tracking/offline_calibration/sub-03/ses-003/run1_online_gaze2D.npz"
+    python -m convert_serialGaze_2_npz --infile="${IFILE}" --run_dir="${RUNDIR}" --outfile="${OFILE}"
+
+
     '''
     seri_gaze = load_pldata_file(args.infile, 'gaze')[0]
 

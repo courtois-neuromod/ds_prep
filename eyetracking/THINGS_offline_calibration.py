@@ -12,7 +12,7 @@ from THINGS_qualitycheck import assess_timegaps, qc_report
 def get_arguments():
 
     parser = argparse.ArgumentParser(description='Perform off-line gaze mapping with 2D and 3D pupil detectors ')
-    parser.add_argument('--run_dir', default='', type=str, help='absolute path to main code directory')
+    parser.add_argument('--code_dir', default='', type=str, help='absolute path to main code directory')
     parser.add_argument('--config', default='config.json', type=str, help='absolute path to config file')
     args = parser.parse_args()
 
@@ -468,7 +468,7 @@ if __name__ == '__main__':
     '''
     args = get_arguments()
 
-    sys.path.append(os.path.join(args.run_dir, "pupil", "pupil_src", "shared_modules"))
+    sys.path.append(os.path.join(args.code_dir, "pupil", "pupil_src", "shared_modules"))
     from video_capture.file_backend import File_Source
     from file_methods import PLData_Writer, load_pldata_file, load_object, save_object
     from gaze_producer.worker.fake_gpool import FakeGPool, FakeIPC
