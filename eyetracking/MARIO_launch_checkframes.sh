@@ -8,8 +8,6 @@ EYETRACKDIR="/home/labopb/Documents/Marie/neuromod/Mario/Eye-tracking/pupil_data
 GAZEDIR="/home/labopb/Documents/Marie/neuromod/Mario/Eye-tracking/offline_calibration/sub-01/ses-002"
 OUTDIR="/home/labopb/Documents/Marie/neuromod/Mario/tests2"
 
-python -m MARIO_makemovie \
+python -m MARIO_framerateQC \
       --file_path="${EYETRACKDIR}" \
-      --gaze_path="${GAZEDIR}" \
-      --out_path="${OUTDIR}" \
-      --conf=0.80
+      --out_path="${OUTDIR}" 
