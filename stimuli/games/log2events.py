@@ -8,6 +8,7 @@ rep_tag = "level step: 0"
 TTL_tag = "fMRI TTL 0"
 record_tag = "VideoGame: recording movie"
 abort_tags = ["<class 'src.tasks.videogame.VideoGameMultiLevel'>", "abort"]
+restart_tags= ["<class 'src.tasks.videogame.VideoGameMultiLevel'>", "restart"]
 complete_tags = [" <class 'src.tasks.videogame.VideoGameMultiLevel'>", "complete"]
 
 retro.data.Integrations.add_custom_path(
@@ -40,7 +41,7 @@ def split_rep_logs(log):
             print(f"\n\n\n{record}")
         elif all(stt in e[2] for stt in stop_tags):
             stop = e
-        elif all(abt in e[2] for abt in abort_tags):
+        elif all(abt in e[2] for abt in abort_tags) or all(abt in e[2] for abt in restart_tags):
             TTL = None
             rep_log = None
     return rep_logs
@@ -50,7 +51,7 @@ def logs2event_files(in_files, out_file_tpl):
     run = 0
     TTL = None
     last_rep_last_run = 'aaa'
-    for in_file in in_files:
+    for in_file in sorted(in_files):
         rep_log = None
         log = load_log_file(in_file)
         for e in log:
@@ -58,7 +59,7 @@ def logs2event_files(in_files, out_file_tpl):
                 rep_log.append(e)
             if record_tag in e[2]:
                 record = "/".join(e[2].split(" ")[-1].split("/")[-4:])
-                print(f"\n\n\n{record}")
+                print(f"\n{record}")
             elif e[2] == TTL_tag:
                 if not TTL:
                     run += 1  # only increment if the previous scan was not aborted
@@ -70,6 +71,7 @@ def logs2event_files(in_files, out_file_tpl):
             elif all(stt in e[2] for stt in stop_tags):
                 stop = e
                 if TTL:
+                    record = record.replace('sourcedata','sourcedata/behavior').replace('ses-0','ses-shinobi_0')
                     bk2 = retro.Movie(record)
                     bk2_dur  = 0
                     while bk2.step():
@@ -88,12 +90,12 @@ def logs2event_files(in_files, out_file_tpl):
                                 None,
                             )
                         )
-                        duration_steps = int(duration_log*60.02)
-                        keypresses, rewards = extract_keypress_rewards(rep_log)
+                        #duration_steps = int(duration_log*60.02)
+                        #keypresses, rewards = extract_keypress_rewards(rep_log)
                         #print(keypresses, rewards)
-                        kp_1hot = keypresses_1hot(keypresses, duration_steps)
-                        bk2 = retro.Movie(record)
-                        print(find_keyreleases(bk2, kp_1hot, rewards, duration_steps))
+                        #kp_1hot = keypresses_1hot(keypresses, duration_steps)
+                        #bk2 = retro.Movie(record)
+                        #print(find_keyreleases(bk2, kp_1hot, rewards, duration_steps))
                     else:
                         repetition[-1].append(
                             (
@@ -109,15 +111,16 @@ def logs2event_files(in_files, out_file_tpl):
             elif all(cpt in e[2] for cpt in complete_tags):
                 TTL = None
                 last_rep_last_run = repetition[-1][-1]
-            elif all(abt in e[2] for abt in abort_tags):
-                TTL = None
-                if len(repetition): # only if TTL was received
+            elif all(abt in e[2] for abt in abort_tags) or all(abt in e[2] for abt in restart_tags):
+                if TTL and len(repetition): # only if TTL was received
                     del repetition[-1]
+                TTL = None                    
                 rep_log = None
         TTL = None  # reset the TTL
     run = 0
     for reps in repetition:
         if len(reps) == 0:  # skip empty tasks or without scanning
+            print("empty task")
             continue
         run += 1
         out_file = out_file_tpl % run
@@ -252,7 +255,7 @@ def find_keyreleases(movie, keypresses, rewards, duration):
             players=movie.players,
             inttype=retro.data.Integrations.CUSTOM_ONLY,
         )
-        movie.step()
+        #movie.step()
         
         env.initial_state = movie.get_state()
         env.reset()
