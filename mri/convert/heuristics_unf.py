@@ -13,7 +13,7 @@ from heudiconv.heuristics.reproin import (
 )
 
 def load_example_dcm(seqinfo):
-    ex_dcm_path = glob.glob(os.path.join('/tmp', 'heudiconv*', '*', seqinfo.dcm_dir_name, seqinfo.example_dcm_file))[0]
+    ex_dcm_path = sorted(glob.glob(os.path.join('/tmp', 'heudiconv*', '*', seqinfo.dcm_dir_name, seqinfo.example_dcm_file)))[0]
     return nb_dw.wrapper_from_file(ex_dcm_path)
 
 def infotoids(seqinfos, outdir):
@@ -80,7 +80,7 @@ rec_exclude = [
     "NONE",
     "DIFFUSION",
     "UNI",
-]
+] + [f"TE{i}" for i in range(9)]
 
 
 def get_seq_bids_info(s, ex_dcm):
@@ -95,6 +95,7 @@ def get_seq_bids_info(s, ex_dcm):
         if it not in rec_exclude:
             seq_extra["rec"] = it.lower()
     seq_extra["part"] = "mag" if "M" in s.image_type else ("phase" if "P" in s.image_type else None)
+    print(s, s.image_type)
     
     try:
         pedir = ex_dcm.dcm_data.InPlanePhaseEncodingDirection
@@ -166,12 +167,14 @@ def get_seq_bids_info(s, ex_dcm):
         if "T1w" in s.protocol_name:
             seq["acq"] = "T1w"
         else:
-            seq["acq"] = "MTon" if scan_options == "MT" else "MToff"
+            seq["mt"] = "on" if scan_options == "MT" else "off"
+            # do not work for multiple flip-angle, need data to find how to detect index
+            seq["flip"] = 2 if 'T1w' in s.series_id else 1
 
     elif "tfl2d1" in s.sequence_name:
         seq["type"] = "fmap"
-        seq["label"] = "B1plusmap"
-        seq["acq"] = "flipangle" if "flip angle map" in image_comments else "anat"
+        seq["label"] = "TB1TFL"
+        seq["acq"] = "famp" if "flip angle map" in image_comments else "anat"
 
     # SWI
     elif (s.dim4 == 1) and ("swi3d1r" in s.sequence_name):
@@ -191,17 +194,17 @@ def get_seq_bids_info(s, ex_dcm):
         seq["label"] = "sbref" if is_sbref else "dwi"
 
     # CMRR or Siemens functional sequences
-    elif "epfid2d1" in s.sequence_name:
+    elif "epfid2d" in s.sequence_name:
         seq["task"] = get_task(s)
         print(seq)
         # if no task, this is a fieldmap
-        if seq["task"]:
-            seq["type"] = "func"
-            seq["label"] = "sbref" if is_sbref else "bold"
-        else:
+        if "AP" in s.series_id and not seq["task"]:
             seq["type"] = "fmap"
             seq["label"] = "epi"
             seq["acq"] = "sbref" if is_sbref else "bold"
+        else:
+            seq["type"] = "func"
+            seq["label"] = "sbref" if is_sbref else "bold"
 
         seq["run"] = get_run(s)
         if s.is_motion_corrected:
@@ -214,6 +217,10 @@ def get_seq_bids_info(s, ex_dcm):
     elif "*me2d1r3" in s.sequence_name:
         seq["label"] = "T2starmap"
 
+    if seq["label"] == "sbref" and "part" in seq:
+        print("deleting part", s.sequence_name)
+        del seq["part"]
+        
     return seq, seq_extra
 
 
@@ -255,6 +262,7 @@ def infotodict(seqinfo):
     """
 
     lgr.info("Processing %d seqinfo entries", len(seqinfo))
+    lgr.info(seqinfo)
 
     info = OrderedDict()
     skipped, skipped_unknown = [], []
@@ -317,7 +325,7 @@ def infotodict(seqinfo):
                 ]
                 suffix = "_".join(filter(bool, suffix_parts))
                 template = create_key("fmap", suffix, prefix=prefix, outtype=outtype)
-                print( template)
+                print(template)
                 if template not in info:
                     info[template] = []
                 info[template].append(s.series_id)
@@ -348,6 +356,7 @@ def infotodict(seqinfo):
 
     for k, i in info.items():
         print(k, i)
+    print(info)
     return info
 
 
@@ -355,11 +364,9 @@ def dedup_bids_extra(info, bids_infos):
     # add `rec-` or `part-` to dedup series originating from the same acquisition
     info = info.copy()
     for template, series_ids in list(info.items()):
-        if len(series_ids) > 1:
+        if len(series_ids) >= 2:
             lgr.warning("Detected %d run(s) for template %s: %s",
                         len(series_ids), template[0], series_ids)
-            # copy the duplicate ones into separate ones
-            dup_id = 0  # reset since declared per series
 
             for extra in ["rec", "part"]:
                 
