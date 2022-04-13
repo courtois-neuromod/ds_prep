@@ -66,8 +66,8 @@ datalad_pre = """
 export LOCAL_DATASET=$SLURM_TMPDIR/${{SLURM_JOB_NAME//-/}}/
 flock --verbose {ds_lockfile} datalad clone {output_repo} $LOCAL_DATASET
 cd $LOCAL_DATASET
-datalad get -s ria-beluga-storage -n -r -R1 . # get sourcedata/* containers
-datalad get -s ria-beluga-storage -r sourcedata/templateflow/tpl-{{{templates}}}
+datalad get -s ria-beluga-storage -J 4 -n -r -R1 . # get sourcedata/* containers
+datalad get -s ria-beluga-storage -J 4 -r sourcedata/templateflow/tpl-{{{templates}}}
 if [ -d sourcedata/smriprep ] ; then
     datalad get -n sourcedata/smriprep sourcedata/smriprep/sourcedata/freesurfer
 fi
@@ -83,7 +83,7 @@ fi
 datalad_post = """
 flock --verbose {ds_lockfile} datalad push -d ./ --to origin
 if [ -d sourcedata/freesurfer ] ; then
-    flock --verbose {ds_lockfile} datalad push -d sourcedata/freesurfer $LOCAL_DATASET --to origin
+    flock --verbose {ds_lockfile} datalad push -J 4 -d sourcedata/freesurfer $LOCAL_DATASET --to origin
 fi 
 """
 
