@@ -1,4 +1,5 @@
-import os, re
+import os, re, glob
+from collections import defaultdict
 import nibabel.nicom.dicomwrappers as nb_dw
 from heudiconv.heuristics import reproin
 from heudiconv.heuristics.reproin import (
@@ -11,22 +12,25 @@ from heudiconv.heuristics.reproin import (
     series_spec_fields,
 )
 
+def load_example_dcm(seqinfo):
+    ex_dcm_path = sorted(glob.glob(os.path.join('/tmp', 'heudiconv*', '*', seqinfo.dcm_dir_name, seqinfo.example_dcm_file)))[0]
+    return nb_dw.wrapper_from_file(ex_dcm_path)
 
 def infotoids(seqinfos, outdir):
 
     seqinfo = next(seqinfos.__iter__())
-    ex_dcm = nb_dw.wrapper_from_file(seqinfo.example_dcm_file_path)
 
-    # pi = str(ex_dcm.dcm_data.ReferringPhysicianName)
+    ex_dcm = load_example_dcm(seqinfo)
+
     pi = str(seqinfo.referring_physician_name)
-    # study_name = str(ex_dcm.dcm_data.StudyDescription)
     study_name = str(seqinfo.study_description)
-
     patient_name = str(ex_dcm.dcm_data.PatientName)
 
     study_path = study_name.split("^")
 
-    rema = re.match("(([^_]*)_)?(([^_]*)_)?p([0-9]*)_([a-z]*)([0-9]*)", patient_name)
+    rema = re.match("(([^_]*)_)?(([^_]*)_)?p([0-9]*)_([a-zA-Z]*)([0-9]*)", patient_name)
+    if rema is None:
+        rema = re.match("(([^_]*)_)?(([^_]*)_)?(dev)_([a-zA-Z]*)([0-9]*)", patient_name)
 
     locator = os.path.join(pi, *study_path)
 
@@ -46,6 +50,8 @@ def infotoids(seqinfos, outdir):
 
 def get_task(s):
     mtch = re.match(".*_task\-([^_]+).*", s.series_id)
+    if mtch is None:
+        mtch = re.match(".*\-task_([^_]+).*", s.series_id)# for floc messup
     if mtch is not None:
         task = mtch.group(1).split("-")
         if len(task) > 1:
@@ -67,13 +73,14 @@ rec_exclude = [
     "ORIGINAL",
     "PRIMARY",
     "M",
+    "P",
     "MB",
     "ND",
     "MOSAIC",
     "NONE",
     "DIFFUSION",
     "UNI",
-]
+] + [f"TE{i}" for i in range(9)]
 
 
 def get_seq_bids_info(s, ex_dcm):
@@ -82,10 +89,14 @@ def get_seq_bids_info(s, ex_dcm):
         "type": "anat",  # by default to make code concise
         "label": None,
     }
+
+    seq_extra = {}
     for it in s.image_type[2:]:
         if it not in rec_exclude:
-            seq["rec"] = it.lower()
-
+            seq_extra["rec"] = it.lower()
+    seq_extra["part"] = "mag" if "M" in s.image_type else ("phase" if "P" in s.image_type else None)
+    print(s, s.image_type)
+    
     try:
         pedir = ex_dcm.dcm_data.InPlanePhaseEncodingDirection
         if "COL" in pedir:
@@ -156,12 +167,14 @@ def get_seq_bids_info(s, ex_dcm):
         if "T1w" in s.protocol_name:
             seq["acq"] = "T1w"
         else:
-            seq["acq"] = "MTon" if scan_options == "MT" else "MToff"
+            seq["mt"] = "on" if scan_options == "MT" else "off"
+            # do not work for multiple flip-angle, need data to find how to detect index
+            seq["flip"] = 2 if 'T1w' in s.series_id else 1
 
     elif "tfl2d1" in s.sequence_name:
         seq["type"] = "fmap"
-        seq["label"] = "B1plusmap"
-        seq["acq"] = "flipangle" if "flip angle map" in image_comments else "anat"
+        seq["label"] = "TB1TFL"
+        seq["acq"] = "famp" if "flip angle map" in image_comments else "anat"
 
     # SWI
     elif (s.dim4 == 1) and ("swi3d1r" in s.sequence_name):
@@ -181,16 +194,17 @@ def get_seq_bids_info(s, ex_dcm):
         seq["label"] = "sbref" if is_sbref else "dwi"
 
     # CMRR or Siemens functional sequences
-    elif "epfid2d1" in s.sequence_name:
+    elif "epfid2d" in s.sequence_name:
         seq["task"] = get_task(s)
+        print(seq)
         # if no task, this is a fieldmap
-        if seq["task"]:
-            seq["type"] = "func"
-            seq["label"] = "sbref" if is_sbref else "bold"
-        else:
+        if "AP" in s.series_id and not seq["task"]:
             seq["type"] = "fmap"
             seq["label"] = "epi"
             seq["acq"] = "sbref" if is_sbref else "bold"
+        else:
+            seq["type"] = "func"
+            seq["label"] = "sbref" if is_sbref else "bold"
 
         seq["run"] = get_run(s)
         if s.is_motion_corrected:
@@ -203,7 +217,36 @@ def get_seq_bids_info(s, ex_dcm):
     elif "*me2d1r3" in s.sequence_name:
         seq["label"] = "T2starmap"
 
-    return seq
+    if seq["label"] == "sbref" and "part" in seq:
+        print("deleting part", s.sequence_name)
+        del seq["part"]
+        
+    return seq, seq_extra
+
+
+def generate_bids_key(seq_type, seq_label, prefix, bids_info, show_dir=False, outtype=("nii.gz",), **bids_extra):
+    bids_info.update(bids_extra)
+    suffix_parts = [
+        None if not bids_info.get("task") else "task-%s" % bids_info["task"],
+        None if not bids_info.get("acq") else "acq-%s" % bids_info["acq"],
+        None if not bids_info.get("ce") else "ce-%s" % bids_info["ce"],
+        None
+        if not (bids_info.get("dir") and show_dir)
+        else "dir-%s" % bids_info["dir"],
+        None if not bids_info.get("inv") else "inv-%d" % bids_info["inv"],
+        None if not bids_info.get("rec") else "rec-%s" % bids_info["rec"],
+        None if not bids_info.get("tsl") else "tsl-%d" % bids_info["tsl"],
+        None if not bids_info.get("loc") else "loc-%s" % bids_info["loc"],
+        None if not bids_info.get("run") else "run-%02d" % int(bids_info["run"]),
+        None if not bids_info.get("bp") else "bp-%s" % bids_info["bp"],
+        None if not bids_info.get("echo") else "echo-%d" % int(bids_info["echo"]),
+        None if not bids_info.get("part") else "part-%s" % bids_info["part"],
+        seq_label,
+    ]
+    # filter those which are None, and join with _
+    suffix = "_".join(filter(bool, suffix_parts))
+    
+    return create_key(seq_type, suffix, prefix=prefix, outtype=outtype)
 
 
 def infotodict(seqinfo):
@@ -219,9 +262,7 @@ def infotodict(seqinfo):
     """
 
     lgr.info("Processing %d seqinfo entries", len(seqinfo))
-
-    # for s in seqinfo:
-    #    print(s)
+    lgr.info(seqinfo)
 
     info = OrderedDict()
     skipped, skipped_unknown = [], []
@@ -235,14 +276,14 @@ def infotodict(seqinfo):
     prefix = ""
 
     fieldmap_runs = {}
+    all_bids_infos = {}
 
     for s in seqinfo:
+        
+        ex_dcm = load_example_dcm(s)
 
-        ex_dcm = nb_dw.wrapper_from_file(s.example_dcm_file_path)
-
-        bids_info = get_seq_bids_info(s, ex_dcm)
-        print(s)
-        print(bids_info)
+        bids_info, bids_extra = get_seq_bids_info(s, ex_dcm)
+        all_bids_infos[s.series_id] = (bids_info, bids_extra)
 
         # XXX: skip derived sequences, we don't store them to avoid polluting
         # the directory, unless it is the motion corrected ones
@@ -260,9 +301,12 @@ def infotodict(seqinfo):
         seq_type = bids_info["type"]
         seq_label = bids_info["label"]
 
-        if (seq_type == "fmap" and seq_label == "epi") or (
+        if (seq_type == "fmap" and seq_label == "epi" and bids_extra['part']=='phase' and seq_label=='bold'):
+            continue
+        
+        if ((seq_type == "fmap" and seq_label == "epi") or (
             sbref_as_fieldmap and seq_label == "sbref"
-        ):
+        )) and bids_info.get("part") in ["mag", None]:
             pe_dir = bids_info.get("dir", None)
             if not pe_dir in fieldmap_runs:
                 fieldmap_runs[pe_dir] = 0
@@ -281,54 +325,19 @@ def infotodict(seqinfo):
                 ]
                 suffix = "_".join(filter(bool, suffix_parts))
                 template = create_key("fmap", suffix, prefix=prefix, outtype=outtype)
+                print(template)
                 if template not in info:
                     info[template] = []
                 info[template].append(s.series_id)
 
         show_dir = seq_type in ["fmap", "dwi"]
 
-        # print(bids_info)
-        suffix_parts = [
-            None if not bids_info.get("task") else "task-%s" % bids_info["task"],
-            None if not bids_info.get("acq") else "acq-%s" % bids_info["acq"],
-            None if not bids_info.get("ce") else "ce-%s" % bids_info["ce"],
-            None
-            if not (bids_info.get("dir") and show_dir)
-            else "dir-%s" % bids_info["dir"],
-            None if not bids_info.get("inv") else "inv-%d" % bids_info["inv"],
-            None if not bids_info.get("part") else "part-%s" % bids_info["part"],
-            None if not bids_info.get("tsl") else "tsl-%d" % bids_info["tsl"],
-            None if not bids_info.get("loc") else "loc-%s" % bids_info["loc"],
-            None if not bids_info.get("run") else "run-%02d" % int(bids_info["run"]),
-            None if not bids_info.get("bp") else "bp-%s" % bids_info["bp"],
-            None if not bids_info.get("echo") else "echo-%d" % int(bids_info["echo"]),
-            seq_label,
-        ]
-        # filter those which are None, and join with _
-        suffix = "_".join(filter(bool, suffix_parts))
+        template = generate_bids_key(seq_type, seq_label, prefix, bids_info, show_dir, outtype)
 
-        # if "_Scout" in s.series_description or \
-        #        (seqtype == 'anat' and seqtype_label and seqtype_label.startswith('scout')):
-        #    outtype = ('dicom',)
-        # else:
-        #    outtype = ('nii.gz', 'dicom')
-
-        template = create_key(seq_type, suffix, prefix=prefix, outtype=outtype)
-
-        # we wanted ordered dict for consistent demarcation of dups
         if template not in info:
             info[template] = []
-        else:
-            # maybe images are exported with different reconstruction parameters.
-            if bids_info.get("rec") and not any([]):
-                # insert the rec-
-                suffix_parts.insert(7, "rec-%s" % bids_info["rec"])
-                # filter those which are None, and join with _
-                suffix = "_".join(filter(bool, suffix_parts))
-                template = create_key(seq_type, suffix, prefix=prefix, outtype=outtype)
-                info[template] = []
-
         info[template].append(s.series_id)
+        
 
     if skipped:
         lgr.info("Skipped %d sequences: %s" % (len(skipped), skipped))
@@ -338,6 +347,7 @@ def infotodict(seqinfo):
             % (len(skipped_unknown), skipped_unknown)
         )
 
+    info = dedup_bids_extra(info, all_bids_infos)
     info = get_dups_marked(info)  # mark duplicate ones with __dup-0x suffix
 
     info = dict(
@@ -346,4 +356,45 @@ def infotodict(seqinfo):
 
     for k, i in info.items():
         print(k, i)
+    print(info)
+    return info
+
+
+def dedup_bids_extra(info, bids_infos):
+    # add `rec-` or `part-` to dedup series originating from the same acquisition
+    info = info.copy()
+    for template, series_ids in list(info.items()):
+        if len(series_ids) >= 2:
+            lgr.warning("Detected %d run(s) for template %s: %s",
+                        len(series_ids), template[0], series_ids)
+
+            for extra in ["rec", "part"]:
+                
+                bids_extra_values = [bids_infos[sid][1].get(extra) for sid in series_ids]
+
+                if len(set(bids_extra_values)) < 2:
+                    continue #does not differentiate series
+
+                lgr.info(f"dedup series using {extra}")
+
+                for sid in list(series_ids): #need a copy of list because we are removing elements in that loop
+
+                    series_bids_info, series_bids_extra = bids_infos[sid]
+
+                    new_template = generate_bids_key(
+                        series_bids_info["type"],
+                        series_bids_info["label"],
+                        "",
+                        series_bids_info,
+                        show_dir=series_bids_info["type"] in ["fmap", "dwi"],
+                        outtype=("nii.gz",),
+                        **{extra: series_bids_extra.get(extra)})
+
+                    if new_template not in info:
+                        info[new_template] = []
+                    info[new_template].append(sid)
+                    info[template].remove(sid)
+                    if not len(info[template]):
+                        del info[template]
+                break
     return info

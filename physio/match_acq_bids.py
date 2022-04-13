@@ -1,4 +1,5 @@
 import os, sys
+import shutil
 import bids
 import bioread
 import pandas
@@ -6,6 +7,7 @@ import pathlib
 import argparse
 import logging
 import datetime
+import struct
 from pytz import timezone
 
 
@@ -48,8 +50,13 @@ def match_all_bolds(bids_path, biopac_path):
             if len(acq_h.time_index):
                 acq_end = acq_start + datetime.timedelta(seconds=acq_h.time_index[-1])
             acqk_files_startends.append((acqk, acq_start, acq_end))
+
+
+        except struct.error as e:
+            logging.error(f"read error for file {acqk}: {e}")
         except Exception as e:
-            logging.error(f"read error for file: {acqk}")
+            logging.error('Exception occur while reading file %s : %s' % (acqk, str(e)))
+                        
 
     sourcedata = bids_path / "sourcedata" / "physio"
     sourcedata.mkdir(parents=True, exist_ok=True)
@@ -96,7 +103,7 @@ def match_all_bolds(bids_path, biopac_path):
                     )
                     if not dest_path.exists() and acq_files[0][0].exists():
                         logging.info(f"moving {acq_files[0][0]} to {dest_path}")
-                        os.rename(acq_files[0][0], dest_path)
+                        shutil.copyfile(acq_files[0][0], dest_path)
         list_matches_out.write_text("\n".join([f"{m[0]}\t{m[1]}" for m in matches]))
 
 
