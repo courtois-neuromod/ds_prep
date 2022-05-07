@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from scipy.io import loadmat, savemat
 from scipy.interpolate import interp1d
-#from scipy.signal import savgol_filter
+from scipy.signal import savgol_filter
 from skimage.transform import resize
 from skimage.feature import peak_local_max
 
@@ -268,6 +268,7 @@ def get_arguments():
     parser.add_argument('--export_plots', action='store_true', help='if true, script exports QC plots')
     parser.add_argument('--export_mp4', action='store_true', help='if true, script exports episode movie with superimposed corrected and uncorrected gaze')
     parser.add_argument('--chunk_centermass', action='store_true', help='if true, also perform the center of mass correction per chunk, without DeepGaze, for comparison')
+    parser.add_argument('--savgol', action='store_true', help='if true, use Savitzky-Golay filter to correct drift w DeepGaze')
     #parser.add_argument('--use_deepgaze', action='store_true', help='if true, gaze recentered based on deepgaze, else from own centers of mass')
 
     parser.add_argument('--out_path', type=str, default='./results', help='path to output directory')
@@ -488,6 +489,43 @@ def get_distances(frame_count, gazes_perframe, DGvals_perframe, use_deepgaze=Fal
     return (et_x, et_y), (dist_x, dist_y), (dg_x, dg_y), frame_nums
 
 
+def median_clean(frame_times, et_x, et_y, dist_x, dist_y):
+    jump = int(len(dist_x)/100)
+    idx = 0
+    gap = 0.6
+
+    filtered_times = []
+    filtered_x = []
+    filtered_y = []
+    filtered_distx = []
+    filtered_disty = []
+
+    current_medx = np.median(np.array(dist_x)[idx:idx+jump])
+    current_medy = np.median(np.array(dist_y)[idx:idx+jump])
+    stdevx = np.std(np.array(dist_x)[idx:idx+jump])
+    stdevy = np.std(np.array(dist_y)[idx:idx+jump])
+
+    for i in range(len(dist_x)):
+        if i > (idx + jump):
+            idx += 1
+            current_medx = np.median(np.array(dist_x)[idx:idx+jump])
+            current_medy = np.median(np.array(dist_y)[idx:idx+jump])
+            stdevx = np.std(np.array(dist_x)[idx:idx+jump])
+            stdevy = np.std(np.array(dist_y)[idx:idx+jump])
+
+        if dist_x[i] < current_medx + (gap*stdevx):
+            if dist_x[i] > current_medx - (gap*stdevx):
+                if dist_y[i] < current_medy + (gap*stdevy):
+                    if dist_y[i] > current_medy - (gap*stdevx):
+                        filtered_times.append(frame_times[i])
+                        filtered_distx.append(dist_x[i])
+                        filtered_disty.append(dist_y[i])
+                        filtered_x.append(et_x[i])
+                        filtered_y.append(et_y[i])
+
+    return filtered_times, filtered_x, filtered_y, filtered_distx, filtered_disty
+
+
 def apply_poly(ref_times, distances, degree, all_times, anchors = 150):
 
     if degree == 1:
@@ -507,6 +545,27 @@ def apply_poly(ref_times, distances, degree, all_times, anchors = 150):
         p_of_all = p4*(all_times**4) + p3*(all_times**3) + p2*(all_times**2) + p1*(all_times) + p0
 
     return p_of_all
+
+
+def fit_savgol(frame_times, dist_x, dist_y, all_times, anchor=50):
+    div = 3
+    polyorder = 2 #2
+
+    window_length = int(len(dist_y[anchor:-anchor])/div)
+
+    if window_length % 2 == 0:
+        window_length += 1 # must be odd number
+
+    p_of_x_sav = savgol_filter(np.array(dist_x[anchor:-anchor]), window_length, polyorder, deriv=0, delta=1.0, axis=- 1, mode='nearest')
+    p_of_y_sav = savgol_filter(np.array(dist_y[anchor:-anchor]), window_length, polyorder, deriv=0, delta=1.0, axis=- 1, mode='nearest')
+
+    f_x = interp1d(frame_times[anchor:-anchor], p_of_x_sav, fill_value='extrapolate')
+    f_y = interp1d(frame_times[anchor:-anchor], p_of_y_sav, fill_value='extrapolate')
+
+    p_of_x_sav_interp = f_x(all_times)
+    p_of_y_sav_interp = f_y(all_times)
+
+    return p_of_x_sav_interp, p_of_y_sav_interp
 
 
 def make_QC_figs(d, out_path, outname):
@@ -629,20 +688,25 @@ def main():
     (et_x, et_y), (dist_x, dist_y), (dg_x, dg_y), frame_nums = get_distances(frame_count, uncorr_gazes,
                                                                              all_DGvals, use_deepgaze,
                                                                              x_mass, y_mass)
-
     # attribute time to middle of the frame
     frame_times = (np.array(frame_nums) + 0.5) / fps
     clean_times_arr = np.array(clean_times)
     all_times_arr = np.array(all_times)
 
+    anchors = 150
+    if use_deepgaze:
+        # remove distances too far from median within sliding windows for cleaner signal
+        frame_times, et_x, et_y, dist_x, dist_y = median_clean(frame_times, et_x, et_y, dist_x, dist_y)
+        anchors = 50
+
     specs = ''
     if args.xdeg is not None:
         deg_x = args.xdeg
         specs += '_deg' + str(deg_x) + 'x'
-        p_of_clean_x = apply_poly(frame_times, dist_x, deg_x, clean_times_arr, anchors=150)
+        p_of_clean_x = apply_poly(frame_times, dist_x, deg_x, clean_times_arr, anchors=anchors)
         clean_x_aligned = np.array(clean_x) - (p_of_clean_x)
 
-        p_of_all_x = apply_poly(frame_times, dist_x, deg_x, all_times_arr, anchors=150)
+        p_of_all_x = apply_poly(frame_times, dist_x, deg_x, all_times_arr, anchors=anchors)
         all_x_aligned = np.array(all_x) - (p_of_all_x)
 
         if args.chunk_centermass:
@@ -658,10 +722,10 @@ def main():
     if args.ydeg is not None:
         deg_y = args.ydeg
         specs += '_deg' + str(deg_y) + 'y'
-        p_of_clean_y = apply_poly(frame_times, dist_y, deg_y, clean_times_arr, anchors=150)
+        p_of_clean_y = apply_poly(frame_times, dist_y, deg_y, clean_times_arr, anchors=anchors)
         clean_y_aligned = np.array(clean_y) - (p_of_clean_y)
 
-        p_of_all_y = apply_poly(frame_times, dist_y, deg_y, all_times_arr, anchors=150)
+        p_of_all_y = apply_poly(frame_times, dist_y, deg_y, all_times_arr, anchors=anchors)
         all_y_aligned = np.array(all_y) - (p_of_all_y)
 
         if args.chunk_centermass:
@@ -676,6 +740,11 @@ def main():
 
     if use_deepgaze:
         specs += '_DG'
+
+    if args.savgol:
+        p_of_x_svg, p_of_y_svg = fit_savgol(frame_times, dist_x, dist_y, clean_times, anchors)
+        clean_x_svgaligned = np.array(clean_x) - (p_of_x_svg)
+        clean_y_svgaligned = np.array(clean_y) - (p_of_y_svg)
 
     # Export corrected gaze as array of dictionaries
     all_gazes_array = np.empty(len(all_times), dtype='object')
@@ -731,10 +800,15 @@ def main():
         if args.chunk_centermass:
             corr_gazes_chunks = gaze_2_frame(frame_count, fps, clean_x_chunkaligned, clean_y_chunkaligned, clean_times)
             specs += '_CMass'
-            clip_gaze = clip.fx( drawgaze_multiples, [uncorr_gazes, corr_gazes, corr_gazes_chunks], [False, False, False], [5, 5, 5], [(155, 0, 0), (0, 0, 100), (202, 228, 241)], fps)
+            if args.savgol:
+                specs += '_SVG'
+                corr_gazes_svg = gaze_2_frame(frame_count, fps, clean_x_svgaligned, clean_y_svgaligned, clean_times)
+                clip_gaze = clip.fx( drawgaze_multiples, [uncorr_gazes, corr_gazes, corr_gazes_svg, corr_gazes_chunks], [False, False, False, False], [5, 5, 5, 5], [(155, 0, 0), (0, 0, 155), (0, 200, 0), (202, 228, 241)], fps)
+            else:
+                clip_gaze = clip.fx( drawgaze_multiples, [uncorr_gazes, corr_gazes, corr_gazes_chunks], [False, False, False], [5, 5, 5], [(155, 0, 0), (0, 0, 155), (202, 228, 241)], fps)
 
         else:
-            clip_gaze = clip.fx( drawgaze_multiples, [uncorr_gazes, corr_gazes], [False, False], [5, 5], [(155, 0, 0), (0, 0, 100)], fps)
+            clip_gaze = clip.fx( drawgaze_multiples, [uncorr_gazes, corr_gazes], [False, False], [5, 5], [(155, 0, 0), (0, 0, 155)], fps)
         clip_gaze.write_videofile(os.path.join(args.out_path, args.outname + specs + '.mp4'))
 
 
