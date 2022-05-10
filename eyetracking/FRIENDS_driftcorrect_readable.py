@@ -30,161 +30,61 @@ https://github.com/courtois-neuromod/deepgaze_mr/blob/mariedev_narval/scripts/pr
 Steps:
 
 - From online or offline gaze data (from pupil), extract normalized gaze positions
-and time stamps. Only include high confidence gaze (specify cutoff threshold)
+and their corresponding time stamps. Only include high confidence gaze (above cutoff threshold)
 
-- Extract deepgaze coordinates from movie frames for which a single local maximum was identified (high confidence)
+- Extract deepgaze coordinates from movie frames for which a single local maximum was identified ("high confidence")
 
-- For those frames (one deepgaze maximum) calculate the difference between the deepgaze coordinate and the average gaze position in x and y
+- For frames with one DG max and above-threshold gaze, calculate distance between deepgaze coordinate and average gaze position in x and y
 
-- Draw a polynomial through the distribution of that difference over time
+- Within a sliding window, keep distances within 0.6 stdev of the median (the gazes most likely close to deepgaze fixation)
+
+- Draw a polynomial through the distribution of those filtered distances plotted over time
 
 - Correct gaze position by removing the "difference" polynomial from the gaze position
 
 - Option: Export plots and a movie (gaze over movie frames) to assess quality of drift correction / gaze mapping
 
-- Alternative: correction without deepgaze. Instead of using difference from deepgaze to correct drift, compute the
-difference between gaze and the "average" position within the frame.
+- Alternative: correction without deepgaze. When no Deepgaze file is provided, compute the
+difference between gaze and the expected "average" position within the frame. Correct drift based on deviations from those positions
 0.5 in x = middle
 0.7 in y is the height at which most faces are, most of the time. Friends is very consistent in its cinematography across episodes
 
-'''
-
-
-'''
-UTILITY FUNCTIONS
 
 Notes on frame dimentions:
 Full screen is 1280:1024
 Friends is projected onto 4:3 using the screen's entire width,
 It is centered along the height dimension w padding along height (above and below movie) -> 1280:960
 Friends frame sizes = 720:480 pixels (file dims) stretched into 1280:960 (on screen)
+Normalized gaze brought back to frame (not screen) pixel space (w padding) is 720 by 512 (16 pix of padding above and below)
 '''
 
-def norm2pix(x_norms, y_norms):
-    '''
-    Function norm2pix converts gaze from normalized space [0, 1] to pixel space.
-    From cartesian coordinates x and y as percent of screen -> coordinates h, w
-    on image frame (array)) where 1 = 100% of screen size
-    Input:
-        x_norms (numpy array of floats): gaze coordinate in x (width)
-        y_norms (numpy array of floats): gaze coordinate in y (height)
-        0, 0 = bottom left (cartesian coordinates)
-    Output:
-        w_pix (list of int): gaze coordinate in pixel space (width)
-        h_pix (list of int): gaze coordinate in pixel space (height)
-    '''
-    assert len(x_norms)==len(y_norms)
 
-    screen_size = (1280, 1024)
-    img_shape = (720, 480)
+def get_arguments():
 
-    # x (width) is projected along full width of the screen, so 100% = 720
-    w_pix = np.floor(x_norms*720).astype(int)
-    w_pix[w_pix > 719] = 719
-    w_pix[w_pix < 0] = 0
+    parser = argparse.ArgumentParser(description='Apply drift correction on pupil gaze data during free viewing (Friends) based on DeepGaze_MR coordinates')
+    parser.add_argument('--gaze', default='run_s2e04a_online_gaze2D.npz', type=str, help='absolute path to gaze file')
+    parser.add_argument('--film', default='friends_s2e04a_copy.mkv', type=str, help='absolute path to film .mkv file')
+    parser.add_argument('--deepgaze_file', default=None, type=str, help='absolute path to deepgaze .npz local maxima file; if None, center of mass correction used instead')
 
-    # y (height) is projected along 960/1024 of the screen height, so 93.75% = 480 and 100% = 512 (480*1024/960)
-    # also, y coordinate is flipped to project onto stimulus (movie frame)
-    h_pix = np.floor((1 - y_norms)*512).astype(int)
-    h_pix -= 16 # remove padding to realign gaze onto unpadded frames
+    parser.add_argument('--xdeg', type=int, default=None, help='degree of polynomial to correct drift in x')
+    parser.add_argument('--ydeg', type=int, default=None, help='degree of polynomial to correct drift in y')
+    parser.add_argument('--fps', type=float, default=29.97, help='frames per second')
 
-    h_pix[h_pix > 479] = 479
-    h_pix[h_pix < 0] = 0
+    parser.add_argument('--gaze_confthres', type=float, default=0.98, help='gaze confidence threshold')
+    parser.add_argument('--export_plots', action='store_true', help='if true, script exports QC plots')
+    parser.add_argument('--export_mp4', action='store_true', help='if true, script exports episode movie with superimposed corrected and uncorrected gaze')
+    parser.add_argument('--chunk_centermass', action='store_true', help='if true, also perform the center of mass correction per chunk, without DeepGaze, and plots it on mp4 for comparison')
+    parser.add_argument('--savgol', action='store_true', help='if true, use Savitzky-Golay filter to correct drift w DeepGaze and plot it onto mp4 for comparison')
+    #parser.add_argument('--use_deepgaze', action='store_true', help='if true, gaze recentered based on deepgaze, else from own centers of mass')
 
-    return w_pix.tolist(), h_pix.tolist()
+    parser.add_argument('--out_path', type=str, default='./results', help='path to output directory')
+    parser.add_argument('--outname', default='test', type=str, help='name of output movie')
+    args = parser.parse_args()
+
+    return args
 
 
-def pix2norm(h_pix, w_pix):
-    '''
-    Function pix2norm converts gaze coordinates from pixel space to normalized space
-    coordinates h, w on image frame (array) -> cartesian coordinates x and y as percent of shown screen
-    '''
-    assert len(h_pix)==len(w_pix)
-
-    screen_size = (1280, 1024)
-    img_shape = (720, 480)
-
-    # x (width) is projected along full width of the screen, so 720 = 100%
-    x_norm = np.array(w_pix / 720).astype(float)
-
-    # y (height) is projected along 960/1024 of the screen height, so 93.75% = 480 and 100% = 512 (480*1024/960)
-    # also, y coordinate is flipped to project onto stimulus (movie frame)
-    y_norm = np.array(((480 - h_pix) + 16) / 512).astype(float) # 16 pixels reflects the padding around height
-
-    return list(zip(x_norm.tolist(), y_norm.tolist()))
-
-
-# Export recentered gaze into movie (episode)
-def drawgaze(clip,fx,fy,r_zone):
-    """
-    Returns a filter that will add a moving circle that corresponds to the gaze mapped onto
-    the frames. The position of the circle at time t is
-    defined by (fx(t), fy(t)), and the radius of the circle
-    by ``r_zone``.
-    Requires OpenCV for the circling.
-    Automatically deals with the case where part of the image goes
-    offscreen.
-    """
-
-    def fl(gf,t):
-
-        im_orig = gf(t)
-        im = np.copy(im_orig)
-
-        #im.setflags(write=1)
-        h,w,d = im.shape
-        x,y = int(fx(t)),int(fy(t))
-        x1,x2 = max(0,x-r_zone),min(x+r_zone,w)
-        y1,y2 = max(0,y-r_zone),min(y+r_zone,h)
-        region_size = y2-y1,x2-x1
-
-        orig = im[y1:y2, x1:x2]
-        circled = cv2.circle(orig, (r_zone, r_zone), r_zone, (155, 0, 155), -1,
-                             lineType=cv2.CV_AA)
-
-        im[y1:y2, x1:x2] = circled
-        return im
-
-    return clip.fl(fl)
-
-
-def drawgaze_confidence(clip,fx,fy,r_zone, f_conf):
-    """
-    Returns a filter that will add a moving circle that corresponds to the gaze mapped onto
-    the frames. The position of the circle at time t is
-    defined by (fx(t), fy(t)), and the radius of the circle
-    by ``r_zone``.
-    Requires OpenCV for the circling.
-    Automatically deals with the case where part of the image goes
-    offscreen.
-    """
-
-    def fl(gf,t):
-
-        im_orig = gf(t)
-        im = np.copy(im_orig)
-
-        confi_thres = f_conf(t)
-
-        if confi_thres < 0.1:
-            #im.setflags(write=1)
-            h,w,d = im.shape
-            x,y = int(fx(t)),int(fy(t))
-            x1,x2 = max(0,x-r_zone),min(x+r_zone,w)
-            y1,y2 = max(0,y-r_zone),min(y+r_zone,h)
-            region_size = y2-y1,x2-x1
-
-            orig = im[y1:y2, x1:x2]
-            circled = cv2.circle(orig, (r_zone, r_zone), r_zone, (155, 0, 155), -1,
-                                 lineType=cv2.CV_AA)
-
-            im[y1:y2, x1:x2] = circled
-
-        return im
-
-    return clip.fl(fl)
-
-
+# Export recentered gaze into movie (half episode)
 def drawgaze_multiples(clip, et_list, is_dg, zone_list, shade_list, fps):
     """
     Adds mulitple gazes from eyetracking and/or deepgaze per frame
@@ -193,13 +93,14 @@ def drawgaze_multiples(clip, et_list, is_dg, zone_list, shade_list, fps):
         h,w,d = image.shape
 
         if dg:
-            #assert(np.argmax(np.array(coord)[:, 0]) == 0)
+            # if multiple DGaze local maxima, scale their size based on salience value
             mean_weight = np.mean(np.array(coord)[:, 0])
 
         for i in range(len(coord)):
             x_norm, y_norm = coord[i][1:]
 
-            # convert normalized to pixel
+            # convert normalized gaze to pixel space
+            # (frame is 720w by 480h, w padding along height to fit frame)
             x = int(np.floor(x_norm*720))
             x = 719 if x > 719 else x
             x = 0 if x < 0 else x
@@ -208,14 +109,14 @@ def drawgaze_multiples(clip, et_list, is_dg, zone_list, shade_list, fps):
             y = 479 if y > 479 else y
             y = 0 if y < 0 else y
 
-            # Largest (highest salience deepgaze) gets different hue
+            # Largest (highest salience deepgaze) gets different hue (yellow)
             if dg and i == 0:
                 dot_shade = (250, 250, 0)
             else:
                 dot_shade = shade
 
             if dg:
-                # scale proportionally to salience value
+                # scale DG local maxima proportionally to salience value
                 r_zone = int(np.floor((r_size*coord[i][0])/mean_weight))
             else:
                 r_zone = r_size
@@ -251,31 +152,6 @@ def drawgaze_multiples(clip, et_list, is_dg, zone_list, shade_list, fps):
         return im
 
     return clip.fl(fl)
-
-
-def get_arguments():
-
-    parser = argparse.ArgumentParser(description='Apply drift correction on pupil gaze data during free viewing (Friends) based on DeepGaze_MR coordinates')
-    parser.add_argument('--gaze', default='run_s2e04a_online_gaze2D.npz', type=str, help='absolute path to gaze file')
-    parser.add_argument('--film', default='friends_s2e04a_copy.mkv', type=str, help='absolute path to film .mkv file')
-    parser.add_argument('--deepgaze_file', default=None, type=str, help='absolute path to deepgaze .npz local maxima file; if None, gaze center of mass used instead')
-
-    parser.add_argument('--xdeg', type=int, default=None, help='degree of polynomial to correct drift in x')
-    parser.add_argument('--ydeg', type=int, default=None, help='degree of polynomial to correct drift in y')
-    parser.add_argument('--fps', type=float, default=29.97, help='frames per second')
-
-    parser.add_argument('--gaze_confthres', type=float, default=0.98, help='gaze confidence threshold')
-    parser.add_argument('--export_plots', action='store_true', help='if true, script exports QC plots')
-    parser.add_argument('--export_mp4', action='store_true', help='if true, script exports episode movie with superimposed corrected and uncorrected gaze')
-    parser.add_argument('--chunk_centermass', action='store_true', help='if true, also perform the center of mass correction per chunk, without DeepGaze, for comparison')
-    parser.add_argument('--savgol', action='store_true', help='if true, use Savitzky-Golay filter to correct drift w DeepGaze')
-    #parser.add_argument('--use_deepgaze', action='store_true', help='if true, gaze recentered based on deepgaze, else from own centers of mass')
-
-    parser.add_argument('--out_path', type=str, default='./results', help='path to output directory')
-    parser.add_argument('--outname', default='test', type=str, help='name of output movie')
-    args = parser.parse_args()
-
-    return args
 
 
 def get_indices(film_path, gz, fps):
@@ -322,19 +198,20 @@ def get_norm_coord(gz, zero_idx, conf_thresh=0.9, gap_thresh = 0.1):
     Export normalized x and y coordinates, and their corresponding time stamp
     '''
     # build array of x, y and timestamps
-    # all gaze values
+    # all gaze values (unfiltered)
     all_x = []
     all_y = []
     all_times = []
     all_conf = []
 
-    # thresholded with gaze confidence
+    # gaze filtered based on confidence threshold
     clean_x = []
     clean_y = []
     clean_times = []
     clean_conf = []
 
     # if 0.0, no gap between current eye frame and previous, else 1.0 if gap > 0.1 s (should be 0.004 at 250 fps)
+    # TODO: improve this metric (plotting isn't great)...
     long_gap = [0.0]
 
     for i in range(zero_idx, len(gz)):
@@ -384,6 +261,8 @@ def get_norm_coord(gz, zero_idx, conf_thresh=0.9, gap_thresh = 0.1):
 
 def get_centermass(all_x, all_y, all_times):
     '''
+    This is a "legacy" function, for comparison purposes (only plot on mp4):
+    performs Center-of-Mass driftcorrection the way I used to validate DeepGaze
     Iterate through chunks of gaze of a certain duration
     Here, ever 20 seconds, sample 5 seconds worth of eye-tracking coordinates
     '''
@@ -407,7 +286,7 @@ def get_centermass(all_x, all_y, all_times):
 
             tstamp = (idx * jump) + (sample_dur/2)
 
-            if len(chunk) > chunk_thresh: # can technically set this threshold higher
+            if len(chunk) > chunk_thresh: # can probably set this threshold higher
                 chunk = np.array(chunk)
                 x_mean, y_mean = np.mean(chunk, axis=0)
                 x_chunks.append(x_mean)
@@ -445,6 +324,10 @@ def gaze_2_frame(frame_count, fps, x_vals, y_vals, time_vals):
 
 
 def get_distances(frame_count, gazes_perframe, DGvals_perframe, use_deepgaze=False, x_mass=0.5, y_mass=0.7):
+    '''
+    Calculates distances between mean gaze (averaged per frame) and DeepGaze
+    If use_deepgaze is False, then calculates distances to target centers of mass x = 0.5 and y = 0.7
+    '''
     frame_nums = []
 
     et_x = []
@@ -490,9 +373,14 @@ def get_distances(frame_count, gazes_perframe, DGvals_perframe, use_deepgaze=Fal
 
 
 def median_clean(frame_times, et_x, et_y, dist_x, dist_y):
+    '''
+    Within bins of 1/100 the number of frames,
+    select only frames where distance between gaze and deepgaze falls within 0.6 stdev of the median
+    These frames most likely reflect when deepgaze and gaze "look" at the same thing
+    '''
     jump = int(len(dist_x)/100)
     idx = 0
-    gap = 0.6
+    gap = 0.6 # interval of distances included around median, in stdev
 
     filtered_times = []
     filtered_x = []
@@ -527,7 +415,15 @@ def median_clean(frame_times, et_x, et_y, dist_x, dist_y):
 
 
 def apply_poly(ref_times, distances, degree, all_times, anchors = 150):
+    '''
+    Fit polynomial to a distribution, then export points along that polynomial curve
+    that correspond to specific gaze time stamps
 
+    The very begining and end of distribution are excluded for stability
+    e.g., participants sometimes look off screen at movie onset & offset,
+    while deepgaze is biased to the center when shown a black screen.
+    This really throws off polynomials
+    '''
     if degree == 1:
         p1, p0 = np.polyfit(ref_times[anchors:-anchors], distances[anchors:-anchors], 1)
         p_of_all = p1*(all_times) + p0
@@ -548,6 +444,11 @@ def apply_poly(ref_times, distances, degree, all_times, anchors = 150):
 
 
 def fit_savgol(frame_times, dist_x, dist_y, all_times, anchor=50):
+    '''
+    Currently only for visualization purposes (to plot on movie mp4):
+    Applies the Savitzky-Golay filter to a distance distribution in x and y,
+    then interpolates points from that distribution for specific gaze timestamps
+    '''
     div = 3
     polyorder = 2 #2
 
@@ -569,7 +470,9 @@ def fit_savgol(frame_times, dist_x, dist_y, all_times, anchor=50):
 
 
 def make_QC_figs(d, out_path, outname):
-
+    '''
+    Export a bunch of quick and dirty figs to assess drift estimation goodness of fit
+    '''
     clean_times = d['clean_times']
     all_times = d['all_times']
     frame_times = d['frame_times']
@@ -658,12 +561,15 @@ def main():
 
     # extract above-threshold normalized coordinates and their realigned time stamps
     all_vals, clean_vals = get_norm_coord(gz, zero_idx, args.gaze_confthres)
+    # all gazes (unfiltered): to export entire dataset?
     all_x, all_y, all_times, all_conf = all_vals
+    # filtered gazes (above confidence threshold)
     clean_x, clean_y, clean_times, clean_conf, long_gaps = clean_vals
 
     '''
-    Correct by chunk centers of mass (no deepgaze): for reference only
-    NOTE: this is the non-deepgaze based approach, strictly for comparison (plotted on movies if exported)
+    For reference only (legacy?)
+    Correct drift with centers of mass from chunks sampled at set intervals (independant from deepgaze):
+    NOTE: this is the non-deepgaze based approach, strictly for comparison (to plot on movies if exported)
     '''
     if args.chunk_centermass:
         x_chunks, y_chunks, chunk_timepoints = get_centermass(clean_x, clean_y, clean_times)
@@ -687,13 +593,13 @@ def main():
         assert(len(all_DGvals) == frame_count)
 
     # compute normalized distance between movie frame's mean gaze and deepgaze's estimated coordinates
-    # (or average position in x and y if no deepgaze file is given)
+    # (or expected average position in x and y (x_mass and y_mass) if no deepgaze file is given)
     x_mass = 0.5
     y_mass = 0.7
     (et_x, et_y), (dist_x, dist_y), (dg_x, dg_y), frame_nums = get_distances(frame_count, uncorr_gazes,
                                                                              all_DGvals, use_deepgaze,
                                                                              x_mass, y_mass)
-    # attribute time stamp to middle of each movie frame
+    # attribute time stamp in s to middle of each movie frame
     frame_times = (np.array(frame_nums) + 0.5) / fps
     clean_times_arr = np.array(clean_times)
     all_times_arr = np.array(all_times)
@@ -758,7 +664,7 @@ def main():
         clean_x_svgaligned = np.array(clean_x) - (p_of_x_svg)
         clean_y_svgaligned = np.array(clean_y) - (p_of_y_svg)
 
-    # Export corrected gaze as array of dictionaries (all gazes, or only filtered ones above confidence threshold)
+    # Export corrected gaze as array of dictionaries (all gaze)
     all_gazes_array = np.empty(len(all_times), dtype='object')
     for i in range(len(all_gazes_array)):
         gaze = {}
@@ -769,6 +675,7 @@ def main():
         all_gazes_array[i] =  gaze
     np.savez(os.path.join(args.out_path, 'All_gazecorr_' + args.outname + specs + '.npz'), gaze2d_corr = all_gazes_array)
 
+    # Export corrected gaze as array of dictionaries (filtered gaze above confidence threshold)
     clean_gazes_array = np.empty(len(clean_times), dtype='object')
     for i in range(len(clean_times)):
         gaze = {}
@@ -779,7 +686,7 @@ def main():
         clean_gazes_array[i] =  gaze
     np.savez(os.path.join(args.out_path, 'Clean_gazecorr_' + args.outname + specs + '.npz'), gaze2d_corr = clean_gazes_array)
 
-    # Option to export plots to assess correction fit
+    # Option to export plots to assess correction fit (for QC)
     if args.export_plots:
         plot_data_dict = {}
         plot_data_dict['all_times'] = all_times
@@ -802,7 +709,7 @@ def main():
 
         make_QC_figs(plot_data_dict, args.out_path, args.outname)
 
-    # create movie of frames w uncorr and corr gaze super-imposed
+    # create movie of episodes w uncorrected and corrected gaze super-imposed
     if args.export_mp4:
         # assign corrected gaze to frames
         corr_gazes = gaze_2_frame(frame_count, fps, clean_x_aligned, clean_y_aligned, clean_times)
@@ -810,9 +717,11 @@ def main():
         clip = VideoFileClip(film_path)
 
         if args.chunk_centermass:
+            # option to add gaze corrected with center-of-mass approach
             corr_gazes_chunks = gaze_2_frame(frame_count, fps, clean_x_chunkaligned, clean_y_chunkaligned, clean_times)
             specs += '_CMass'
             if args.savgol:
+                # option to add gaze corrected with savgol algo applied to gaze-deepgaze distances, instead of polynomial
                 specs += '_SVG'
                 corr_gazes_svg = gaze_2_frame(frame_count, fps, clean_x_svgaligned, clean_y_svgaligned, clean_times)
                 clip_gaze = clip.fx( drawgaze_multiples, [uncorr_gazes, corr_gazes, corr_gazes_svg, corr_gazes_chunks], [False, False, False, False], [5, 5, 5, 5], [(155, 0, 0), (0, 0, 155), (0, 200, 0), (202, 228, 241)], fps)
@@ -820,6 +729,7 @@ def main():
                 clip_gaze = clip.fx( drawgaze_multiples, [uncorr_gazes, corr_gazes, corr_gazes_chunks], [False, False, False], [5, 5, 5], [(155, 0, 0), (0, 0, 155), (202, 228, 241)], fps)
 
         else:
+            # basic option: uncorrected and corrected (deepgaze) gaze
             clip_gaze = clip.fx( drawgaze_multiples, [uncorr_gazes, corr_gazes], [False, False], [5, 5], [(155, 0, 0), (0, 0, 155)], fps)
         clip_gaze.write_videofile(os.path.join(args.out_path, args.outname + specs + '.mp4'))
 
