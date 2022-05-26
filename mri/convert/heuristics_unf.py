@@ -125,9 +125,9 @@ def get_seq_bids_info(s, ex_dcm):
     # Anats
     if "localizer" in s.protocol_name.lower():
         seq["label"] = "localizer"
-    #        slice_orient = ex_dcm.dcm_data.get([0x0051,0x100e])
-    #        if slice_orient is not None:
-    #            seq['acq'] = slice_orient.value.lower()
+        slice_orient = ex_dcm.dcm_data.get([0x0051,0x100e])
+        if slice_orient is not None:
+            seq['acq'] = slice_orient.value.lower()
     elif "AAHead_Scout" in s.protocol_name:
         seq["label"] = "scout"
     elif (
@@ -237,9 +237,11 @@ def generate_bids_key(seq_type, seq_label, prefix, bids_info, show_dir=False, ou
         None if not bids_info.get("rec") else "rec-%s" % bids_info["rec"],
         None if not bids_info.get("tsl") else "tsl-%d" % bids_info["tsl"],
         None if not bids_info.get("loc") else "loc-%s" % bids_info["loc"],
-        None if not bids_info.get("run") else "run-%02d" % int(bids_info["run"]),
         None if not bids_info.get("bp") else "bp-%s" % bids_info["bp"],
+        None if not bids_info.get("run") else "run-%02d" % int(bids_info["run"]),
         None if not bids_info.get("echo") else "echo-%d" % int(bids_info["echo"]),
+        None if not bids_info.get("flip") else "flip-%d" % int(bids_info["flip"]),
+        None if not bids_info.get("mt") else "mt-%d" % int(bids_info["mt"]),
         None if not bids_info.get("part") else "part-%s" % bids_info["part"],
         seq_label,
     ]
@@ -273,6 +275,7 @@ def infotodict(seqinfo):
 
     outtype = ("nii.gz",)
     sbref_as_fieldmap = True  # duplicate sbref in fmap dir to be used by topup
+    sbref_as_fieldmap = False
     prefix = ""
 
     fieldmap_runs = {}
