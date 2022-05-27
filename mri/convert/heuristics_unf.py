@@ -95,7 +95,6 @@ def get_seq_bids_info(s, ex_dcm):
         if it not in rec_exclude:
             seq_extra["rec"] = it.lower()
     seq_extra["part"] = "mag" if "M" in s.image_type else ("phase" if "P" in s.image_type else None)
-    print(s, s.image_type)
     
     try:
         pedir = ex_dcm.dcm_data.InPlanePhaseEncodingDirection
@@ -115,6 +114,7 @@ def get_seq_bids_info(s, ex_dcm):
     bodypart = ex_dcm.dcm_data.get("BodyPartExamined", None)
     if bodypart is not None and bodypart != "BRAIN":
         seq["bp"] = bodypart.lower()
+        print(seq)
 
     scan_options = ex_dcm.dcm_data.get("ScanOptions", None)
     image_comments = ex_dcm.dcm_data.get("ImageComments", [])
@@ -126,8 +126,8 @@ def get_seq_bids_info(s, ex_dcm):
     if "localizer" in s.protocol_name.lower():
         seq["label"] = "localizer"
         slice_orient = ex_dcm.dcm_data.get([0x0051,0x100e])
-        if slice_orient is not None:
-            seq['acq'] = slice_orient.value.lower()
+#        if slice_orient is not None:
+#            seq['acq'] = slice_orient.value.lower()
     elif "AAHead_Scout" in s.protocol_name:
         seq["label"] = "scout"
     elif (
@@ -164,12 +164,9 @@ def get_seq_bids_info(s, ex_dcm):
     # GRE acquisition
     elif "*fl3d1" in s.sequence_name:
         seq["label"] = "MTS"
-        if "T1w" in s.protocol_name:
-            seq["acq"] = "T1w"
-        else:
-            seq["mt"] = "on" if scan_options == "MT" else "off"
-            # do not work for multiple flip-angle, need data to find how to detect index
-            seq["flip"] = 2 if 'T1w' in s.series_id else 1
+        seq["mt"] = "on" if scan_options == "MT" else "off"
+        # do not work for multiple flip-angle, need data to find how to detect index
+        seq["flip"] = 2 if 'T1w' in s.series_id else 1
 
     elif "tfl2d1" in s.sequence_name:
         seq["type"] = "fmap"
@@ -196,7 +193,7 @@ def get_seq_bids_info(s, ex_dcm):
     # CMRR or Siemens functional sequences
     elif "epfid2d" in s.sequence_name:
         seq["task"] = get_task(s)
-        print(seq)
+
         # if no task, this is a fieldmap
         if "AP" in s.series_id and not seq["task"]:
             seq["type"] = "fmap"
@@ -215,10 +212,9 @@ def get_seq_bids_info(s, ex_dcm):
         seq["label"] = "T2w"
     #        seq['bp'] = 'spine'
     elif "*me2d1r3" in s.sequence_name:
-        seq["label"] = "T2starmap"
+        seq["label"] = "T2starw"
 
     if seq["label"] == "sbref" and "part" in seq:
-        print("deleting part", s.sequence_name)
         del seq["part"]
         
     return seq, seq_extra
@@ -233,15 +229,15 @@ def generate_bids_key(seq_type, seq_label, prefix, bids_info, show_dir=False, ou
         None
         if not (bids_info.get("dir") and show_dir)
         else "dir-%s" % bids_info["dir"],
-        None if not bids_info.get("inv") else "inv-%d" % bids_info["inv"],
         None if not bids_info.get("rec") else "rec-%s" % bids_info["rec"],
+        None if not bids_info.get("inv") else "inv-%d" % bids_info["inv"],
         None if not bids_info.get("tsl") else "tsl-%d" % bids_info["tsl"],
         None if not bids_info.get("loc") else "loc-%s" % bids_info["loc"],
         None if not bids_info.get("bp") else "bp-%s" % bids_info["bp"],
         None if not bids_info.get("run") else "run-%02d" % int(bids_info["run"]),
         None if not bids_info.get("echo") else "echo-%d" % int(bids_info["echo"]),
         None if not bids_info.get("flip") else "flip-%d" % int(bids_info["flip"]),
-        None if not bids_info.get("mt") else "mt-%d" % int(bids_info["mt"]),
+        None if not bids_info.get("mt") else "mt-%s" % bids_info["mt"],
         None if not bids_info.get("part") else "part-%s" % bids_info["part"],
         seq_label,
     ]
@@ -263,8 +259,8 @@ def infotodict(seqinfo):
     session: scan index for longitudinal acq
     """
 
-    lgr.info("Processing %d seqinfo entries", len(seqinfo))
-    lgr.info(seqinfo)
+    #lgr.info("Processing %d seqinfo entries", len(seqinfo))
+    #lgr.info(seqinfo)
 
     info = OrderedDict()
     skipped, skipped_unknown = [], []
@@ -328,12 +324,11 @@ def infotodict(seqinfo):
                 ]
                 suffix = "_".join(filter(bool, suffix_parts))
                 template = create_key("fmap", suffix, prefix=prefix, outtype=outtype)
-                print(template)
                 if template not in info:
                     info[template] = []
                 info[template].append(s.series_id)
 
-        show_dir = seq_type in ["fmap", "dwi"]
+        show_dir = seq_type in ["fmap", "dwi"] and not seq_label=='TB1TFL'
 
         template = generate_bids_key(seq_type, seq_label, prefix, bids_info, show_dir, outtype)
 
@@ -358,8 +353,8 @@ def infotodict(seqinfo):
     )  # convert to dict since outside functionality depends on it being a basic dict
 
     for k, i in info.items():
-        print(k, i)
-    print(info)
+        lgr.info(f"{k} {i}")
+
     return info
 
 
