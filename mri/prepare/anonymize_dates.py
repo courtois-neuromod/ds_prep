@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import argparse
 import datalad.api
 import pandas as pd
 from bids import BIDSLayout
@@ -65,7 +66,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def main(args):
+def main():
 
     args = parse_args()
     logging.basicConfig(level=logging.getLevelName(args.debug_level.upper()))
@@ -108,3 +109,7 @@ def main(args):
             modified_files,
             message="make accquisition time relative to the first session and update distribution-restrictions",
         )
+
+
+if __name__ == "__main__":
+    main()
