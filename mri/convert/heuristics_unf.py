@@ -271,7 +271,7 @@ def infotodict(seqinfo):
 
     outtype = ("nii.gz",)
     sbref_as_fieldmap = True  # duplicate sbref in fmap dir to be used by topup
-    sbref_as_fieldmap = False
+#    sbref_as_fieldmap = False # sbref as fieldmaps is still required to use fMRIPrep LTS.
     prefix = ""
 
     fieldmap_runs = {}
