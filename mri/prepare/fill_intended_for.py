@@ -391,6 +391,11 @@ def parse_args():
         default="before",
         help='Strategy to resolve multiple matches: "before"/"after" closest matching in time  ',
     )
+    parser.add_argument(
+        "--b0-field-id",
+        action="store_true",
+        help="fill new BIDS B0FieldIdentifier instead of IntendedFor",
+    )
 
     return parser.parse_args()
 
@@ -399,5 +404,8 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     args = parse_args()
-    #fill_intended_for(args)
-    fill_b0_meta(args)
+    if args.b0_field_id:
+        fill_b0_meta(args)
+    else:
+        fill_intended_for(args)
+    
