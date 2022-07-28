@@ -59,17 +59,20 @@ def logs2event_files(in_files, out_file_tpl):
                 rep_log.append(e)
             if record_tag in e[2]:
                 record = "/".join(e[2].split(" ")[-1].split("/")[-4:])
-                print(f"\n{record}")
+#                print(f"\n{record}")
             elif e[2] == TTL_tag:
                 if not TTL:
                     run += 1  # only increment if the previous scan was not aborted
                     TTL = e[0]
                 rep_log = []
+                print('##########################################')
                 repetition.append([])
             elif e[2] == rep_tag:
                 rep = e
             elif all(stt in e[2] for stt in stop_tags):
                 stop = e
+                print(stop)
+
                 if TTL:
                     record = record.replace('sourcedata','sourcedata/behavior').replace('ses-0','ses-shinobi_0')
                     bk2 = retro.Movie(record)
@@ -108,16 +111,19 @@ def logs2event_files(in_files, out_file_tpl):
                             )
                         )
                 rep_log = None
+#                print(repetition[-1])
             elif all(cpt in e[2] for cpt in complete_tags):
                 TTL = None
                 last_rep_last_run = repetition[-1][-1]
             elif all(abt in e[2] for abt in abort_tags) or all(abt in e[2] for abt in restart_tags):
                 if TTL and len(repetition): # only if TTL was received
                     del repetition[-1]
-                TTL = None                    
+                if not all(abt in e[2] for abt in restart_tags):
+                    TTL = None                    
                 rep_log = None
         TTL = None  # reset the TTL
     run = 0
+    print(repetition)
     for reps in repetition:
         if len(reps) == 0:  # skip empty tasks or without scanning
             print("empty task")
