@@ -23,7 +23,7 @@ from dipy.align.transforms import (
     AffineTransform3D,
     RigidTransform3D,
     RigidScalingTransform3D,
-    RigidIsoscalingTransform3D,
+    RigidIsoScalingTransform3D,
 )
 
 PYBIDS_CACHE_PATH = ".pybids_cache"
@@ -110,10 +110,10 @@ def registration(ref, moving, ref_mask=None, moving_mask=None):
     ref_mask_data, mov_mask_data = None, None
     ref_data = ref.get_fdata()
     if ref_mask:
-        ref_mask_data = ref_mask.get_fdata() > 0.5
+        ref_mask_data = (ref_mask.get_fdata() > 0.5).astype(np.int)
     mov_data = moving.get_fdata()
     if moving_mask:
-        mov_mask_data = moving_mask.get_fdata() > 0.5
+        mov_mask_data = (moving_mask.get_fdata() > 0.5).astype(np.int)
 
     metric = MutualInformationMetric(nbins=32, sampling_proportion=None)
     transform = RigidTransform3D()
@@ -248,7 +248,7 @@ def main():
         ref_image_nb = ref_image.get_image()
 
         matrix_path = ref_image.path.replace(
-            "_%s.%s" % (ref_image.entities["suffix"], ref_image.entities["extension"]),
+            "_%s%s" % (ref_image.entities["suffix"], ref_image.entities["extension"]),
             "_mod-%s_defacemaskreg.mat" % ref_image.entities["suffix"],
         )
 
