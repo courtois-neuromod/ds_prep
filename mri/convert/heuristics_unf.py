@@ -41,7 +41,7 @@ def infotoids(seqinfos, outdir):
     session_id = rema.group(7)
 
     return {
-        "locator": locator,
+#        "locator": locator,
         # Sessions to be deduced yet from the names etc TODO
         "session": session_id,
         "subject": subject_id,
