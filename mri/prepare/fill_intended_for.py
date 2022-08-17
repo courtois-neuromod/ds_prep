@@ -12,21 +12,21 @@ from heudiconv.utils import json_dumps_pretty
 
 PYBIDS_CACHE_PATH = ".pybids_cache"
 
-def fill_b0_meta(args):
-    path = os.path.abspath(args.bids_path)
+def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before'):
+    path = os.path.abspath(bids_path)
     pybids_cache_path = os.path.join(path, PYBIDS_CACHE_PATH)
 
     layout = BIDSLayout(
         path,
         database_path=pybids_cache_path,
-        reset_database=args.force_reindex,
+        reset_database=force_reindex,
         validate=False,
     )
     extra_filters = {}
-    if args.participant_label:
-        extra_filters["subject"] = args.participant_label
-    if args.session_label:
-        extra_filters["session"] = args.session_label
+    if participant_label:
+        extra_filters["subject"] = participant_label
+    if session_label:
+        extra_filters["session"] = session_label
     
     bolds = layout.get(suffix="bold", extension=".nii.gz", part='mag', **extra_filters) + \
             layout.get(suffix="bold", extension=".nii.gz", part=Query.NONE, **extra_filters)
@@ -102,7 +102,7 @@ def fill_b0_meta(args):
             key=itemgetter(1),
         )
         
-        if args.match_strategy == "before":
+        if match_strategy == "before":
             delta_for_sbref = datetime.timedelta(seconds=0)
             match_fmap = [
                 fm for fm, ftd in fmaps_time_diffs if ftd <= delta_for_sbref
@@ -111,10 +111,10 @@ def fill_b0_meta(args):
                 match_fmap = match_fmap[-1]
             else:
                 logging.warning(
-                    f"No fmap matched the {args.match_strategy} strategy for {bold.path}, taking the first match after scan."
+                    f"No fmap matched the {match_strategy} strategy for {bold.path}, taking the first match after scan."
                 )
                 match_fmap = fmaps_time_diffs[0][0]
-        elif args.match_strategy == "after":
+        elif match_strategy == "after":
             # to match the sbref with the corresponding bold, there is a diff of ~11sec
             delta_for_sbref = datetime.timedelta(seconds=-30)
             match_fmap = [
@@ -124,7 +124,7 @@ def fill_b0_meta(args):
                 match_fmap = match_fmap[0]
             else:
                 logging.warning(
-                    f"No fmap matched the {args.match_strategy} strategy for {bold.path}, taking the first match before scan."
+                    f"No fmap matched the {match_strategy} strategy for {bold.path}, taking the first match before scan."
                 )
                 match_fmap = fmaps_time_diffs[-1][0]
 
@@ -169,21 +169,21 @@ def insert_values_in_json(path, dct):
         
     
 
-def fill_intended_for(args):
-    path = os.path.abspath(args.bids_path)
+def fill_intended_for(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before'):
+    path = os.path.abspath(bids_path)
     pybids_cache_path = os.path.join(path, PYBIDS_CACHE_PATH)
 
     layout = BIDSLayout(
         path,
         database_path=pybids_cache_path,
-        reset_database=args.force_reindex,
+        reset_database=force_reindex,
         validate=False,
     )
     extra_filters = {}
-    if args.participant_label:
-        extra_filters["subject"] = args.participant_label
-    if args.session_label:
-        extra_filters["session"] = args.session_label
+    if participant_label:
+        extra_filters["subject"] = participant_label
+    if session_label:
+        extra_filters["session"] = session_label
     bolds = layout.get(suffix="bold", extension=".nii.gz", part='mag', **extra_filters) + \
             layout.get(suffix="bold", extension=".nii.gz", part=Query.NONE, **extra_filters)
     logging.info(f"found {len(bolds)} runs")
@@ -278,7 +278,7 @@ def fill_intended_for(args):
                 key=itemgetter(1),
             )
 
-            if args.match_strategy == "before":
+            if match_strategy == "before":
                 delta_for_sbref = datetime.timedelta(seconds=0)
                 match_fmap = [
                     fm for fm, ftd in fmaps_time_diffs if ftd <= delta_for_sbref
@@ -287,10 +287,10 @@ def fill_intended_for(args):
                     match_fmap = match_fmap[-1]
                 else:
                     logging.warning(
-                        f"No fmap matched the {args.match_strategy} strategy for {bold.path}, taking the first match after scan."
+                        f"No fmap matched the {match_strategy} strategy for {bold.path}, taking the first match after scan."
                     )
                     match_fmap = fmaps_time_diffs[0][0]
-            elif args.match_strategy == "after":
+            elif match_strategy == "after":
                 # to match the sbref with the corresponding bold, there is a diff of ~11sec
                 delta_for_sbref = datetime.timedelta(seconds=-15)
                 match_fmap = [
@@ -300,7 +300,7 @@ def fill_intended_for(args):
                     match_fmap = match_fmap[0]
                 else:
                     logging.warning(
-                        f"No fmap matched the {args.match_strategy} strategy for {bold.path}, taking the first match before scan."
+                        f"No fmap matched the {match_strategy} strategy for {bold.path}, taking the first match before scan."
                     )
                     match_fmap = fmaps_time_diffs[-1][0]
             if ("IntendedFor" not in match_fmap.tags) or (
@@ -405,7 +405,7 @@ if __name__ == "__main__":
 
     args = parse_args()
     if args.b0_field_id:
-        fill_b0_meta(args)
+        fill_b0_meta(**vars(args))
     else:
-        fill_intended_for(args)
+        fill_intended_for(**vars(args))
     
