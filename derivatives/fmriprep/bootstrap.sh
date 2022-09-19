@@ -22,7 +22,8 @@ mkdir code
 cp $SCRIPT_DIR/freesurfer.license code/
 cp $SCRIPT_DIR/../.gitattributes_default .gitattributes
 echo "workdir/" >> .gitignore
-echo 'code/*.{out,err}' >> .gitignore
+echo 'code/*.out' >> .gitignore
+echo 'code/*.err' >> .gitignore
 
 datalad save -m 'setup dataset gitattribute gitignore and install freesurfer license'
 
