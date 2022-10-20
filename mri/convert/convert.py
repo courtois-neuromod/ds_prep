@@ -51,7 +51,6 @@ def single_session_job(input_file, output_datalad, ria_storage_remote):
     file_lock = FileLock(lock_path)
     
     with tempfile.TemporaryDirectory() as tmpdirname:
-        tmpdirpath = pathlib.Path(tmpdirname)
         with file_lock:
             ds = datalad.api.install(path=tmpdirname, source=output_datalad)
 
@@ -72,9 +71,9 @@ def single_session_job(input_file, output_datalad, ria_storage_remote):
         print(heudiconv_params)
         heudiconv_workflow(**heudiconv_params)
 
-        fix_fmap_phase(ds, tmpdirpath)
-        fix_complex_events(ds, tmpdirpath)
-        fill_intended_for(tmpdirpath)
+        fix_fmap_phase(ds)
+        fix_complex_events(ds)
+        fill_intended_for(ds.pathobj)
         ds.save(message='fill IntendedFor')
         
         with file_lock:
@@ -85,14 +84,23 @@ def single_session_job(input_file, output_datalad, ria_storage_remote):
         ds.drop('./.heudiconv/', reckless='kill', recursive=True)
         ds.drop('.', reckless='kill', recursive=True)
 
+    print(f"processed {input_file}")
 
-def fix_fmap_phase(ds, tmpdirpath):
+def fix_fmap_phase(ds):
     #### fix fmap phase data (sbref series will contain both and heudiconv auto name it)
-    ds.repo.remove('sub-*/ses-*/fmap/*_part-phase*')
-    for f in tmpdirpath.glob('sub-*/ses-*/fmap/*_part-mag*'):
+    new_files = [(ds.pathobj / nf) for nf in ds.repo.call_git(['show','--name-only','HEAD','--format=oneline']).split('\n')[1:]]
+
+    phase_glob = 'sub-*/ses-*/fmap/*_part-phase*'
+    phase_files = [f for f in ds.pathobj.glob(phase_glob) if f in new_files]
+    if not list(phase_files):
+        return
+    ds.repo.remove(phase_files)
+    mag_fmaps = [f for f in ds.pathobj.glob('sub-*/ses-*/fmap/*_part-mag*') if f in new_files]
+    for f in mag_fmaps:
         ds.repo.call_git(['mv', str(f), str(f).replace('_part-mag','')])
-    scans_tsvs = list(tmpdirpath.glob('sub-*/ses-*/*_scans.tsv'))
-    ds.unlock(scans_tsvs)
+
+    scans_tsvs = [nf for nf in new_files if '_scans.tsv' in str(nf)]
+    ds.unlock(scans_tsvs, on_failure='ignore')
     with fileinput.input(files=scans_tsvs, inplace=True) as f:
         for line in f:
             if not all([k in line for k in ['fmap/','_part-phase']]): # remove phase fmap
@@ -102,11 +110,14 @@ def fix_fmap_phase(ds, tmpdirpath):
     ds.save(message='fix fmap phase')
 
 
-def fix_complex_events(ds, tmpdirpath):
+def fix_complex_events(ds):
     # remove phase event files.
-    ds.repo.remove('sub-*/ses-*/func/*_part-phase*_events.tsv')
+    phase_events = 'sub-*/ses-*/func/*_part-phase*_events.tsv'
+    if not list(ds.pathobj.glob(phase_events)):
+        return
+    ds.repo.remove(phase_events)
     # remove part-mag from remaining event files 
-    for f in tmpdirpath.glob('sub-*/ses-*/func/*_part-mag*_events.tsv'):
+    for f in ds.pathobj.glob('sub-*/ses-*/func/*_part-mag*_events.tsv'):
         ds.repo.call_git(['mv', str(f), str(f).replace('_part-mag','')])
     ds.save(message='fix complex event files')
     

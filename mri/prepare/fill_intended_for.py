@@ -12,7 +12,7 @@ from heudiconv.utils import json_dumps_pretty
 
 PYBIDS_CACHE_PATH = ".pybids_cache"
 
-def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before'):
+def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before', **kwargs):
     path = os.path.abspath(bids_path)
     pybids_cache_path = os.path.join(path, PYBIDS_CACHE_PATH)
 
@@ -169,7 +169,7 @@ def insert_values_in_json(path, dct):
         
     
 
-def fill_intended_for(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before'):
+def fill_intended_for(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before', **kwargs):
     path = os.path.abspath(bids_path)
     pybids_cache_path = os.path.join(path, PYBIDS_CACHE_PATH)
 

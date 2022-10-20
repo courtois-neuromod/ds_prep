@@ -1,5 +1,5 @@
 import os, re, glob
-from collections import defaultdict
+from frozendict import frozendict
 import nibabel.nicom.dicomwrappers as nb_dw
 from heudiconv.heuristics import reproin
 from heudiconv.heuristics.reproin import (
@@ -16,29 +16,54 @@ def load_example_dcm(seqinfo):
     ex_dcm_path = sorted(glob.glob(os.path.join('/tmp', 'heudiconv*', '*', seqinfo.dcm_dir_name, seqinfo.example_dcm_file)))[0]
     return nb_dw.wrapper_from_file(ex_dcm_path)
 
+def custom_seqinfo(wrapper, series_files):
+    #print('calling custom_seqinfo', wrapper, series_files)
+
+    pedir_pos = None
+    if hasattr(wrapper, 'csa_header'):
+        pedir_pos = wrapper.csa_header["tags"]["PhaseEncodingDirectionPositive"]["items"]
+        pedir_pos = pedir_pos[0] if len(pedir_pos) else None
+    custom_info = frozendict({
+        'patient_name': wrapper.dcm_data.PatientName,
+        'pe_dir': wrapper.dcm_data.get('InPlanePhaseEncodingDirection', None),
+        'pe_dir_pos': pedir_pos,
+        'body_part': wrapper.dcm_data.get("BodyPartExamined", None),
+        'scan_options': str(wrapper.dcm_data.get("ScanOptions", None)),
+        'image_comments': wrapper.dcm_data.get("ImageComments", ""),
+        'slice_orient': str(wrapper.dcm_data.get([0x0051,0x100e]).value),
+        'echo_number': str(wrapper.dcm_data.get("EchoNumber", None))
+    })
+    return custom_info
+
 def infotoids(seqinfos, outdir):
 
     seqinfo = next(seqinfos.__iter__())
 
-    ex_dcm = load_example_dcm(seqinfo)
+    #ex_dcm = load_example_dcm(seqinfo)
 
     pi = str(seqinfo.referring_physician_name)
     study_name = str(seqinfo.study_description)
-    patient_name = str(ex_dcm.dcm_data.PatientName)
+    patient_name = str(seqinfo.custom['patient_name'])
 
     study_path = study_name.split("^")
 
     rema = re.match("(([^_]*)_)?(([^_]*)_)?p([0-9]*)_([a-zA-Z]*)([0-9]*)", patient_name)
     if rema is None:
         rema = re.match("(([^_]*)_)?(([^_]*)_)?(dev)_([a-zA-Z]*)([0-9]*)", patient_name)
+    if rema:
+        study_name = rema.group(1)
+        sub_study_name = rema.group(3)
+        subject_id = rema.group(5)
+        session_type = rema.group(6)
+        session_id = rema.group(7)
+
+    if rema is None:
+        rema = re.match("(([^_]*)_)?([a-zA-Z0-9]*)_([a-zA-Z0-9]*)", patient_name)
+        study_name = rema.group(2)
+        subject_id = rema.group(3)
+        session_id = rema.group(4)
 
     locator = os.path.join(pi, *study_path)
-
-    study_name = rema.group(1)
-    sub_study_name = rema.group(3)
-    subject_id = rema.group(5)
-    session_type = rema.group(6)
-    session_id = rema.group(7)
 
     return {
 #        "locator": locator,
@@ -83,7 +108,7 @@ rec_exclude = [
 ] + [f"TE{i}" for i in range(9)]
 
 
-def get_seq_bids_info(s, ex_dcm):
+def get_seq_bids_info(s):
 
     seq = {
         "type": "anat",  # by default to make code concise
@@ -97,13 +122,13 @@ def get_seq_bids_info(s, ex_dcm):
     seq_extra["part"] = "mag" if "M" in s.image_type else ("phase" if "P" in s.image_type else None)
     
     try:
-        pedir = ex_dcm.dcm_data.InPlanePhaseEncodingDirection
+        pedir = s.custom['pe_dir']
         if "COL" in pedir:
             pedir = "AP"
         else:
             pedir = "LR"
         pedir_pos = bool(
-            ex_dcm.csa_header["tags"]["PhaseEncodingDirectionPositive"]["items"][0]
+            s.custom['pe_dir_pos']
         )
 
         seq["dir"] = pedir if pedir_pos else pedir[::-1]
@@ -111,21 +136,22 @@ def get_seq_bids_info(s, ex_dcm):
         pass
 
     # label bodypart which are not brain, mainly for spine if we set the dicom fields at the console properly
-    bodypart = ex_dcm.dcm_data.get("BodyPartExamined", None)
+    bodypart = s.custom['body_part'] #ex_dcm.dcm_data.get("BodyPartExamined", None)
     if bodypart is not None and bodypart != "BRAIN":
         seq["bp"] = bodypart.lower()
         print(seq)
 
-    scan_options = ex_dcm.dcm_data.get("ScanOptions", None)
-    image_comments = ex_dcm.dcm_data.get("ImageComments", [])
+    scan_options = s.custom['scan_options'] #ex_dcm.dcm_data.get("ScanOptions", None)
+    image_comments = s.custom['image_comments'] #ex_dcm.dcm_data.get("ImageComments", [])
 
     # CMRR bold and dwi
     is_sbref = "Single-band reference" in image_comments
+    print(s, is_sbref)
 
     # Anats
     if "localizer" in s.protocol_name.lower():
         seq["label"] = "localizer"
-        slice_orient = ex_dcm.dcm_data.get([0x0051,0x100e])
+        slice_orient = s.custom['slice_orient'] #ex_dcm.dcm_data.get([0x0051,0x100e]) 
 #        if slice_orient is not None:
 #            seq['acq'] = slice_orient.value.lower()
     elif "AAHead_Scout" in s.protocol_name:
@@ -173,6 +199,10 @@ def get_seq_bids_info(s, ex_dcm):
         seq["label"] = "TB1TFL"
         seq["acq"] = "famp" if "flip angle map" in image_comments else "anat"
 
+    elif "fm2d2r" in s.sequence_name:
+        seq["type"] = "fmap"
+        seq["label"] = "phasediff" if "phase" in s.image_type else "magnitude%d"%s.custom['echo_number']     
+        
     # SWI
     elif (s.dim4 == 1) and ("swi3d1r" in s.sequence_name):
         seq["type"] = "swi"
@@ -271,7 +301,7 @@ def infotodict(seqinfo):
 
     outtype = ("nii.gz",)
     sbref_as_fieldmap = True  # duplicate sbref in fmap dir to be used by topup
-#    sbref_as_fieldmap = False # sbref as fieldmaps is still required to use fMRIPrep LTS.
+    #sbref_as_fieldmap = False # sbref as fieldmaps is still required to use fMRIPrep LTS.
     prefix = ""
 
     fieldmap_runs = {}
@@ -279,9 +309,9 @@ def infotodict(seqinfo):
 
     for s in seqinfo:
         
-        ex_dcm = load_example_dcm(s)
+        #ex_dcm = load_example_dcm(s)
 
-        bids_info, bids_extra = get_seq_bids_info(s, ex_dcm)
+        bids_info, bids_extra = get_seq_bids_info(s)
         all_bids_infos[s.series_id] = (bids_info, bids_extra)
 
         # XXX: skip derived sequences, we don't store them to avoid polluting

@@ -284,9 +284,6 @@ def main():
                 )
             )
 
-        # unlock before making any change to avoid unwanted save
-        if args.datalad:
-            annex_repo.unlock([serie.path for serie in series_to_deface])
 
         for serie in series_to_deface:
             if args.datalad:
@@ -303,6 +300,10 @@ def main():
             logging.info(f"defacing {serie.path}")
 
             datalad.api.get(serie.path)
+            # unlock before making any change to avoid unwanted save
+            if args.datalad:
+                annex_repo.unlock([serie.path for serie in series_to_deface])
+
             serie_nb = serie.get_image()
             warped_mask = warp_mask(tmpl_defacemask, serie_nb, ref2tpl_affine)
             if args.save_all_masks or serie == ref_image:
