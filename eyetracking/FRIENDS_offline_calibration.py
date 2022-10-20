@@ -193,6 +193,8 @@ if __name__ == '__main__':
     g_pool.get_timestamp = time
 
     # Option A: use existing calibration parameters (.plcal file)
+    # Note that these are not saved during cneuromod data acquisition,
+    # but offline calibration params can be saved w the current script for later re-use
     if cfg['use_online_calib_params']:
 
         cal_path_2d = cfg['calibration_parameters_2d']
@@ -221,7 +223,7 @@ if __name__ == '__main__':
         cal_data = {}
         cal_data['ref_list'] = cal_file['markers'].tolist()
 
-        # load pupils detected online if no offline calibration pupils produced from previous optional step
+        # load pupils detected online if no offline calibration pupils produced from previous optional step (Step 1)
         if not cfg['detect_calib_pupils']:
             # use pupils from Basile's file (better organized)
             calib_pupils_2d = cal_file['pupils'].tolist()

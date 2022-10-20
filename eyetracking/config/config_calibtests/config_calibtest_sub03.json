@@ -1,0 +1,36 @@
+{
+
+    "data_dir": "/home/labopb/Documents/Marie/neuromod/eyetrack_calib/test_data/pupil_data/sub-03_dev/ses-100",
+    "focal_length": 256.0,
+    "min_calibration_confidence": 0.6,
+    "use3D": false,
+
+    "validation": true,
+    "freeze_3d_at_test": false,
+    "overwrite_camera_intrinsics": false,
+
+    "properties": {"coarse_detection": true,
+                    "coarse_filter_min": 128,
+                    "coarse_filter_max": 280,
+                    "intensity_range": 4,
+                    "blur_size": 5,
+                    "canny_treshold": 160,
+                    "canny_ration": 2,
+                    "canny_aperture": 5,
+                    "pupil_size_max": 100,
+                    "pupil_size_min": 10,
+                    "strong_perimeter_ratio_range_min": 0.8,
+                    "strong_perimeter_ratio_range_max": 1.1,
+                    "strong_area_ratio_range_min": 0.6,
+                    "strong_area_ratio_range_max": 1.1,
+                    "contour_size_min": 5,
+                    "ellipse_roundness_ratio": 0.1,
+                    "initial_ellipse_fit_treshhold": 1.8,
+                    "final_perimeter_ratio_range_min": 0.6,
+                    "final_perimeter_ratio_range_max": 1.2,
+                    "ellipse_true_support_min_dist": 2.5,
+                    "support_pixel_ratio_exponent": 2.0},
+
+    "out_dir": "/home/labopb/Documents/Marie/neuromod/eyetrack_calib/test_data/offline_data/sub-03_dev/ses-100"
+
+}
