@@ -12,7 +12,7 @@ import argparse
 parser = argparse.ArgumentParser(description='Perform off-line gaze mapping with 2D and 3D pupil detectors ')
 parser.add_argument('--infile', default='', type=str, help='absolute path to main input file')
 parser.add_argument('--run_dir', default='', type=str, help='absolute path to main code directory')
-parser.add_argument('--outfile', default='config.json', type=str, help='absolute path to config file')
+parser.add_argument('--outfile', default='test.npz', type=str, help='absolute path to output file')
 args = parser.parse_args()
 
 sys.path.append(os.path.join(args.run_dir, "pupil", "pupil_src", "shared_modules"))

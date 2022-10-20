@@ -414,7 +414,7 @@ def median_clean(frame_times, et_x, et_y, dist_x, dist_y):
     return filtered_times, filtered_x, filtered_y, filtered_distx, filtered_disty
 
 
-def apply_poly(ref_times, distances, degree, all_times, anchors = 150):
+def apply_poly(ref_times, distances, degree, all_times, anchors = [150, 150]):
     '''
     Fit polynomial to a distribution, then export points along that polynomial curve
     that correspond to specific gaze time stamps
@@ -425,19 +425,19 @@ def apply_poly(ref_times, distances, degree, all_times, anchors = 150):
     This really throws off polynomials
     '''
     if degree == 1:
-        p1, p0 = np.polyfit(ref_times[anchors:-anchors], distances[anchors:-anchors], 1)
+        p1, p0 = np.polyfit(ref_times[anchors[0]:-anchors[1]], distances[anchors[0]:-anchors[1]], 1)
         p_of_all = p1*(all_times) + p0
 
     elif degree == 2:
-        p2, p1, p0 = np.polyfit(ref_times[anchors:-anchors], distances[anchors:-anchors], 2)
+        p2, p1, p0 = np.polyfit(ref_times[anchors[0]:-anchors[1]], distances[anchors[0]:-anchors[1]], 2)
         p_of_all = p2*(all_times**2) + p1*(all_times) + p0
 
     elif degree == 3:
-        p3, p2, p1, p0 = np.polyfit(ref_times[anchors:-anchors], distances[anchors:-anchors], 3)
+        p3, p2, p1, p0 = np.polyfit(ref_times[anchors[0]:-anchors[1]], distances[anchors[0]:-anchors[1]], 3)
         p_of_all = p3*(all_times**3) + p2*(all_times**2) + p1*(all_times) + p0
 
     elif degree == 4:
-        p4, p3, p2, p1, p0 = np.polyfit(ref_times[anchors:-anchors], distances[anchors:-anchors], 4)
+        p4, p3, p2, p1, p0 = np.polyfit(ref_times[anchors[0]:-anchors[1]], distances[anchors[0]:-anchors[1]], 4)
         p_of_all = p4*(all_times**4) + p3*(all_times**3) + p2*(all_times**2) + p1*(all_times) + p0
 
     return p_of_all
@@ -604,11 +604,11 @@ def main():
     clean_times_arr = np.array(clean_times)
     all_times_arr = np.array(all_times)
 
-    anchors = 150 # to exclude values at extremities (when black screen, sometimes participants look off the screen while deepgaze defaults to middle...)
+    anchors = [150,150] # to exclude values at extremities (when black screen, sometimes participants look off the screen while deepgaze defaults to middle...)
     if use_deepgaze:
         # remove distances too far from median within sliding windows for cleaner signal
         frame_times, et_x, et_y, dist_x, dist_y = median_clean(frame_times, et_x, et_y, dist_x, dist_y)
-        anchors = 50
+        anchors = [50,50]
 
     specs = ''
     if args.xdeg is not None:
@@ -624,7 +624,7 @@ def main():
 
         if args.chunk_centermass:
             # additional option for reference only: contrast center of mass correction to deepgaze
-            p_of_x_chunks = apply_poly(chunk_timepoints, x_chunks, deg_x, clean_times_arr, anchors=1)
+            p_of_x_chunks = apply_poly(chunk_timepoints, x_chunks, deg_x, clean_times_arr, anchors=[1, 1])
             clean_x_chunkaligned = np.array(clean_x) - (p_of_x_chunks - x_mass)
 
     else:
@@ -646,7 +646,7 @@ def main():
         all_y_aligned = np.array(all_y) - (p_of_all_y)
 
         if args.chunk_centermass:
-            p_of_y_chunks = apply_poly(chunk_timepoints, y_chunks, deg_y, clean_times_arr, anchors=1)
+            p_of_y_chunks = apply_poly(chunk_timepoints, y_chunks, deg_y, clean_times_arr, anchors=[1, 1])
             clean_y_chunkaligned = np.array(clean_y) - (p_of_y_chunks - y_mass)
 
     else:
