@@ -31,8 +31,6 @@ SINGULARITY_CMD_BASE = " ".join(
         "datalad containers-run "
         "-m 'fMRIPrep_{subject_session}'",
         "-n containers/bids-fmriprep",
-        "--input sourcedata/{study}/{subject_session}/fmap/",
-        "--input sourcedata/{study}/{subject_session}/func/",
     ] + [
         "--input sourcedata/templateflow/tpl-%s/"% tpl for tpl in REQUIRED_TEMPLATES
     ] + [
@@ -57,13 +55,12 @@ slurm_preamble = """#!/bin/bash
  
 set -e -u -x
 
-export SINGULARITYENV_TEMPLATEFLOW_HOME="sourcedata/templateflow/"
-
 """
 
 
 datalad_pre = """
 export LOCAL_DATASET=$SLURM_TMPDIR/${{SLURM_JOB_NAME//-/}}/
+export SINGULARITYENV_TEMPLATEFLOW_HOME="${{LOCAL_DATASET}}/sourcedata/templateflow/"
 flock --verbose {ds_lockfile} datalad clone {output_repo} $LOCAL_DATASET
 cd $LOCAL_DATASET
 datalad get -s ria-beluga-storage -J 4 -n -r -R1 . # get sourcedata/* containers
@@ -83,10 +80,9 @@ fi
 datalad_post = """
 flock --verbose {ds_lockfile} datalad push -d ./ --to origin
 if [ -d sourcedata/freesurfer ] ; then
-    flock --verbose {ds_lockfile} datalad push -J 4 -d sourcedata/freesurfer $LOCAL_DATASET --to origin
+    flock --verbose {ds_lockfile} datalad push -J 4 -d sourcedata/freesurfer --to origin
 fi 
 """
-
 def load_bidsignore(bids_root, mode="python"):
     """Load .bidsignore file from a BIDS dataset, returns list of regexps"""
     bids_ignore_path = bids_root / ".bidsignore"
@@ -123,7 +119,7 @@ def write_job_footer(fd, jobname):
     fd.write("exit $fmriprep_exitcode \n")
 
 
-def write_fmriprep_job(layout, subject, args, anat_only=True):
+def write_fmriprep_job(layout, subject, args, anat_only=True, longitudinal=False):
     derivatives_path = os.path.realpath(os.path.abspath(args.output_path))
 
     study = os.path.basename(layout.root)
@@ -131,17 +127,20 @@ def write_fmriprep_job(layout, subject, args, anat_only=True):
     job_specs = dict(
         study=study,
         subject=subject,
-        subject_session=f"sub-{subject}" + (f"/ses-{session}" if session else ""),
+        subject_session=f"sub-{subject}" + (f"/ses-{args.session_label}" if args.session_label else "/ses-*"),
         slurm_account=args.slurm_account,
-        jobname=f"smriprep_sub-{subject}",
+        jobname=f"{'s' if anat_only else 'f'}mriprep_sub-{subject}",
         email=args.email,
         bids_root=layout.root,
+        output_repo=args.output_repo,
         derivatives_path=derivatives_path,
-        ds_lockfile=os.path.join(derivatives_path, '.datalad_lock'),
+        ds_lockfile=os.path.join(args.output_repo.replace('ria+file://','').replace('#~','/alias/').split('@')[0], '.datalad_lock'),
         TEMPLATEFLOW_HOME=TEMPLATEFLOW_HOME,
         templates=",".join(REQUIRED_TEMPLATES),
     )
     job_specs.update(SMRIPREP_REQ)
+    if args.longitudinal:
+        job_specs['time'] = '72:0:0'
 
     job_path = os.path.join(derivatives_path, SLURM_JOB_DIR, f"{job_specs['jobname']}.sh")
 
@@ -164,6 +163,10 @@ def write_fmriprep_job(layout, subject, args, anat_only=True):
             " ".join(
                 [
                     SINGULARITY_CMD_BASE.format(**job_specs),
+                    # too large scope, but only a few MB unnecessary pulled
+                    "--input 'sourcedata/{study}/{subject_session}/anat/*_T1w.nii.gz'".format(**job_specs),
+                    "--input 'sourcedata/{study}/{subject_session}/anat/*_T2w.nii.gz'".format(**job_specs),
+                    "--input 'sourcedata/{study}/{subject_session}/anat/*_FLAIR.nii.gz'".format(**job_specs),
                     "--",
                     "-w ./workdir",
                     f"--participant-label {subject}",
@@ -180,7 +183,8 @@ def write_fmriprep_job(layout, subject, args, anat_only=True):
                     f"--nprocs {job_specs['cpus']}",
                     f"--mem_mb {job_specs['mem_per_cpu']*job_specs['cpus']}",
                     "--fs-license-file", 'code/freesurfer.license',
-                    args.bids_path.relative_to(args.output_path),
+                    "--longitudinal" if longitudinal else "",
+                    str(args.bids_path.relative_to(args.output_path)),
                     "./",
                     "participant",
                     "\n",
@@ -279,18 +283,19 @@ def write_func_job(layout, subject, session, args):
     # run_shapes = [run.get_image().shape for run in bold_runs]
     # run_lengths = [rs[-1] for rs in run_shapes]
 
+    subject_session = f"sub-{subject}" + (f"/ses-{session}" if session not in [None,'*'] else "")
     job_specs = dict(
         study=study,
         subject=subject,
         session=session,
-        subject_session=f"sub-{subject}" + (f"/ses-{session}" if session not in [None,'*'] else ""),
+        subject_session=subject_session,
         slurm_account=args.slurm_account,
         jobname=f"fmriprep_study-{study}_sub-{subject}"+ (f"_ses-{session}" if session not in [None, '*'] else ""),
         email=args.email,
         bids_root=layout.root,
         derivatives_path=derivatives_path,
         output_repo=args.output_repo,
-        ds_lockfile=os.path.join(args.output_repo.replace('ria+file://','').replace('#~','/alias/'), '.datalad_lock'),
+        ds_lockfile=os.path.join(args.output_repo.replace('ria+file://','').replace('#~','/alias/').split('@')[0], '.datalad_lock'),
         TEMPLATEFLOW_HOME=TEMPLATEFLOW_HOME,
         templates=",".join(REQUIRED_TEMPLATES),
     )
@@ -323,6 +328,9 @@ def write_func_job(layout, subject, session, args):
             " ".join(
                 [
                     SINGULARITY_CMD_BASE.format(**job_specs),
+                    f"--input 'sourcedata/{study}/{subject_session}/fmap/'",
+                    f"--input 'sourcedata/{study}/{subject_session}/func/'",
+                    
                     f"--input 'sourcedata/smriprep/sub-{subject}/anat/'",
                     f"--input sourcedata/smriprep/sourcedata/freesurfer/fsaverage/",
                     f"--input sourcedata/smriprep/sourcedata/freesurfer/sub-{subject}/",
@@ -417,7 +425,13 @@ def parse_args():
         action="store_true",
         help="Activate slicetiming correction",
     )
+    parser.add_argument(
+        "--longitudinal",
+        action="store_true",
+        help="Use smriprep longitudinal pipeline",
+    )
 
+    
     parser.add_argument(
         "--force-reindex",
         action="store_true",
@@ -456,9 +470,9 @@ def run_fmriprep(layout, args, pipe="all"):
                     continue
                 yield job_path
         elif pipe == "anat":
-            yield write_fmriprep_job(layout, subject, args, anat_only=True)
+            yield write_fmriprep_job(layout, subject, args, anat_only=True, longitudinal=args.longitudinal)
         elif pipe == "all":
-            yield write_fmriprep_job(layout, subject, args, anat_only=False)
+            yield write_fmriprep_job(layout, subject, args, anat_only=False, longitudinal=args.longitudinal)
 
 
 def main():
