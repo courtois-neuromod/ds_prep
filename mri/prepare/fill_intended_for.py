@@ -38,8 +38,7 @@ def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_re
     
     for bold in bolds:
         logging.info(f"matching fmap for {bold.path}")
-        #bold_series_id = f"{bold.entities['SeriesNumber']}-{bold.entities['SeriesDescription']}"
-        bold_series_id = os.path.basename(bold.path)
+        bold_series_id = os.path.basename(bold.path).split('.')[0].split('_echo')[0].replace('-', '_')
         bold_b0fieldsource = bold.entities.get('B0FieldSource', None)
         bold_scan_time = datetime.datetime.strptime(
             bold.tags["AcquisitionTime"].value, "%H:%M:%S.%f"
@@ -51,7 +50,11 @@ def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_re
         bold_pedir = bold.entities["PhaseEncodingDirection"]
         opposite_pedir = bold_pedir[-1:] if '-' in bold_pedir else f"{bold_pedir}-"
 
-        sbref = layout.get(**{**bold.get_entities(), 'suffix':'sbref'})
+        sbref = layout.get(**{
+            **bold.get_entities(),
+            'suffix':'sbref',
+            'echo': 1 if bold.entities.get('echo', None) else None # 
+        })
         assert len(sbref)==1, "There should be a single SBRef for each bold"
         if not sbref:
             logging.error(f"SBref not found for {bold.path}, something went wrong, check BIDS conversion.")
@@ -69,7 +72,7 @@ def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_re
             acquisition="sbref",
             subject=bold.entities["subject"],
             session=bold.entities.get("session", None),
-            echo=bold.entities.get("echo", None),
+            echo=1 if bold.entities.get("echo", None) else None, # get first echo
             PhaseEncodingDirection=opposite_pedir,
             ImageOrientationPatientDICOM=str(bold.entities['ImageOrientationPatientDICOM']),
         )
@@ -115,7 +118,7 @@ def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_re
                 )
                 match_fmap = fmaps_time_diffs[0][0]
         elif match_strategy == "after":
-            # to match the sbref with the corresponding bold, there is a diff of ~11sec
+            # to match the sbref with the corresponding bold, there is a diff of ~11sec, depending on multiband/multi-echo params
             delta_for_sbref = datetime.timedelta(seconds=-30)
             match_fmap = [
                     fm for fm, ftd in fmaps_time_diffs if ftd >= delta_for_sbref
@@ -137,23 +140,25 @@ def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_re
 
             if fmap_json_path not in fmaps_to_modify:
                 fmaps_to_modify[fmap_json_path] = []
-            fmaps_to_modify[fmap_json_path].append(bold_series_id)
+            if bold_series_id not in fmaps_to_modify[fmap_json_path]:
+                fmaps_to_modify[fmap_json_path].append(bold_series_id)
 
         insert_values_in_json(
             sbref.get_associations(kind='Metadata')[0].path,
-            {'B0FieldIdentifier': [bold_series_id],
-             'B0FieldSource': [bold_series_id]}
+            {'B0FieldIdentifier': bold_series_id,
+             'B0FieldSource': bold_series_id}
         )
         insert_values_in_json(
             bold.get_associations(kind='Metadata')[0].path,
             {'B0FieldSource': bold_series_id}
         )
     for fmap_path, b0fieldids in fmaps_to_modify.items():
+        #avoid lists due to SDCFlows/pybids current limitations: see https://github.com/nipreps/sdcflows/issues/266#issuecomment-1303696056
+        b0fieldids = b0fieldids if len(b0fieldids)>1 else b0fieldids[0]
         insert_values_in_json(
             fmap_path,
             {'B0FieldIdentifier': b0fieldids}
         )
-        
             
 def insert_values_in_json(path, dct):
     logging.info(f"modifying {path} add {dct}")
