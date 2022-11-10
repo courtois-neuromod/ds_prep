@@ -7,7 +7,7 @@ import multiprocessing
 from functools import partial
 from filelock import FileLock
 import fileinput
-from ..prepare.fill_intended_for import fill_intended_for
+from ..prepare.fill_intended_for import fill_intended_for, fill_b0_meta
 
 HEURISTICS_PATH = pathlib.Path(__file__).parent.resolve() / 'heuristics_unf.py'
 
@@ -41,10 +41,17 @@ def parse_args():
         type=int,
         default=4,
         help='number of jobs to run in parallel with multiprocessing')
+
+    parser.add_argument(
+        "--b0-field-id",
+        action="store_true",
+        help="fill new BIDS B0FieldIdentifier instead of IntendedFor",
+    )
+    
     return parser.parse_args()
 
 
-def single_session_job(input_file, output_datalad, ria_storage_remote):
+def single_session_job(input_file, output_datalad, ria_storage_remote, b0_field_id=False):
     session_name = input_file.stem.split('.')[0]
     remote_path = pathlib.Path(output_datalad.replace('ria+file://', '').replace('#~', '/alias/').split('@')[0])
     lock_path = remote_path / '.datalad_lock'
@@ -74,8 +81,12 @@ def single_session_job(input_file, output_datalad, ria_storage_remote):
 
             fix_fmap_phase(ds)
             fix_complex_events(ds)
-            fill_intended_for(ds.pathobj)
-            ds.save(message='fill IntendedFor')
+            if b0_field_id:
+                fill_b0_meta(ds.pathobj)
+                ds.save(message='fill B0Field* tags')
+            else:
+                fill_intended_for(ds.pathobj)
+                ds.save(message='fill IntendedFor')
 
             with file_lock:
                 print('pushing')
@@ -137,7 +148,8 @@ def main():
     res = pool.map(
         partial(single_session_job,
                 output_datalad=args.output_datalad,
-                ria_storage_remote=args.ria_storage_remote),
+                ria_storage_remote=args.ria_storage_remote,
+                b0_field_id=args.b0_field_id),
         args.files)
 
 if __name__ == "__main__":
