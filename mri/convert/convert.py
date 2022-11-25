@@ -91,10 +91,11 @@ def single_session_job(input_file, output_datalad, ria_storage_remote, b0_field_
             with file_lock:
                 print('pushing')
                 ds.push(to='origin', data='anything')
+            ds.push(to=ria_storage_remote, data='anything') #if deps is not properly set
             ds.repo.call_annex(['unused'])
             ds.repo.call_annex(['dropunused', '--force', 'all'])
             ds.drop('./.heudiconv/', reckless='kill', recursive=True)
-            ds.drop('.', reckless='kill', recursive=True)
+            ds.drop('.', recursive=True)
         print(f"processed {input_file}")
     except Exception as e:
         print(f"An error occur processing {input_file}")
