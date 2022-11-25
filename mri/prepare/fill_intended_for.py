@@ -12,7 +12,7 @@ from heudiconv.utils import json_dumps_pretty
 
 PYBIDS_CACHE_PATH = ".pybids_cache"
 
-def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before', **kwargs):
+def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before', sloppy=False, **kwargs):
     path = os.path.abspath(bids_path)
     pybids_cache_path = os.path.join(path, PYBIDS_CACHE_PATH)
 
@@ -74,11 +74,14 @@ def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_re
             session=bold.entities.get("session", None),
             echo=1 if bold.entities.get("echo", None) else None, # get first echo
             PhaseEncodingDirection=opposite_pedir,
-            ImageOrientationPatientDICOM=str(bold.entities['ImageOrientationPatientDICOM']),
         )
         
         # strict match
-        fmaps = layout.get(**fmap_query_base, ShimSetting=str(bold.entities['ShimSetting']))
+        fmaps = layout.get(
+            **fmap_query_base,
+            ShimSetting=str(bold.entities['ShimSetting']),
+            ImageOrientationPatientDICOM=str(bold.entities['ImageOrientationPatientDICOM']),
+        )
         if not fmaps:
             bolds_with_shim_mismatch.append(bold)
             logging.warning(
@@ -86,14 +89,30 @@ def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_re
                 "Including other based on ImageOrientationPatient."
             )
             # looser match
-            fmaps = layout.get(**fmap_query_base)
+            fmaps = layout.get(
+                **fmap_query_base,
+                ImageOrientationPatientDICOM=str(bold.entities['ImageOrientationPatientDICOM']),
+            )
         if not fmaps:
             logging.error(
                 f"We couldn't find an epi fieldmaps with matching ImageOrientationPatient and opposite pedir for {bold.path}. "
                 "Please review manually.")
-            bolds_with_no_fmap.append(bold)
-            continue
-                
+            if sloppy > 0:
+                all_fmaps = layout.get(
+                    **fmap_query_base,
+                )
+                fmaps = [fmap for fmap in all_fmaps
+                         if np.allclose(bold.entities['ImageOrientationPatientDICOM'],
+                                        fmap.entities['ImageOrientationPatientDICOM'],
+                                        atol=sloppy)]
+                if not len(fmaps):
+                    logging.error(f"Sloppy match gives no {bold.path}.")
+                    continue
+            else:
+                bolds_with_no_fmap.append(bold)
+                continue
+
+            
         fmaps_time_diffs = sorted(
             [(
                 fm,
@@ -174,7 +193,7 @@ def insert_values_in_json(path, dct):
         
     
 
-def fill_intended_for(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before', **kwargs):
+def fill_intended_for(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before', sloppy=False, **kwargs):
     path = os.path.abspath(bids_path)
     pybids_cache_path = os.path.join(path, PYBIDS_CACHE_PATH)
 
@@ -232,16 +251,14 @@ def fill_intended_for(bids_path, participant_label=None, session_label=None, for
                     fm
                     for fm in fmaps
                     if np.allclose(
-                        fm.tags["ImageOrientationPatientDICOM"].value,
-                        bold.tags["ImageOrientationPatientDICOM"].value,
+                            fm.tags["ImageOrientationPatientDICOM"].value,
+                            bold.tags["ImageOrientationPatientDICOM"].value,
                     )
                     and fm not in fmaps_match
                 ]
             )
 
-            pedirs = set(
-                [fm.tags["PhaseEncodingDirection"].value for fm in fmaps_match]
-            )
+            pedirs = set([fm.tags["PhaseEncodingDirection"].value for fm in fmaps_match])
 
         # get all fmap possible
         if len(fmaps_match) < 2 or len(pedirs) < 2:
@@ -253,7 +270,23 @@ def fill_intended_for(bids_path, participant_label=None, session_label=None, for
             continue
             # TODO: maybe match on time distance
             # fmaps_match = fmaps
+        elif sloppy > 0:
+            fmaps_match.extend(
+                [
+                    fm
+                    for fm in fmaps
+                    if np.allclose(
+                        fm.tags["ImageOrientationPatientDICOM"].value,
+                        bold.tags["ImageOrientationPatientDICOM"].value,
+                    )
+                    and fm not in fmaps_match
+                ]
+            )
+            pedirs = set([fm.tags["PhaseEncodingDirection"].value for fm in fmaps_match])
+            if len(fmaps_match) < 2 or len(pedirs) < 2:
+                logging.error(f"No sloppy match for {bold.path}. Please review manually.")
 
+            
         # only get 2 images with opposed pedir
         fmaps_match_pe_pos = [
             fm
@@ -264,6 +297,8 @@ def fill_intended_for(bids_path, participant_label=None, session_label=None, for
             fm for fm in fmaps_match if "-" in fm.tags["PhaseEncodingDirection"].value
         ]
 
+
+        
         if not fmaps_match_pe_pos or not fmaps_match_pe_neg:
             logging.error("no matching fieldmaps")
             continue
@@ -400,6 +435,14 @@ def parse_args():
         "--b0-field-id",
         action="store_true",
         help="fill new BIDS B0FieldIdentifier instead of IntendedFor",
+    )
+
+
+    parser.add_argument(
+        "--sloppy",
+        type=float,
+        default=0,
+        help="tolerance to allow finding fieldmaps with approximate matching position",
     )
 
     return parser.parse_args()
