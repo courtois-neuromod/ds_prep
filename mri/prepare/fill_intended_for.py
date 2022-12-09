@@ -38,7 +38,7 @@ def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_re
     
     for bold in bolds:
         logging.info(f"matching fmap for {bold.path}")
-        bold_series_id = os.path.basename(bold.path).split('.')[0].split('_echo')[0].replace('-', '_')
+        bold_series_id = os.path.basename(bold.path).split('.')[0].split('_echo')[0].split('_part')[0].replace('-', '_')
         bold_b0fieldsource = bold.entities.get('B0FieldSource', None)
         bold_scan_time = datetime.datetime.strptime(
             bold.tags["AcquisitionTime"].value, "%H:%M:%S.%f"
