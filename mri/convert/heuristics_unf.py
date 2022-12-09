@@ -31,7 +31,8 @@ def custom_seqinfo(wrapper, series_files):
         'scan_options': str(wrapper.dcm_data.get("ScanOptions", None)),
         'image_comments': wrapper.dcm_data.get("ImageComments", ""),
         'slice_orient': str(wrapper.dcm_data.get([0x0051,0x100e]).value),
-        'echo_number': str(wrapper.dcm_data.get("EchoNumber", None))
+        'echo_number': str(wrapper.dcm_data.get("EchoNumber", None)),
+        'rescale_slope': wrapper.dcm_data.get("RescaleSlope", None),
     })
     return custom_info
 
@@ -220,6 +221,10 @@ def get_seq_bids_info(s):
         seq["type"] = "dwi"
         seq["label"] = "sbref" if is_sbref else "dwi"
 
+        # dumb far-fetched heuristics, no info in dicoms see https://github.com/CMRR-C2P/MB/issues/305
+        seq["part"] = 'phase' if s.custom['rescale_slope'] else 'mag'
+
+
     # CMRR or Siemens functional sequences
     elif "epfid2d" in s.sequence_name:
         seq["task"] = get_task(s)
@@ -237,6 +242,7 @@ def get_seq_bids_info(s):
         if s.is_motion_corrected:
             seq["rec"] = "moco"
 
+            
     ################## SPINAL CORD PROTOCOL #####################
     elif "spcR_100" in s.sequence_name:
         seq["label"] = "T2w"
