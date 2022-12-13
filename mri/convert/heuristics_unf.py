@@ -222,7 +222,7 @@ def get_seq_bids_info(s):
         seq["label"] = "sbref" if is_sbref else "dwi"
 
         # dumb far-fetched heuristics, no info in dicoms see https://github.com/CMRR-C2P/MB/issues/305
-        seq["part"] = 'phase' if s.custom['rescale_slope'] else 'mag'
+        seq_extra["part"] = 'phase' if s.custom['rescale_slope'] else 'mag'
 
 
     # CMRR or Siemens functional sequences
@@ -339,9 +339,9 @@ def infotodict(seqinfo):
         if (seq_type == "fmap" and seq_label == "epi" and bids_extra['part']=='phase' and seq_label=='bold'):
             continue
         
-        if ((seq_type == "fmap" and seq_label == "epi") or (
-            sbref_as_fieldmap and seq_label == "sbref"
-        )) and bids_info.get("part") in ["mag", None]:
+        if ((seq_type == "fmap" and seq_label == "epi") or
+            (sbref_as_fieldmap and seq_label == "sbref" and seq_type=='bold')
+        ) and bids_info.get("part") in ["mag", None]:
             pe_dir = bids_info.get("dir", None)
             if not pe_dir in fieldmap_runs:
                 fieldmap_runs[pe_dir] = 0
