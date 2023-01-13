@@ -231,11 +231,11 @@ def get_candidate_fmaps(layout, epi, match_shim=True, sloppy=0):
         #PhaseEncodingDirection=opposite_pedir,
     )
 
-    dtype_suffix_acq_comb = [
-        ('fmap', 'epi', 'sbref'),
-        ('fmap', 'epi', Query.NONE),
-        (epi.entities['datatype'], 'sbref', Query.NONE),
-        (epi.entities['datatype'], 'sbref', Query.ANY)]
+    dtype_suffix_acq_part_comb = [
+        ('fmap', 'epi', 'sbref', None),
+        ('fmap', 'epi', Query.NONE, None),
+        (epi.entities['datatype'], 'sbref', None, Query.NONE),
+        (epi.entities['datatype'], 'sbref', None, 'mag')]
     
     fmaps = sum([
         layout.get(
@@ -243,10 +243,10 @@ def get_candidate_fmaps(layout, epi, match_shim=True, sloppy=0):
             datatype=dtype,
             suffix=suffix,
             acquisition=acq,
+            part=part,
             ShimSetting=str(epi.entities['ShimSetting']) if match_shim else Query.ANY,
             ImageOrientationPatientDICOM=str(epi.entities['ImageOrientationPatientDICOM']) if not sloppy else Query.ANY,
-            'echo': 1 if epi.entities.get('echo', None) else None # get first echo as ref for multi-echo data
-        ) for dtype, suffix, acq in dtype_suffix_acq_comb ],[])
+        ) for dtype, suffix, acq, part in dtype_suffix_acq_part_comb ],[])
     
     if sloppy > 0:
         # find fmaps with close enough patient position
