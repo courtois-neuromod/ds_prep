@@ -2,6 +2,7 @@ import os, sys
 import numpy as np
 import pandas as pd
 import retro
+import tqdm
 
 stop_tags = ["VideoGame", "stopped at"]
 rep_tag = "level step: 0"
@@ -81,7 +82,7 @@ def logs2event_files(in_files, out_file_tpl):
                         bk2_dur += 1
 
                     duration_log = stop[0] - rep[0]
-                    if np.abs(duration_log-bk2_dur/60.) > 1 or record == last_rep_last_run:
+                    if np.abs(duration_log-bk2_dur/fps) > .05 or record == last_rep_last_run:
                         print(f"error : run-{len(repetition)} {rep[0]} {record} {duration_log} - {bk2_dur/60.}={duration_log-(bk2_dur/60.)}")
                         repetition[-1].append(
                             (
@@ -93,12 +94,12 @@ def logs2event_files(in_files, out_file_tpl):
                                 None,
                             )
                         )
-                        #duration_steps = int(duration_log*60.02)
-                        #keypresses, rewards = extract_keypress_rewards(rep_log)
-                        #print(keypresses, rewards)
-                        #kp_1hot = keypresses_1hot(keypresses, duration_steps)
-                        #bk2 = retro.Movie(record)
-                        #print(find_keyreleases(bk2, kp_1hot, rewards, duration_steps))
+                        duration_steps = int(duration_log*fps)
+                        keypresses, rewards = extract_keypress_rewards(rep_log)
+                        print(keypresses, rewards)
+                        kp_1hot = keypresses_1hot(keypresses, duration_steps)
+                        bk2 = retro.Movie(record)
+                        print(find_keyreleases(bk2, kp_1hot, rewards, duration_steps))
                     else:
                         repetition[-1].append(
                             (
@@ -119,7 +120,7 @@ def logs2event_files(in_files, out_file_tpl):
                 if TTL and len(repetition): # only if TTL was received
                     del repetition[-1]
                 if not all(abt in e[2] for abt in restart_tags):
-                    TTL = None                    
+                    TTL = None
                 rep_log = None
         TTL = None  # reset the TTL
     run = 0
@@ -135,7 +136,7 @@ def logs2event_files(in_files, out_file_tpl):
         )
         df.to_csv(out_file, sep="\t", index=False)
 
-
+fps=60.15
 
 def extract_keypress_rewards(rep_log):
     keypresses = {}
@@ -143,22 +144,30 @@ def extract_keypress_rewards(rep_log):
     refs = {}
     for e in rep_log:
         if 'level step:' in e[2]:
-            refs[e[0]] = int(e[2].split(' ')[2])
-    ref_keys = np.asarray(list(refs.keys()))
-    for e in rep_log:
-        closest_ref = ref_keys[np.argmin(np.abs(ref_keys-e[0]))]
+            ref_time = e[0]
+            step = int(e[2].split(' ')[2])
+            refs[ref_time] = step
+    #ref_keys = np.asarray(list(refs.keys()))
+    #for e in rep_log:
+            closest_ref = ref_time
         if 'Keypress' in e[2]:
             key = e[2].split(' ')[1]
             if key in 'rludyab':
-                
-                keypress_step = refs[closest_ref] + int(np.ceil((e[0]-closest_ref)*60))
+
+                keypress_step = refs[closest_ref] + int(np.ceil((e[0]-closest_ref)*fps+1/fps))
                 if keypress_step in keypresses:
                     keypresses[keypress_step].append(key)
                 else:
                     keypresses[keypress_step] = [key]
         elif 'Reward' in e[2]:
             reward = float(e[2].split(' ')[1])
-            reward_step = refs[closest_ref] + int(np.floor((e[0]-closest_ref)*60))
+            reward_step = refs[closest_ref] + int(np.round((e[0]-closest_ref)*fps)) + 1
+            if reward_step in rewards:
+                print(f"error reward double assigned {reward_step} {reward}")
+                if reward_step - 1 in rewards:
+                    print(f"error cannot retro assign {reward_step-1} {reward}")
+                else:
+                    rewards[reward_step-1] = rewards[reward_step]
             rewards[reward_step] = reward
     return keypresses, rewards
 
@@ -173,113 +182,125 @@ def keypresses_1hot(keypresses, duration):
         for k in ks:
             hot1[idx, KEY_SET.index(k)] = True
     return hot1
-    
+
 MAX_PRESS_LENGTH = 1200
 
-def _rec_find_keyreleases(env, initial_step, key_state, keypresses, rewards, key_releases, duration, depth=1, total_rewards=0):
+def _rec_find_keyreleases(
+        env, initial_step, key_state, keypresses,
+        rewards, key_releases, duration,
+        depth=1, total_rewards=0, render=False):
     key_state = np.logical_or(key_state, keypresses[initial_step])
     keys = [KEY_SET[i] for i,p in enumerate(keypresses[initial_step]) if p]
-    long_keys = [k for k in keys if k in "lrdby"] # key with press duration effect:
+    long_keys = [k for k in keys if k in "lrdby"] # keys with press duration effect:
 
+    step_reward = total_rewards
     _obs, _rew, done, _info = env.step(key_state)
-    if initial_step%60 == 0:
+    if render and initial_step%render == 0:
         env.render()
     if _rew:
-        total_rewards += _rew
+        print(f"reward at {initial_step: }: {step_reward}")
     if initial_step in rewards:
-        #print(f"\n### evaluate reward {_rew} {rewards[initial_step]}\n")
-        if rewards[initial_step] != total_rewards or _rew==0:
-            sys.stdout.write("#"*depth + f" reward mismatch: step :{initial_step}, depth: {depth}, {total_rewards} != {rewards[initial_step]} \n")
-            sys.stdout.flush()
-            return False # kill that branch
+        if rewards[initial_step] != step_reward or _rew==0:
+            return -1, step_reward # kill that branch
         else:
-            print("\n" + "#"*depth +" reward match: step :{initial_step}, depth: {depth}\n")
+            print(f"___ match reward at {initial_step}= {rewards[initial_step]}")
 
-    
     if not len(long_keys):
-        # reset key as length has no impact
+        # release key as keypress duration has no impact
         key_state[keypresses[initial_step]] = False
+
+        step = initial_step+1
+        # loop when no long keypress to limit recursion level
+        while not any(keypresses[step]):
+            _obs, _rew, done, _info = env.step(key_state)
+            if render and step%render == 0:
+                env.render()
+            step_reward += _rew
+            if _rew:
+                print(f"reward at {step: }: {step_reward}")
+            if step in rewards:
+                if rewards[step] != step_reward or _rew==0:
+                    return 0, step_reward # kill that branch, but allow backtrack
+                else:
+                    print(f"### match reward at {step}= {rewards[step]}")
+            step += 1
+        return _rec_find_keyreleases(
+            env, step, key_state,
+            keypresses, rewards, key_releases,
+            duration, depth+1, step_reward, render=render
+        )
     else:
         # find next occurence of press (which means it has been released before that)
         max_press_length = np.where(keypresses[initial_step+1:, keypresses[initial_step]])[0]
-        max_press_length = max_press_length[0]-1 if len(max_press_length) else min(MAX_PRESS_LENGTH, duration-initial_step-1)
+        max_press_length = max_press_length[0]-2 if len(max_press_length) else min(MAX_PRESS_LENGTH, duration-initial_step-1)
 
-        backtrace_state = env.em.get_state()
-        backtrace_key_state = key_state
+        backtrack_state = env.em.get_state()
+        backtrack_key_state = np.copy(key_state)
 
-        sys.stdout.write("\n")
-
-        for key_len in range(1, max_press_length):
-            sys.stdout.write("#"*depth + f" keys: {keys}, step: {initial_step}, depth: {depth}, key_len: {key_len}/{max_press_length}    \r")
-            sys.stdout.flush()
-            if initial_step+key_len >= duration:
-                return True # reached the end of the run
+        for key_len in tqdm.tqdm(
+            range(1, max_press_length),
+            desc=f"depth: {depth}: keys: {keys}, step: {initial_step}, reward: {step_reward}",
+            leave=depth < 5):
+            step = initial_step + key_len
 
             # do key release on next step
-            key_state = np.logical_xor(
-                key_state,
-                keypresses[initial_step]) # key release # todo:fix
+            key_state[keypresses[initial_step]] = False
 
-            for step_eval in range(initial_step+key_len, duration):
-                ret =_rec_find_keyreleases(
-                    env, step_eval, key_state, keypresses, rewards, key_releases, duration, depth+1, total_rewards,
-                )
-                if ret is False:
-                    break
-            if ret is False:
+            ret, step_reward =_rec_find_keyreleases(
+                env, step, key_state,
+                keypresses, rewards, key_releases,
+                duration, depth+1, step_reward, render=render
+            )
+            if ret < 0:
+                return 0, step_reward # kill branch, allow backtrack one level down
+            elif ret < 1:
                 # backtrack one step
-                env.initial_state = backtrace_state
+                env.initial_state = backtrack_state
                 env.reset()
                 # and move one step with key still pressed
-                key_state = np.logical_and(backtrace_key_state, keypresses[initial_step+key_len])
+                key_state = np.copy(backtrack_key_state)
                 _obs, _rew, done, _info = env.step(key_state)
-                #env.render()
-                backtrace_state = env.em.get_state()
-
-                # if not releasing does not match rewards, abandon the whole search of that branch
-                step_backtrack = initial_step+key_len
-                if step_backtrack in rewards:
-                    if rewards[step_backtrack] != total_rewards+_rew or _rew==0:
-                        print("#"*depth + f" abort: step :{step_backtrack}, depth: {depth}, key_len: {key_len}/{max_press_length}     ")
-                        return False # kill that branch
+                step_reward += _rew
+                if step in rewards:
+                    if rewards[step] != step_reward or _rew==0:
+                        return -1, step_reward # kill that branch
+                    else:
+                        print(f"$$$ match reward at {step}= {rewards[step]}")
+                backtrack_state = env.em.get_state()
             else:
-                return ret
-        print(f"\n")
+                return ret, step_reward
+    return False, step_reward
 
 
-def find_keyreleases(movie, keypresses, rewards, duration):
+def find_keyreleases(movie, keypresses, rewards, duration, render=False):
 
     #reward_steps = np.asarray(list(rewards.keys()))
     key_releases = {}
-    
-    key_state = keypresses[0]
+    total_rewards = 0
+    keypresses[0]
 
     try:
         env = retro.make(
             game=movie.get_game(),
             state=None,
             players=movie.players,
+            scenario='scenario',
             inttype=retro.data.Integrations.CUSTOM_ONLY,
         )
         #movie.step()
-        
+
         env.initial_state = movie.get_state()
         env.reset()
 
-        step = 1
-        while step < duration:
-            if any(keypresses[step]):
-                ret = _rec_find_keyreleases(
-                    env, step, key_state, keypresses, rewards, key_releases, duration
-                )
-                if ret:
-                    print(f" solution found for step {step}")
-                else:
-                    raise RuntimeError(f"no solution found for step {step}")
-                step += 1
-            else:
-                _obs, _rew, done, _info = env.step(key_state)
-                step += 1
+        ret, ret_rewards = _rec_find_keyreleases(
+            env, 0, keypresses[0], keypresses, rewards, key_releases, duration, 0, total_rewards, render=render,
+        )
+        if ret:
+            print(f" solution found")
+            key_releases[step] = ret
+            total_rewards = ret_rewards
+        else:
+            raise RuntimeError(f"no solution found")
 
         print(key_releases)
         return key_releases
