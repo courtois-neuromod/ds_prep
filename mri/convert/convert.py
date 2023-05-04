@@ -24,7 +24,7 @@ def parse_args():
 
     parser.add_argument(
         "--ria-storage-remote",
-        required=True,
+        required=False,
         help="name of the ria storage remote",
     )
     
@@ -63,7 +63,8 @@ def single_session_job(input_file, output_datalad, ria_storage_remote, b0_field_
                 ds = datalad.api.install(path=tmpdirname, source=output_datalad)
 
             # enable the ria storage remote
-            ds.repo.enable_remote(ria_storage_remote)
+            if ria_storage_remote:
+                ds.repo.enable_remote(ria_storage_remote)
             # checkout a new branch
             ds.repo.checkout(session_name, options=['-b'])
             # this clone will be flush, better say it's already dead.
@@ -88,10 +89,11 @@ def single_session_job(input_file, output_datalad, ria_storage_remote, b0_field_
                 fill_intended_for(ds.pathobj)
                 ds.save(message='fill IntendedFor')
 
+            if ria_storage_remote:
+                ds.push(to=ria_storage_remote, data='anything') #if deps is not properly set
             with file_lock:
                 print('pushing')
                 ds.push(to='origin', data='anything')
-            ds.push(to=ria_storage_remote, data='anything') #if deps is not properly set
             ds.repo.call_annex(['unused'])
             ds.repo.call_annex(['dropunused', '--force', 'all'])
             ds.drop('./.heudiconv/', reckless='kill', recursive=True)

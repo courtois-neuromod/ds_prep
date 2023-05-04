@@ -218,7 +218,7 @@ def insert_values_in_json(path, dct):
     os.chmod(path, file_mask)
 
 
-def get_candidate_fmaps(layout, epi, match_shim=True, sloppy=0):
+def get_candidate_fmaps(layout, epi, match_shim=True, sloppy=0, non_fmap=True):
     
     epi_pedir = epi.entities["PhaseEncodingDirection"]
     opposite_pedir = epi_pedir[-1:] if '-' in epi_pedir else f"{epi_pedir}-"
@@ -233,9 +233,11 @@ def get_candidate_fmaps(layout, epi, match_shim=True, sloppy=0):
 
     dtype_suffix_acq_part_comb = [
         ('fmap', 'epi', 'sbref', None),
-        ('fmap', 'epi', Query.NONE, None),
+        ('fmap', 'epi', Query.NONE, None)]
+    if non_fmap:
+        dtype_suffix_acq_part_comb.extend([
         (epi.entities['datatype'], 'sbref', None, Query.NONE),
-        (epi.entities['datatype'], 'sbref', None, 'mag')]
+        (epi.entities['datatype'], 'sbref', None, 'mag')])
     
     fmaps = sum([
         layout.get(
@@ -307,7 +309,7 @@ def fill_intended_for(bids_path, participant_label=None, session_label=None, for
             epi.tags["AcquisitionTime"].value, "%H:%M:%S.%f"
         )
 
-        fmaps_match_pe_pos, fmaps_match_pe_neg = get_candidate_fmaps(layout, epi, sloppy)
+        fmaps_match_pe_pos, fmaps_match_pe_neg = get_candidate_fmaps(layout, epi, sloppy, non_fmap=False)
         if not fmaps_match_pe_pos or not fmaps_match_pe_neg:
             logging.error(f"no matching fieldmaps for: {epi.relpath}")
             continue

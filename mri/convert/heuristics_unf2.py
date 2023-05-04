@@ -31,10 +31,7 @@ def custom_seqinfo(wrapper, series_files):
         'scan_options': str(wrapper.dcm_data.get("ScanOptions", None)),
         'image_comments': wrapper.dcm_data.get("ImageComments", ""),
         'slice_orient': str(wrapper.dcm_data.get([0x0051,0x100e]).value),
-        'echo_number': str(wrapper.dcm_data.get("EchoNumber", None)),
-        'rescale_slope': wrapper.dcm_data.get("RescaleSlope", None),
-        'receive_coil': str(wrapper.dcm_data.get((0x0051,0x100f),None).value),
-        'image_history': ';'.join(filter(len,wrapper.csa_header['tags']['ImageHistory']['items'])),
+        'echo_number': int(wrapper.dcm_data.get("EchoNumber", 1))
     })
     return custom_info
 
@@ -61,12 +58,13 @@ def infotoids(seqinfos, outdir):
         session_id = rema.group(7)
 
     if rema is None:
-        rema = re.match("(([^_]*)_)?([a-zA-Z0-9]*)_([a-zA-Z0-9]*)", patient_name)
-        study_name = rema.group(2)
-        subject_id = rema.group(3)
+        rema = re.match("([^_]*)_([a-zA-Z0-9]*)(_([a-zA-Z0-9]*))?", patient_name)
+        study_name = rema.group(1)
+        subject_id = rema.group(2)
         session_id = rema.group(4)
-
+        
     locator = os.path.join(pi, *study_path)
+
 
     return {
 #        "locator": locator,
@@ -79,7 +77,7 @@ def infotoids(seqinfos, outdir):
 def get_task(s):
     mtch = re.match(".*_task\-([^_]+).*", s.series_id)
     if mtch is None:
-        mtch = re.match(".*\-task_([^_]+).*", s.series_id)# for floc messup
+        mtch = re.match(".*task-([^_\-]+).*", s.series_id) # for missing bold_ (proventure)
     if mtch is not None:
         task = mtch.group(1).split("-")
         if len(task) > 1:
@@ -90,7 +88,9 @@ def get_task(s):
 
 
 def get_run(s):
-    mtch = re.match(".*run\-([^_]+).*", s.series_id)
+    mtch = re.match(".*run\-([0-9]+).*", s.series_id)
+    if mtch is None: # second chance on non-BIDSified study
+        mtch = re.match(".*[Rr]un([0-9]+).*", s.series_id)
     if mtch is not None:
         return mtch.group(1)
     else:
@@ -154,22 +154,22 @@ def get_seq_bids_info(s):
     # Anats
     if "localizer" in s.protocol_name.lower():
         seq["label"] = "localizer"
-        slice_orient = s.custom['slice_orient'] #ex_dcm.dcm_data.get([0x0051,0x100e])
-        if 'CC:' not in s.custom['image_history']:
-            seq['rec'] = 'uncombined'
-        if slice_orient is not None:
-            seq_extra['acq'] = slice_orient.lower()
+        slice_orient = s.custom['slice_orient'] #ex_dcm.dcm_data.get([0x0051,0x100e]) 
+#        if slice_orient is not None:
+#            seq['acq'] = slice_orient.value.lower()
     elif "AAHead_Scout" in s.protocol_name:
         seq["label"] = "scout"
     elif (
         (s.dim4 == 1)
-        and ("T1" in s.protocol_name)
         and ("tfl3d1_16ns" in s.sequence_name)
     ):
         seq["label"] = "T1w"
-    elif (
-        (s.dim4 == 1) and ("T2" in s.protocol_name) and ("spc_314ns" in s.sequence_name)
-    ):
+    # MEMPRAGE
+    elif (s.sequence_name in [f"tfl3d{nechoes}_16ns" for nechoes in range(2,8)]):
+        seq["label"] = "MEGRE"
+        seq["acq"] = "mprage"
+    elif (s.dim4 == 1) and ("T2" in s.protocol_name) and ("spc_314ns" in s.sequence_name) or \
+         ('tse2d1' in s.sequence_name):
         seq["label"] = "T2w"
     elif (
         ("*tfl3d1_16" in s.sequence_name)
@@ -203,11 +203,11 @@ def get_seq_bids_info(s):
         seq["type"] = "fmap"
         seq["label"] = "TB1TFL"
         seq["acq"] = "famp" if "flip angle map" in image_comments else "anat"
-
+    # dual-echo fieldmap
     elif "fm2d2r" in s.sequence_name:
         seq["type"] = "fmap"
-        seq["label"] = "phasediff" if "phase" in s.image_type else "magnitude%d"%s.custom['echo_number']     
-        
+        seq["label"] = "phasediff" if "P" in s.image_type else "magnitude" #echo number is added by heudiconv/dcm2niix dedup
+
     # SWI
     elif (s.dim4 == 1) and ("swi3d1r" in s.sequence_name):
         seq["type"] = "swi"
@@ -216,28 +216,35 @@ def get_seq_bids_info(s):
         else:
             seq["label"] = "minIP"
 
+    # FLAIR
+    elif 'tse_vfl' in s.sequence_name:
+        seq['label'] = 'FLAIR'
+            
     # Siemens or CMRR diffusion sequence, exclude DERIVED (processing at the console)
     elif (
         ("ep_b" in s.sequence_name)
         or ("ez_b" in s.sequence_name)
         or ("epse2d1_110" in s.sequence_name)
     ) and not any(it in s.image_type for it in ["DERIVED", "PHYSIO"]):
-        seq["type"] = "dwi"
-        seq["label"] = "sbref" if is_sbref else "dwi"
-
-        # dumb far-fetched heuristics, no info in dicoms see https://github.com/CMRR-C2P/MB/issues/305
-        seq_extra["part"] = 'phase' if s.custom['rescale_slope'] else 'mag'
-
+        if 'b0' in s.protocol_name:
+            seq["type"] = "fmap"
+            seq["label"] = "epi"
+            seq["acq"] = "sbref" if is_sbref else "multiband"
+        else:
+            seq["type"] = "dwi"
+            seq["label"] = "sbref" if is_sbref else "dwi"
+            
 
     # CMRR or Siemens functional sequences
     elif "epfid2d" in s.sequence_name:
         seq["task"] = get_task(s)
 
         # if no task, this is a fieldmap
-        if "AP" in s.series_id and not seq["task"]:
+        if "AP" in s.series_id or 'fmap' in s.series_id: #and not seq["task"]:
             seq["type"] = "fmap"
             seq["label"] = "epi"
             seq["acq"] = "sbref" if is_sbref else "bold"
+            del seq["task"]
         else:
             seq["type"] = "func"
             seq["label"] = "sbref" if is_sbref else "bold"
@@ -246,7 +253,6 @@ def get_seq_bids_info(s):
         if s.is_motion_corrected:
             seq["rec"] = "moco"
 
-            
     ################## SPINAL CORD PROTOCOL #####################
     elif "spcR_100" in s.sequence_name:
         seq["label"] = "T2w"
@@ -278,7 +284,7 @@ def generate_bids_key(seq_type, seq_label, prefix, bids_info, show_dir=False, ou
         None if not bids_info.get("echo") else "echo-%d" % int(bids_info["echo"]),
         None if not bids_info.get("flip") else "flip-%d" % int(bids_info["flip"]),
         None if not bids_info.get("mt") else "mt-%s" % bids_info["mt"],
-        None if not bids_info.get("part") else "part-%s" % bids_info["part"],
+        None if not bids_info.get("part") or ("phase" in seq_label) or ("magnitude" in seq_label) else "part-%s" % bids_info["part"],
         seq_label,
     ]
     # filter those which are None, and join with _
@@ -308,13 +314,15 @@ def infotodict(seqinfo):
     run_label = None  # run-
     dcm_image_iod_spec = None
     skip_derived = True
+    skip_moco = True
 
     outtype = ("nii.gz",)
     sbref_as_fieldmap = True  # duplicate sbref in fmap dir to be used by topup
-    #sbref_as_fieldmap = False # sbref as fieldmaps is still required to use fMRIPrep LTS.
+#    sbref_as_fieldmap = False # sbref as fieldmaps is still required to use fMRIPrep LTS.
     prefix = ""
 
-    fieldmap_runs = {}
+    epi_fieldmap_runs = {}
+    dualecho_fieldmap_runs = {}
     all_bids_infos = {}
 
     for s in seqinfo:
@@ -332,7 +340,7 @@ def infotodict(seqinfo):
             and (s.is_derived or ("MPR" in s.image_type))
             and not s.is_motion_corrected
             and not "UNI" in s.image_type
-        ):
+        ) or (skip_moco and s.is_motion_corrected):
             skipped.append(s.series_id)
             lgr.debug("Ignoring derived data %s", s.series_id)
             continue
@@ -343,15 +351,15 @@ def infotodict(seqinfo):
         if (seq_type == "fmap" and seq_label == "epi" and bids_extra['part']=='phase' and seq_label=='bold'):
             continue
         
-        if ((seq_type == "fmap" and seq_label == "epi") or
-            (sbref_as_fieldmap and seq_label == "sbref" and seq_type=='func')
-        ) and bids_info.get("part") in ["mag", None]:
+        if ((seq_type == "fmap" and seq_label == "epi") or (
+            sbref_as_fieldmap and seq_label == "sbref"
+        )) and bids_info.get("part") in ["mag", None]:
             pe_dir = bids_info.get("dir", None)
-            if not pe_dir in fieldmap_runs:
-                fieldmap_runs[pe_dir] = 0
-            fieldmap_runs[pe_dir] += 1
+            if not pe_dir in epi_fieldmap_runs:
+                epi_fieldmap_runs[pe_dir] = 0
+            epi_fieldmap_runs[pe_dir] += 1
             # override the run number
-            run_id = fieldmap_runs[pe_dir]
+            run_id = epi_fieldmap_runs[pe_dir]
 
             # duplicate sbref to be used as fieldmap
             if sbref_as_fieldmap and seq_label == "sbref":
@@ -367,6 +375,11 @@ def infotodict(seqinfo):
                 if template not in info:
                     info[template] = []
                 info[template].append(s.series_id)
+        elif seq_type == "fmap" and bids_info.get('run') is None: #dual-echo case
+            if not seq_label in dualecho_fieldmap_runs:
+                dualecho_fieldmap_runs [seq_label] = 0
+            dualecho_fieldmap_runs[seq_label] += 1
+            bids_info['run'] = dualecho_fieldmap_runs[seq_label]
 
         show_dir = seq_type in ["fmap", "dwi"] and not seq_label=='TB1TFL'
 
