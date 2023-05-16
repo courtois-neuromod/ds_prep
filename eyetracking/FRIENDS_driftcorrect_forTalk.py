@@ -114,145 +114,6 @@ def pix2norm(h_pix, w_pix):
     return list(zip(x_norm.tolist(), y_norm.tolist()))
 
 
-# Export recentered gaze into movie (episode)
-def drawgaze(clip,fx,fy,r_zone):
-    """
-    Returns a filter that will add a moving circle that corresponds to the gaze mapped onto
-    the frames. The position of the circle at time t is
-    defined by (fx(t), fy(t)), and the radius of the circle
-    by ``r_zone``.
-    Requires OpenCV for the circling.
-    Automatically deals with the case where part of the image goes
-    offscreen.
-    """
-
-    def fl(gf,t):
-
-        im_orig = gf(t)
-        im = np.copy(im_orig)
-
-        #im.setflags(write=1)
-        h,w,d = im.shape
-        x,y = int(fx(t)),int(fy(t))
-        x1,x2 = max(0,x-r_zone),min(x+r_zone,w)
-        y1,y2 = max(0,y-r_zone),min(y+r_zone,h)
-        region_size = y2-y1,x2-x1
-
-        orig = im[y1:y2, x1:x2]
-        circled = cv2.circle(orig, (r_zone, r_zone), r_zone, (155, 0, 155), -1,
-                             lineType=cv2.CV_AA)
-
-        im[y1:y2, x1:x2] = circled
-        return im
-
-    return clip.fl(fl)
-
-
-def drawgaze_confidence(clip,fx,fy,r_zone, f_conf):
-    """
-    Returns a filter that will add a moving circle that corresponds to the gaze mapped onto
-    the frames. The position of the circle at time t is
-    defined by (fx(t), fy(t)), and the radius of the circle
-    by ``r_zone``.
-    Requires OpenCV for the circling.
-    Automatically deals with the case where part of the image goes
-    offscreen.
-    """
-
-    def fl(gf,t):
-
-        im_orig = gf(t)
-        im = np.copy(im_orig)
-
-        confi_thres = f_conf(t)
-
-        if confi_thres < 0.1:
-            #im.setflags(write=1)
-            h,w,d = im.shape
-            x,y = int(fx(t)),int(fy(t))
-            x1,x2 = max(0,x-r_zone),min(x+r_zone,w)
-            y1,y2 = max(0,y-r_zone),min(y+r_zone,h)
-            region_size = y2-y1,x2-x1
-
-            orig = im[y1:y2, x1:x2]
-            circled = cv2.circle(orig, (r_zone, r_zone), r_zone, (155, 0, 155), -1,
-                                 lineType=cv2.CV_AA)
-
-            im[y1:y2, x1:x2] = circled
-
-        return im
-
-    return clip.fl(fl)
-
-
-def drawgaze_multiples(clip, et_list, is_dg, zone_list, shade_list, fps):
-    """
-    Adds mulitple gazes from eyetracking and/or deepgaze per frame
-    """
-    def add_dots(image, coord, r_size, shade, dg=False):
-        h,w,d = image.shape
-
-        if dg:
-            #assert(np.argmax(np.array(coord)[:, 0]) == 0)
-            mean_weight = np.mean(np.array(coord)[:, 0])
-
-        for i in range(len(coord)):
-            x_norm, y_norm = coord[i][1:]
-
-            # convert normalized to pixel
-            x = int(np.floor(x_norm*720))
-            x = 719 if x > 719 else x
-            x = 0 if x < 0 else x
-
-            y = int(np.floor((1 - y_norm)*512)) - 16
-            y = 479 if y > 479 else y
-            y = 0 if y < 0 else y
-
-            # Largest (highest salience deepgaze) gets different hue
-            if dg and i == 0:
-                dot_shade = (250, 250, 0)
-            else:
-                dot_shade = shade
-
-            if dg:
-                # scale proportionally to salience value
-                r_zone = int(np.floor((r_size*coord[i][0])/mean_weight))
-            else:
-                r_zone = r_size
-
-            x1,x2 = max(0,x-r_zone),min(x+r_zone,w)
-            y1,y2 = max(0,y-r_zone),min(y+r_zone,h)
-            region_size = y2-y1,x2-x1
-
-            orig = image[y1:y2, x1:x2]
-
-            circled = cv2.circle(orig, (r_zone, r_zone), r_zone, dot_shade, -1,
-                                 lineType=cv2.CV_AA)
-
-            image[y1:y2, x1:x2] = circled
-
-        return image
-
-
-    def fl(gf,t):
-
-        im_orig = gf(t)
-        im = np.copy(im_orig)
-
-        indice = np.floor(t * fps).astype('int')
-
-        for j in range(len(et_list)):
-
-            et_file = et_list[j]
-
-            if indice < len(et_file) and len(et_file[indice]) > 0:
-                im = add_dots(im, et_file[indice], zone_list[j], shade_list[j], dg=is_dg[j])
-
-        return im
-
-    return clip.fl(fl)
-
-
 def get_arguments():
 
     parser = argparse.ArgumentParser(description='Apply drift correction on pupil gaze data during free viewing (Friends) based on DeepGaze_MR coordinates')
@@ -263,12 +124,7 @@ def get_arguments():
     parser.add_argument('--xdeg', type=int, default=None, help='degree of polynomial to correct drift in x')
     parser.add_argument('--ydeg', type=int, default=None, help='degree of polynomial to correct drift in y')
     #parser.add_argument('--fps', type=float, default=29.97, help='frames per second')
-
     parser.add_argument('--gaze_confthres', type=float, default=0.98, help='gaze confidence threshold')
-    parser.add_argument('--export_plots', action='store_true', help='if true, script exports QC plots')
-    parser.add_argument('--export_mp4', action='store_true', help='if true, script exports episode movie with superimposed corrected and uncorrected gaze')
-    parser.add_argument('--chunk_centermass', action='store_true', help='if true, also perform the center of mass correction per chunk, without DeepGaze, for comparison')
-    #parser.add_argument('--use_deepgaze', action='store_true', help='if true, gaze recentered based on deepgaze, else from own centers of mass')
 
     parser.add_argument('--out_path', type=str, default='./results', help='path to output directory')
     parser.add_argument('--outname', default='test', type=str, help='name of output movie')
@@ -510,82 +366,6 @@ def apply_poly(ref_times, distances, degree, all_times, anchors = 150):
     return p_of_all
 
 
-def make_QC_figs(d, out_path, outname):
-
-    clean_times = d['clean_times']
-    all_times = d['all_times']
-    frame_times = d['frame_times']
-    long_gaps = d['long_gaps']
-    x_mass = d['x_mass'] #0.5
-    y_mass = d['y_mass'] #0.7
-
-    plt.clf()
-    plt.ylim([-1, 1])
-    plt.plot(clean_times, long_gaps)
-    plt.xlabel("Time (s)", labelpad=20)
-    plt.ylabel("Gaps of > 0.1s in confident gaze", labelpad=20)
-    plt.title("Gaps in high confidence gaze")
-    plt.savefig(os.path.join(out_path, outname + '_gazedata_gaps.png'))
-
-    plt.clf()
-    plt.ylim([-1, 1])
-    plt.plot(clean_times, long_gaps)
-    plt.plot(frame_times, np.array(d['et_x']) - x_mass)  # eyetracking per frame
-    plt.plot(frame_times, d['dist_x']) # distance from deepgaze (frames w single local maximum)
-    plt.xlabel("Time (s)", labelpad=20)
-    plt.ylabel("Normalized distance from target position", labelpad=20)
-    plt.title("Drift in x gaze position")
-    plt.savefig(os.path.join(out_path, outname + '_X_drift.png'))
-
-    plt.clf()
-    plt.ylim([-1, 1])
-    plt.plot(clean_times, long_gaps)
-    plt.plot(frame_times, np.array(d['et_y']) - y_mass)  # eyetracking per frame
-    plt.plot(frame_times, d['dist_y']) # distance from deepgaze (frames w single local maximum)
-    plt.xlabel("Time (s)", labelpad=20)
-    plt.ylabel("Normalized distance from target position", labelpad=20)
-    plt.title("Drift in y gaze position")
-    plt.savefig(os.path.join(out_path, outname + '_Y_drift.png'))
-
-    plt.clf()
-    plt.ylim([-1, 1])
-    plt.plot(clean_times, np.array(d['clean_y']) - y_mass)
-    plt.plot(frame_times, d['dist_y'])
-    plt.plot(clean_times, d['p_of_clean_y'])
-    plt.xlabel("Time (s)", labelpad=20)
-    plt.ylabel("Normalized distance from target position", labelpad=20)
-    plt.title("Polynomial drift correction in y")
-    plt.savefig(os.path.join(out_path, outname + '_Y_polycorr.png'))
-
-    plt.clf()
-    plt.ylim([-1, 1])
-    plt.plot(clean_times, np.array(d['clean_x']) - x_mass)
-    plt.plot(frame_times, d['dist_x'])
-    plt.plot(clean_times, d['p_of_clean_x'])
-    plt.xlabel("Time (s)", labelpad=20)
-    plt.ylabel("Normalized distance from target position", labelpad=20)
-    plt.title("Polynomial drift correction in x")
-    plt.savefig(os.path.join(out_path, outname + '_X_polycorr.png'))
-
-    plt.clf()
-    plt.ylim([-3, 3])
-    plt.plot(clean_times, d['clean_y'])
-    plt.plot(clean_times, d['clean_y_aligned'])
-    plt.xlabel("Time (s)", labelpad=20)
-    plt.ylabel("Normalized gaze position", labelpad=20)
-    plt.title("Gaze position in y before and after correction")
-    plt.savefig(os.path.join(out_path, outname + '_Y_corrected.png'))
-
-    plt.clf()
-    plt.ylim([-3, 3])
-    plt.plot(clean_times, d['clean_x'])
-    plt.plot(clean_times, d['clean_x_aligned'])
-    plt.xlabel("Time (s)", labelpad=20)
-    plt.ylabel("Normalized gaze position", labelpad=20)
-    plt.title("Gaze position in x before and after correction")
-    plt.savefig(os.path.join(out_path, outname + '_X_corrected.png'))
-
-
 def main():
 
     args = get_arguments()
@@ -596,7 +376,7 @@ def main():
     gz = np.load(gaze_file, allow_pickle=True)['gaze2d']
 
     # get metrics to realign timestamps of movie frames and eyetracking gaze
-    frame_count, zero_idx, fps = get_indices(film_path, gz)
+    frame_count, zero_idx, fps = get_indices(film_path, gz, fps)
 
     # extract above-threshold normalized coordinates and their realigned time stamps
     all_vals, clean_vals = get_norm_coord(gz, zero_idx, args.gaze_confthres)
@@ -606,23 +386,19 @@ def main():
     '''
     Correct by chunk centers of mass (no deepgaze): for reference only
     '''
-    if args.chunk_centermass:
-        x_chunks, y_chunks, chunk_timepoints = get_centermass(clean_x, clean_y, clean_times)
+    x_chunks, y_chunks, chunk_timepoints = get_centermass(clean_x, clean_y, clean_times)
 
     # assign uncorrected gaze to frames
     uncorr_gazes = gaze_2_frame(frame_count, fps, clean_x, clean_y, clean_times)
 
     # Load deepgaze coordinates (local maxima per frame) pre-extracted from salience maps
     # Deepgaze salience files too large to save and run locally, so local maxima are extracted on compute canada...
-    use_deepgaze = False
-    all_DGvals = None
-    deepgaze_file = args.deepgaze_file
 
-    if deepgaze_file is not None:
-        use_deepgaze = True
-        all_DGvals = np.load(deepgaze_file, allow_pickle=True)['deepgaze_vals']
-        # sanity check
-        assert(len(all_DGvals) == frame_count)
+    deepgaze_file = args.deepgaze_file
+    all_DGvals = np.load(deepgaze_file, allow_pickle=True)['deepgaze_vals']
+    use_deepgaze=True
+    # sanity check
+    assert(len(all_DGvals) == frame_count)
 
     # compute difference between frame's mean gaze and deepgaze's estimated coordinates (or average position in x and y)
     x_mass = 0.5
@@ -646,15 +422,13 @@ def main():
         p_of_all_x = apply_poly(frame_times, dist_x, deg_x, all_times_arr, anchors=150)
         all_x_aligned = np.array(all_x) - (p_of_all_x)
 
-        if args.chunk_centermass:
-            p_of_x_chunks = apply_poly(chunk_timepoints, x_chunks, deg_x, clean_times_arr, anchors=1)
-            clean_x_chunkaligned = np.array(clean_x) - (p_of_x_chunks - x_mass)
+        p_of_x_chunks = apply_poly(chunk_timepoints, x_chunks, deg_x, clean_times_arr, anchors=1)
+        clean_x_chunkaligned = np.array(clean_x) - (p_of_x_chunks - x_mass)
 
     else:
         all_x_aligned = all_x
         clean_x_aligned = clean_x
-        if args.chunk_centermass:
-            clean_x_chunkaligned = clean_x
+        clean_x_chunkaligned = clean_x
 
     if args.ydeg is not None:
         deg_y = args.ydeg
@@ -665,78 +439,31 @@ def main():
         p_of_all_y = apply_poly(frame_times, dist_y, deg_y, all_times_arr, anchors=150)
         all_y_aligned = np.array(all_y) - (p_of_all_y)
 
-        if args.chunk_centermass:
-            p_of_y_chunks = apply_poly(chunk_timepoints, y_chunks, deg_y, clean_times_arr, anchors=1)
-            clean_y_chunkaligned = np.array(clean_y) - (p_of_y_chunks - y_mass)
+        p_of_y_chunks = apply_poly(chunk_timepoints, y_chunks, deg_y, clean_times_arr, anchors=1)
+        clean_y_chunkaligned = np.array(clean_y) - (p_of_y_chunks - y_mass)
 
     else:
         all_y_aligned = all_y
         clean_y_aligned = clean_y
-        if args.chunk_centermass:
-            clean_y_chunkaligned = clean_y
+        clean_y_chunkaligned = clean_y
 
-    if use_deepgaze:
-        specs += '_DG'
+    plt.clf()
+    plt.ylim([-17.5, 17.5])
+    plt.plot(clean_times_arr, (clean_x_chunkaligned - clean_x_aligned)*17.5, color='xkcd:blue')#*17.5)
+    plt.plot([clean_times_arr[0], clean_times_arr[-1]], [0, 0], linestyle='dashed', color='xkcd:red')#*17.5)
+    #plt.xlabel("Time (s)", labelpad=20)
+    #plt.ylabel("Degrees of visual angle", labelpad=20)
+    #plt.title("CoM minus DG drift correction in X")
+    plt.savefig(os.path.join(args.out_path, args.outname + '_diff_CoM_DG_X_deg.png'))
 
-    # Export corrected gaze as array of dictionaries
-    all_gazes_array = np.empty(len(all_times), dtype='object')
-    for i in range(len(all_gazes_array)):
-        gaze = {}
-        gaze['confidence'] = all_conf[i]
-        gaze['norm_pos'] = (all_x[i], all_y[i])
-        gaze['norm_pos_corr'] = (all_x_aligned[i], all_y_aligned[i])
-        gaze['timestamp'] = all_times[i]
-        all_gazes_array[i] =  gaze
-    np.savez(os.path.join(args.out_path, 'All_gazecorr_' + args.outname + specs + '.npz'), gaze2d_corr = all_gazes_array)
-
-    clean_gazes_array = np.empty(len(clean_times), dtype='object')
-    for i in range(len(clean_times)):
-        gaze = {}
-        #gaze['confidence'] = clean_conf[i]
-        gaze['norm_pos'] = (clean_x[i], clean_y[i])
-        gaze['norm_pos_corr'] = (clean_x_aligned[i], clean_y_aligned[i])
-        gaze['timestamp'] = clean_times[i]
-        clean_gazes_array[i] =  gaze
-    np.savez(os.path.join(args.out_path, 'Clean_gazecorr_' + args.outname + specs + '.npz'), gaze2d_corr = clean_gazes_array)
-
-
-    if args.export_plots:
-        plot_data_dict = {}
-        plot_data_dict['all_times'] = all_times
-        plot_data_dict['clean_times'] = clean_times
-        plot_data_dict['frame_times'] = frame_times
-        plot_data_dict['long_gaps'] = long_gaps
-
-        plot_data_dict['clean_x'] = clean_x
-        plot_data_dict['clean_y'] = clean_y
-        plot_data_dict['et_x'] = et_x
-        plot_data_dict['et_y'] = et_y
-        plot_data_dict['x_mass'] = x_mass
-        plot_data_dict['y_mass'] = y_mass
-        plot_data_dict['dist_x'] = dist_x
-        plot_data_dict['dist_y'] = dist_y
-        plot_data_dict['p_of_clean_x'] = p_of_clean_x
-        plot_data_dict['p_of_clean_y'] = p_of_clean_y
-        plot_data_dict['clean_x_aligned'] = clean_x_aligned
-        plot_data_dict['clean_y_aligned'] = clean_y_aligned
-
-        make_QC_figs(plot_data_dict, args.out_path, args.outname)
-
-
-    if args.export_mp4:
-        # assign corrected gaze to frames
-        corr_gazes = gaze_2_frame(frame_count, fps, clean_x_aligned, clean_y_aligned, clean_times)
-
-        clip = VideoFileClip(film_path)
-
-        if args.chunk_centermass:
-            corr_gazes_chunks = gaze_2_frame(frame_count, fps, clean_x_chunkaligned, clean_y_chunkaligned, clean_times)
-            specs += '_CMass'
-            clip_gaze = clip.fx( drawgaze_multiples, [uncorr_gazes, corr_gazes, corr_gazes_chunks], [False, False, False], [5, 5, 5], [(155, 0, 0), (0, 0, 100), (202, 228, 241)], fps)
-
-        else:
-            clip_gaze = clip.fx( drawgaze_multiples, [uncorr_gazes, corr_gazes], [False, False], [5, 5], [(155, 0, 0), (0, 0, 100)], fps)
-        clip_gaze.write_videofile(os.path.join(args.out_path, args.outname + specs + '.mp4'))
+    plt.clf()
+    plt.ylim([-14, 14])
+    plt.plot(clean_times_arr, (clean_y_chunkaligned - clean_y_aligned)*14, color='xkcd:blue')#*14)
+    plt.plot([clean_times_arr[0], clean_times_arr[-1]], [0, 0], linestyle='dashed', color='xkcd:red')#*17.5)
+    #plt.xlabel("Time (s)", labelpad=20)
+    #plt.ylabel("Degrees of visual angle", labelpad=20)
+    #plt.title("CoM minus DG drift correction in Y")
+    plt.savefig(os.path.join(args.out_path, args.outname + '_diff_CoM_DG_Y_deg.png'))
 
 
 if __name__ == '__main__':

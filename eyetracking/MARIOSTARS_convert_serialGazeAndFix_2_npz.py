@@ -7,6 +7,8 @@ import matplotlib
 matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 
+from pathlib import Path
+
 import argparse
 
 
@@ -66,7 +68,7 @@ def serialize_pupil_data(in_path, out_path, fix):
         #fix_name = os.path.join(out_path, d + '_' + r + '_online_fixations.npz')
         d_num = gaze_file.split('/')[-4].split('_')[-1].split('.')[0]
         r_num = gaze_file.split('/')[-3].split('_')[-1]
-        gaze_name = os.path.join(out_path, d_num + '_' + r_num + '_online_gaze2D.npz')=
+        gaze_name = os.path.join(out_path, d_num + '_' + r_num + '_online_gaze2D.npz')
         np.savez(gaze_name, gaze2d = deserialized_gaze)
 
         if fix:
@@ -91,6 +93,7 @@ if __name__ == '__main__':
     in_path = args.in_path
     # e.g., '/home/labopb/Documents/Marie/neuromod/MarioStars/Eye-tracking/pupil_data/sub-01/ses-001'
     out_path = args.out_path
+    Path(out_path).mkdir(parents=True, exist_ok=True)
     # e.g., /home/labopb/Documents/Marie/neuromod/MarioStars/Eye-tracking/offline_calibration/sub-01/ses-001
     fix = args.fixations
 

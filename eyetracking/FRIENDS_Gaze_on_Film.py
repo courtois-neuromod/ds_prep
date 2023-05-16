@@ -36,7 +36,7 @@ def get_arguments():
     parser.add_argument('--gaze', default='run_s2e04a_online_gaze2D.npz', type=str, help='absolute path to gaze file')
     parser.add_argument('--film', default='friends_s2e04a_copy.mkv', type=str, help='absolute path to film .mkv file')
     parser.add_argument('--out_path', type=str, default='./results', help='path to output directory')
-    parser.add_argument('--fps', type=float, default=29.97, help='frames per second')
+    #parser.add_argument('--fps', type=float, default=29.97, help='frames per second')
     parser.add_argument('--gaze_confthres', type=float, default=0.98, help='gaze confidence threshold')
     parser.add_argument('--deepgaze', action='store_true', help='if true, map gaze from deepgaze coordinates')
     parser.add_argument('--partial', action='store_true', help='if true, only process a portion of the movie')
@@ -255,7 +255,9 @@ def main():
     args = get_arguments()
 
     film_path = args.film
-    fps = args.fps
+    cap = cv2.VideoCapture(film_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    #fps = args.fps
     gaze_path = args.gaze
 
     start_frame = args.start_frame

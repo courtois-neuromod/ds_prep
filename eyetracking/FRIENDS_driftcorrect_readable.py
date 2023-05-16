@@ -68,7 +68,7 @@ def get_arguments():
 
     parser.add_argument('--xdeg', type=int, default=None, help='degree of polynomial to correct drift in x')
     parser.add_argument('--ydeg', type=int, default=None, help='degree of polynomial to correct drift in y')
-    parser.add_argument('--fps', type=float, default=29.97, help='frames per second')
+    #parser.add_argument('--fps', type=float, default=29.97, help='frames per second')
 
     parser.add_argument('--gaze_confthres', type=float, default=0.98, help='gaze confidence threshold')
     parser.add_argument('--export_plots', action='store_true', help='if true, script exports QC plots')
@@ -154,7 +154,7 @@ def drawgaze_multiples(clip, et_list, is_dg, zone_list, shade_list, fps):
     return clip.fl(fl)
 
 
-def get_indices(film_path, gz, fps):
+def get_indices(film_path, gz):
 
     '''
     Count number of frames in episode .mkv
@@ -180,6 +180,7 @@ def get_indices(film_path, gz, fps):
     In that case ("lag" value is negative and zero_idx remains == 0)
     In that scenario, a zero_idx value of around 110 is a reasonable approximation
     '''
+    fps = cap.get(cv2.CAP_PROP_FPS)
     lag = gz[-1]['timestamp'] - gz[0]['timestamp'] - frame_count/fps
     interval = lag - 1/fps
 
@@ -189,7 +190,7 @@ def get_indices(film_path, gz, fps):
 
     if lag < 0:
         zero_idx = 109
-    return frame_count, zero_idx
+    return frame_count, zero_idx, fps
 
 
 def get_norm_coord(gz, zero_idx, conf_thresh=0.9, gap_thresh = 0.1):
@@ -552,12 +553,12 @@ def main():
     args = get_arguments()
 
     film_path = args.film # e.g., '/home/labopb/Documents/Marie/neuromod/friends_eyetrack/video_stimuli/friends_s06e03a.mkv'
-    fps = args.fps # 29.97 frames per second for Friends
+    #fps = args.fps # 29.97 frames per second for Friends
     gaze_file = args.gaze # e.g., '/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-03/ses-070/run_s6e03a_online_gaze2D.npz'
     gz = np.load(gaze_file, allow_pickle=True)['gaze2d']
 
     # get metrics to realign timestamps of movie frames and eyetracking gaze
-    frame_count, zero_idx = get_indices(film_path, gz, fps)
+    frame_count, zero_idx, fps = get_indices(film_path, gz)
 
     # extract above-threshold normalized coordinates and their realigned time stamps
     all_vals, clean_vals = get_norm_coord(gz, zero_idx, args.gaze_confthres)

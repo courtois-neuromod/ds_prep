@@ -7,10 +7,10 @@ GAZEPATH="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/deepgaze_coord/
 FILMPATH="/home/labopb/Documents/Marie/neuromod/friends_eyetrack/video_stimuli/friends_s2e04a_copy.mkv"
 OUTPATH="/home/labopb/Documents/Marie/neuromod/eyetrack_movies/gaze_movies"
 
+# fps ~ 29.97
 python -m FRIENDS_Gaze_on_Film \
       --gaze="${GAZEPATH}" \
       --film="${FILMPATH}" \
       --out_path="${OUTPATH}" \
-      --fps=29.97 \
       --deepgaze \
-      --outname="s2e04a_DeepGaze" 
+      --outname="s2e04a_DeepGaze"

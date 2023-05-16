@@ -38,7 +38,7 @@ python3 -m retro.import /path/to/your/ROMs/directory/
 e.g., python -m retro.import /home/labopb/Documents/Marie/neuromod/Mario/mario.stimuli
 (mario.stimuli repo contains SuperMarioBros-Nes directory with file rom.nes in it)
 
-Before running the script, the online gaze and fixation data files exported by pupil need
+Before running the script, the online gaze data files exported by pupil need
 to be converted to .npz using the MARIOSTARS_convert_serialGazeAndFix_2_npz.py script
 (On laptop, run in pupil_venv environment)
 '''
@@ -49,7 +49,7 @@ def get_arguments():
     parser.add_argument('--file_path', default='', type=str, help='absolute path to session directory w .bk2, log and gaze files')
     parser.add_argument('--gaze_path', default='', type=str, help='absolute path to directory w preprocessed gaze files (gaze.pldata -> .npz)')
     parser.add_argument('--out_path', default='', type=str, help='absolute path to output directory')
-    parser.add_argument('--driftcorr', action='store_true', help='if true, gaze is corrected based on fixations')
+    parser.add_argument('--driftcorr', action='store_true', help='if true, gaze is corrected based on median gaze at fixations')
     parser.add_argument('--conf', default=0.98, type=float, help='confidence threshold to filter gaze data')
     parser.add_argument('--fixconf', default=0.90, type=float, help='confidence threshold to filter fixations data')
     args = parser.parse_args()
@@ -373,12 +373,12 @@ def norm2pix(x_norms, y_norms):
     return x_pix.tolist(), y_pix.tolist()
 
 
-def get_eyetrack_function(gaze_file, time_0 = 0, d3=False, conf_thresh=0.98, fix_file=None, fix_time = None, fixconf=0.9):
+def get_eyetrack_function(gaze_file, time_0 = 0, d3=False, conf_thresh=0.98, fix_time = None, fixconf=0.9):
     '''
     Function formats subject's eyetracking data (from normalized gaze to pixel space),
     and outputs functions that extrapolate gaze position (in x and y) as a function of onset time
 
-    If fix_file is not None, then the gaze is corrected based on the 5s fixation that precedes the onset of the level
+    If fix_time is not None, then the gaze is corrected based on the 5s fixation that precedes the onset of the level
 
     gaze_file (str): '/path/to/2d_gaze.npz'
     e.g., '/home/labopb/Documents/Marie/neuromod/friends_eyetrack/offline_calib/sub-01/ses-039/2d_gaze.npz'
@@ -398,20 +398,21 @@ def get_eyetrack_function(gaze_file, time_0 = 0, d3=False, conf_thresh=0.98, fix
     # Assume no drift
     fix_position = [0.5, 0.5]
 
-    if fix_file is not None:
-
-        run_fix = np.load(fix_file, allow_pickle=True)['fixations']
+    if fix_time is not None:
+    #if fix_file is not None:
+        #run_fix = np.load(fix_file, allow_pickle=True)['fixations']
 
         # time after fixation onset for gaze to stabilize
-        buffer_time = 1.0
-        end_fix = 2.5
+        buffer_time = 0.8
+        end_fix = 4.0
 
         fix_coord = []
 
-        for fix in run_fix:
-            if fix['confidence'] > fixconf:
-                if fix['timestamp'] > (fix_time[0] + buffer_time) and fix['timestamp'] < (fix_time[0] + end_fix):
-                    fix_coord.append(fix['norm_pos'])
+        #for fix in run_fix:
+        for gaze in gz:
+            if gaze['confidence'] > fixconf:
+                if gaze['timestamp'] > (fix_time[0] + buffer_time) and gaze['timestamp'] < (fix_time[0] + end_fix):
+                    fix_coord.append(gaze['norm_pos'])
 
         if len(fix_coord) > 0:
             # todo : update fix_position
@@ -549,7 +550,7 @@ def create_timingdict(dir_path):
                 tstamp = ev_file['sample'][i]
                 fname = os.path.basename(ev_file['stim_file'][i])
                 fix_onset = ev_file['sample'][i-1]
-                fix_time = [fix_onset, fix_onset + 5.0]
+                fix_time = [fix_onset, fix_onset]
 
                 timing_data[file_num]['run_' + run_num]['bk2_dict'][fname] = {}
                 timing_data[file_num]['run_' + run_num]['bk2_dict'][fname]['start_event'] = tstamp
@@ -579,7 +580,7 @@ def export_gazemovies(timing_dict, gaze_path, out_path, conf_threshold, driftcor
                 run_dict = timing_dict[data_num][run]['bk2_dict']
 
                 run_gpath = gaze_path + '/' + data_num + '_run-0' + rnum + '_online_gaze2D.npz'
-                run_fpath = gaze_path + '/' + data_num + '_run-0' + rnum + '_online_fixations.npz' if driftcorr else None
+                #run_fpath = gaze_path + '/' + data_num + '_run-0' + rnum + '_online_fixations.npz' if driftcorr else None
 
                 for bk2 in run_dict.keys():
                     onset_time = run_dict[bk2]['start_event']
@@ -599,7 +600,8 @@ def export_gazemovies(timing_dict, gaze_path, out_path, conf_threshold, driftcor
                         playback_movie(emulator, m, monitor_csv, video_file, info_file, npy_file, viewer, delay, lossless, reccord_audio)
                         emulator.close()
 
-                        f_xcoord, f_ycoord = get_eyetrack_function(run_gpath, time_0 = onset_time, conf_thresh=conf_threshold, fix_file=run_fpath, fix_time=fixation_time, fixconf=fixconf)
+                        #f_xcoord, f_ycoord = get_eyetrack_function(run_gpath, time_0 = onset_time, conf_thresh=conf_threshold, fix_file=run_fpath, fix_time=fixation_time, fixconf=fixconf)
+                        f_xcoord, f_ycoord = get_eyetrack_function(run_gpath, time_0 = onset_time, conf_thresh=conf_threshold, fix_time=fixation_time, fixconf=fixconf)
                         clip = VideoFileClip(video_file)
 
                         clip_gaze = clip.fx(drawgaze, f_xcoord, f_ycoord, 5)
@@ -615,13 +617,14 @@ def export_gazemovies(timing_dict, gaze_path, out_path, conf_threshold, driftcor
                     playback_movie(emulator, m, monitor_csv, video_file, info_file, npy_file, viewer, delay, lossless, reccord_audio)
                     emulator.close()
 
-                    f_xcoord, f_ycoord = get_eyetrack_function(run_gpath, time_0 = onset_time, conf_thresh=conf_threshold, fix_file=run_fpath, fix_time=fixation_time, fixconf=fixconf)
+                    #f_xcoord, f_ycoord = get_eyetrack_function(run_gpath, time_0 = onset_time, conf_thresh=conf_threshold, fix_file=run_fpath, fix_time=fixation_time, fixconf=fixconf)
+                    f_xcoord, f_ycoord = get_eyetrack_function(run_gpath, time_0 = onset_time, conf_thresh=conf_threshold, fix_time=fixation_time, fixconf=fixconf)
                     clip = VideoFileClip(video_file)
 
                     clip_gaze = clip.fx(drawgaze, f_xcoord, f_ycoord, 5)
 
                     file_ext = '_wgazeDC.mp4' if driftcorr else '_wgaze.mp4'
-                    clip_gaze.write_videofile(video_file.split('.')[0] + file_ext)
+                    clip_gaze.write_videofile(video_file.split('.')[0] + f'_run-0{rnum}' + file_ext)
 
 
 if __name__ == '__main__':
