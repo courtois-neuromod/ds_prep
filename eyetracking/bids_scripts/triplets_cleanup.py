@@ -1,4 +1,4 @@
-import os, glob
+import os, glob, sys
 import pandas as pd
 import numpy as np
 
@@ -81,7 +81,7 @@ def main():
     Step 2: export gaze and pupil files from pupil dataset to numpy .npz format
     For each run, plot the raw gaze / pupil data and export chart(s) for QCing
     '''
-    
+
 
     '''
     Step 3: manual QCing... rate quality of each run, log in spreadsheet
