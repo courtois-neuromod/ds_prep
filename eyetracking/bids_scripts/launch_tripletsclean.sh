@@ -1,5 +1,5 @@
 
-source /data/neuromod/virtualenvs/eyetracking
+source /data/neuromod/virtualenvs/eyetracking/bin/activate
 # run on elm...
 DATADIR="/unf/eyetracker/neuromod/triplets/sourcedata"
 RUNDIR="/home/mariestl/cneuromod/ds_prep/eyetracking"
