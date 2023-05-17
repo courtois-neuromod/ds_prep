@@ -100,72 +100,77 @@ def export_and_plot(pupil_path, out_path):
 
     print(sub, ses, run, task, len(seri_gaze))
 
-    # Convert serialized file to list of dictionaries...
-    gaze_2plot_list = []
-    deserialized_gaze = []
-
-    for gaze in seri_gaze:
-        gaze_data = {}
-        gaze_2plot = np.empty(6) # [gaze_x, gaze_y, pupil_x, pupil_y, timestamp, confidence]
-        for key in gaze.keys():
-            if key != 'base_data': # gaze data
-                if key == 'norm_pos':
-                    gaze_2plot[0: 2] = [gaze[key][0], gaze[key][1]]
-                elif key == 'timestamp':
-                    gaze_2plot[4] = gaze[key]
-                elif key == 'confidence':
-                    gaze_2plot[5] = gaze[key]
-                gaze_data[key] = gaze[key]
-            else: # pupil data from which gaze was derived
-                gaze_pupil_data = {}
-                gaze_pupil = gaze[key][0]
-                for k in gaze_pupil.keys():
-                    if k != 'ellipse':
-                        if k == 'norm_pos':
-                            gaze_2plot[2: 4] = [gaze_pupil[k][0], gaze_pupil[k][1]]
-                        gaze_pupil_data[k] = gaze_pupil[k]
-                    else:
-                        gaze_pupil_ellipse_data = {}
-                        for sk in gaze_pupil[k].keys():
-                            gaze_pupil_ellipse_data[sk] = gaze_pupil[k][sk]
-                        gaze_pupil_data[k] = gaze_pupil_ellipse_data
-                gaze_data[key] = gaze_pupil_data
-
-        deserialized_gaze.append(gaze_data)
-        gaze_2plot_list.append(gaze_2plot)
-
-    print(len(deserialized_gaze))
-
     outpath_gaze = os.path.join(out_path, sub, ses)
-    Path(outpath_gaze).mkdir(parents=True, exist_ok=True)
-    np.savez(f'{outpath_gaze}/{sub}_{task}_{ses}_{run}_gaze2D.npz', gaze2d = deserialized_gaze)
+    gfile_path = f'{outpath_gaze}/{sub}_{task}_{ses}_{run}_gaze2D.npz'
 
-    # create and export QC plots per run
-    array_2plot = np.stack(gaze_2plot_list, axis=0)
+    if not os.path.exists(gfile_path):
+        # Convert serialized file to list of dictionaries...
+        gaze_2plot_list = []
+        deserialized_gaze = []
 
-    fig, axes = plt.subplots(4, 1, figsize=(7, 14))
+        for gaze in seri_gaze:
+            gaze_data = {}
+            gaze_2plot = np.empty(6) # [gaze_x, gaze_y, pupil_x, pupil_y, timestamp, confidence]
+            for key in gaze.keys():
+                if key != 'base_data': # gaze data
+                    if key == 'norm_pos':
+                        gaze_2plot[0: 2] = [gaze[key][0], gaze[key][1]]
+                    elif key == 'timestamp':
+                        gaze_2plot[4] = gaze[key]
+                    elif key == 'confidence':
+                        gaze_2plot[5] = gaze[key]
+                    gaze_data[key] = gaze[key]
+                else: # pupil data from which gaze was derived
+                    gaze_pupil_data = {}
+                    gaze_pupil = gaze[key][0]
+                    for k in gaze_pupil.keys():
+                        if k != 'ellipse':
+                            if k == 'norm_pos':
+                                gaze_2plot[2: 4] = [gaze_pupil[k][0], gaze_pupil[k][1]]
+                            gaze_pupil_data[k] = gaze_pupil[k]
+                        else:
+                            gaze_pupil_ellipse_data = {}
+                            for sk in gaze_pupil[k].keys():
+                                gaze_pupil_ellipse_data[sk] = gaze_pupil[k][sk]
+                            gaze_pupil_data[k] = gaze_pupil_ellipse_data
+                    gaze_data[key] = gaze_pupil_data
 
-    axes[0].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 0], alpha=array_2plot[:, 5]*0.4)
-    axes[0].set_ylim(-2, 2)
-    axes[0].set_title(f'sub-0{sub} {task} {ses} {run} gaze_x')
+            deserialized_gaze.append(gaze_data)
+            gaze_2plot_list.append(gaze_2plot)
 
-    axes[1].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 1], alpha=array_2plot[:, 5]*0.4)
-    axes[1].set_ylim(-2, 2)
-    axes[1].set_title(f'sub-0{sub} {task} {ses} {run} gaze_y')
+        print(len(deserialized_gaze))
 
-    axes[2].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 2], alpha=array_2plot[:, 5]*0.4)
-    axes[2].set_ylim(-1, 1)
-    axes[2].set_title(f'sub-0{sub} {task} {ses} {run} pupil_x')
+        if len(deserialized_gaze) > 0:
+            outpath_gaze = os.path.join(out_path, sub, ses)
+            Path(outpath_gaze).mkdir(parents=True, exist_ok=True)
+            np.savez(f'{outpath_gaze}/{sub}_{task}_{ses}_{run}_gaze2D.npz', gaze2d = deserialized_gaze)
 
-    axes[3].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 3], alpha=array_2plot[:, 5]*0.4)
-    axes[3].set_ylim(-1, 1)
-    axes[3].set_title(f'sub-0{sub} {task} {ses} {run} pupil_y')
+            # create and export QC plots per run
+            array_2plot = np.stack(gaze_2plot_list, axis=0)
 
-    outpath_fig = os.path.join(out_path, 'QC_gaze')
-    Path(outpath_fig).mkdir(parents=True, exist_ok=True)
+            fig, axes = plt.subplots(4, 1, figsize=(7, 14))
 
-    fig.savefig(f'{outpath_fig}/{sub}_{task}_{ses}_{run}_QCplot.png')
-    plt.close()
+            axes[0].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 0], alpha=array_2plot[:, 5]*0.4)
+            axes[0].set_ylim(-2, 2)
+            axes[0].set_title(f'sub-0{sub} {task} {ses} {run} gaze_x')
+
+            axes[1].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 1], alpha=array_2plot[:, 5]*0.4)
+            axes[1].set_ylim(-2, 2)
+            axes[1].set_title(f'sub-0{sub} {task} {ses} {run} gaze_y')
+
+            axes[2].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 2], alpha=array_2plot[:, 5]*0.4)
+            axes[2].set_ylim(-1, 1)
+            axes[2].set_title(f'sub-0{sub} {task} {ses} {run} pupil_x')
+
+            axes[3].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 3], alpha=array_2plot[:, 5]*0.4)
+            axes[3].set_ylim(-1, 1)
+            axes[3].set_title(f'sub-0{sub} {task} {ses} {run} pupil_y')
+
+            outpath_fig = os.path.join(out_path, 'QC_gaze')
+            Path(outpath_fig).mkdir(parents=True, exist_ok=True)
+
+            fig.savefig(f'{outpath_fig}/{sub}_{task}_{ses}_{run}_QCplot.png')
+            plt.close()
 
 
 def main():
