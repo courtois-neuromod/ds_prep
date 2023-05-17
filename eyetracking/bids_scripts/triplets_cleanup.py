@@ -81,7 +81,8 @@ def compile_file_list(in_path):
             has_gaze = len(glob.glob(f'{pupil_path}/{task_type}_{run_num}/000/gaze.pldata')) == 1
 
             run_data = [sub_num, ses_num, run_num, task_type, fnum, (has_pupil+has_eyemv+has_gaze)==3, has_log]
-            df_files = df_files.append(pd.Series(run_data, index=df_files.columns), ignore_index=True)
+            #df_files = df_files.append(pd.Series(run_data, index=df_files.columns), ignore_index=True)
+            df_files = pd.DataFrame(df_files).append(pd.Series(run_data, index=df_files.columns), ignore_index=True)
 
     return df_files, pupil_file_paths
 
