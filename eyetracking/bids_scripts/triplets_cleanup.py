@@ -165,7 +165,7 @@ def export_and_plot(pupil_path, out_path):
     Path(outpath_fig).mkdir(parents=True, exist_ok=True)
 
     fig.savefig(f'{outpath_fig}/{sub}_{task}_{ses}_{run}_QCplot.png')
-
+    plt.close()
 
 
 def main():
