@@ -18,14 +18,15 @@ args = parser.parse_args()
 #args.run_dir = /home/mariestl/cneuromod/ds_prep/eyetracking
 sys.path.append(os.path.join(args.run_dir, "pupil", "pupil_src", "shared_modules"))
 #sys.path.append(os.path.join("/home/labopb/Documents/Marie/neuromod/ds_prep/eyetracking", "pupil", "pupil_src", "shared_modules"))
-from video_capture.file_backend import File_Source
-from file_methods import PLData_Writer, load_pldata_file, load_object, save_object
-from gaze_producer.worker.fake_gpool import FakeGPool, FakeIPC
 
-from pupil_detector_plugins.detector_2d_plugin import Detector2DPlugin
-from gaze_mapping.gazer_2d import Gazer2D
-from pupil_detector_plugins.pye3d_plugin import Pye3DPlugin
-from gaze_mapping.gazer_3d.gazer_headset import Gazer3D
+#from video_capture.file_backend import File_Source
+from file_methods import PLData_Writer, load_pldata_file, load_object, save_object
+#from gaze_producer.worker.fake_gpool import FakeGPool, FakeIPC
+
+#from pupil_detector_plugins.detector_2d_plugin import Detector2DPlugin
+#from gaze_mapping.gazer_2d import Gazer2D
+#from pupil_detector_plugins.pye3d_plugin import Pye3DPlugin
+#from gaze_mapping.gazer_3d.gazer_headset import Gazer3D
 
 
 # List CNeuromod1 datasets that include eyetracking data
