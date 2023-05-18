@@ -3,7 +3,6 @@ from frozendict import frozendict
 import nibabel.nicom.dicomwrappers as nb_dw
 from heudiconv.heuristics import reproin
 from heudiconv.heuristics.reproin import (
-    OrderedDict,
     create_key,
     get_dups_marked,
     parse_series_spec,
@@ -11,6 +10,7 @@ from heudiconv.heuristics.reproin import (
     lgr,
     series_spec_fields,
 )
+from collections import OrderedDict
 
 def load_example_dcm(seqinfo):
     ex_dcm_path = sorted(glob.glob(os.path.join('/tmp', 'heudiconv*', '*', seqinfo.dcm_dir_name, seqinfo.example_dcm_file)))[0]
@@ -35,6 +35,7 @@ def custom_seqinfo(wrapper, series_files):
         'rescale_slope': wrapper.dcm_data.get("RescaleSlope", None),
         'receive_coil': str(wrapper.dcm_data.get((0x0051,0x100f),None).value),
         'image_history': ';'.join(filter(len,wrapper.csa_header['tags']['ImageHistory']['items'])),
+        'ice_dims': wrapper.csa_header['tags']['ICE_Dims']['items'][0],
     })
     return custom_info
 
@@ -50,6 +51,10 @@ def infotoids(seqinfos, outdir):
 
     study_path = study_name.split("^")
 
+    study_name = 'unknown'
+    subject_id = 'unknown'
+    session_id = 'unknown'
+
     rema = re.match("(([^_]*)_)?(([^_]*)_)?p([0-9]*)_([a-zA-Z]*)([0-9]*)", patient_name)
     if rema is None:
         rema = re.match("(([^_]*)_)?(([^_]*)_)?(dev)_([a-zA-Z]*)([0-9]*)", patient_name)
@@ -62,9 +67,10 @@ def infotoids(seqinfos, outdir):
 
     if rema is None:
         rema = re.match("(([^_]*)_)?([a-zA-Z0-9]*)_([a-zA-Z0-9]*)", patient_name)
-        study_name = rema.group(2)
-        subject_id = rema.group(3)
-        session_id = rema.group(4)
+        if rema:
+            study_name = rema.group(2)
+            subject_id = rema.group(3)
+            session_id = rema.group(4)
 
     locator = os.path.join(pi, *study_path)
 
@@ -123,7 +129,7 @@ def get_seq_bids_info(s):
         if it not in rec_exclude:
             seq_extra["rec"] = it.lower()
     seq_extra["part"] = "mag" if "M" in s.image_type else ("phase" if "P" in s.image_type else None)
-    
+
     try:
         pedir = s.custom['pe_dir']
         if "COL" in pedir:
@@ -151,12 +157,12 @@ def get_seq_bids_info(s):
     is_sbref = "Single-band reference" in image_comments
     print(s, is_sbref)
 
+    if s.custom['ice_dims'][0] != 'X':
+        seq['rec'] = 'uncombined'
     # Anats
     if "localizer" in s.protocol_name.lower():
         seq["label"] = "localizer"
         slice_orient = s.custom['slice_orient'] #ex_dcm.dcm_data.get([0x0051,0x100e])
-        if 'CC:' not in s.custom['image_history']:
-            seq['rec'] = 'uncombined'
         if slice_orient is not None:
             seq_extra['acq'] = slice_orient.lower()
     elif "AAHead_Scout" in s.protocol_name:
@@ -206,8 +212,8 @@ def get_seq_bids_info(s):
 
     elif "fm2d2r" in s.sequence_name:
         seq["type"] = "fmap"
-        seq["label"] = "phasediff" if "phase" in s.image_type else "magnitude%d"%s.custom['echo_number']     
-        
+        seq["label"] = "phasediff" if "phase" in s.image_type else "magnitude%d"%s.custom['echo_number']
+
     # SWI
     elif (s.dim4 == 1) and ("swi3d1r" in s.sequence_name):
         seq["type"] = "swi"
@@ -246,7 +252,7 @@ def get_seq_bids_info(s):
         if s.is_motion_corrected:
             seq["rec"] = "moco"
 
-            
+
     ################## SPINAL CORD PROTOCOL #####################
     elif "spcR_100" in s.sequence_name:
         seq["label"] = "T2w"
@@ -256,7 +262,7 @@ def get_seq_bids_info(s):
 
     if seq["label"] == "sbref" and "part" in seq:
         del seq["part"]
-        
+
     return seq, seq_extra
 
 
@@ -283,7 +289,7 @@ def generate_bids_key(seq_type, seq_label, prefix, bids_info, show_dir=False, ou
     ]
     # filter those which are None, and join with _
     suffix = "_".join(filter(bool, suffix_parts))
-    
+
     return create_key(seq_type, suffix, prefix=prefix, outtype=outtype)
 
 
@@ -318,7 +324,7 @@ def infotodict(seqinfo):
     all_bids_infos = {}
 
     for s in seqinfo:
-        
+
         #ex_dcm = load_example_dcm(s)
 
         bids_info, bids_extra = get_seq_bids_info(s)
@@ -342,7 +348,7 @@ def infotodict(seqinfo):
 
         if (seq_type == "fmap" and seq_label == "epi" and bids_extra['part']=='phase' and seq_label=='bold'):
             continue
-        
+
         if ((seq_type == "fmap" and seq_label == "epi") or
             (sbref_as_fieldmap and seq_label == "sbref" and seq_type=='func')
         ) and bids_info.get("part") in ["mag", None]:
@@ -375,7 +381,7 @@ def infotodict(seqinfo):
         if template not in info:
             info[template] = []
         info[template].append(s.series_id)
-        
+
 
     if skipped:
         lgr.info("Skipped %d sequences: %s" % (len(skipped), skipped))
@@ -407,7 +413,7 @@ def dedup_bids_extra(info, bids_infos):
                         len(series_ids), template[0], series_ids)
 
             for extra in ["rec", "part"]:
-                
+
                 bids_extra_values = [bids_infos[sid][1].get(extra) for sid in series_ids]
 
                 if len(set(bids_extra_values)) < 2:
