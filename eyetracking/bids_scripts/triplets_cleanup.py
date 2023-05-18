@@ -53,7 +53,7 @@ ds_specs = {
 
 def compile_file_list(in_path):
 
-    col_names = ['subject', 'session', 'run', 'task', 'file_number', 'has_pupil', 'has_gaze', 'has_eyemovie' 'has_log']
+    col_names = ['subject', 'session', 'run', 'task', 'file_number', 'has_pupil', 'has_gaze', 'has_eyemovie', 'has_log']
     df_files = pd.DataFrame(columns=col_names)
 
     # on elm, for triplets : in_path = '/unf/eyetracker/neuromod/triplets/sourcedata'
