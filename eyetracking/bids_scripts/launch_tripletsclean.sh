@@ -8,4 +8,5 @@ OUTDIR="/home/mariestl/cneuromod/eyetracking/triplets"
 python -m triplets_cleanup \
       --in_path="${DATADIR}" \
       --run_dir="${RUNDIR}" \
+      --phase="A" \
       --out_path="${OUTDIR}"
