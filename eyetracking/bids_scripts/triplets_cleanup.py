@@ -30,6 +30,7 @@ from file_methods import PLData_Writer, load_pldata_file, load_object, save_obje
 
 
 # List CNeuromod1 datasets that include eyetracking data
+'''
 ds_specs = {
     'emotionsvideos': {},
     'floc': {},
@@ -47,12 +48,12 @@ ds_specs = {
     'things': {},
     'triplets': {}
 }
-
+'''
 
 
 def compile_file_list(in_path):
 
-    col_names = ['subject', 'session', 'run', 'task', 'file_number', 'complete_files', 'has_log']
+    col_names = ['subject', 'session', 'run', 'task', 'file_number', 'has_pupil', 'has_gaze', 'has_eyemovie' 'has_log']
     df_files = pd.DataFrame(columns=col_names)
 
     # on elm, for triplets : in_path = '/unf/eyetracker/neuromod/triplets/sourcedata'
@@ -75,12 +76,12 @@ def compile_file_list(in_path):
             list_pupil = glob.glob(f'{pupil_path}/{task_type}_{run_num}/000/pupil.pldata')
             has_pupil = len(list_pupil) == 1
             if has_pupil:
-                pupil_file_paths.append((os.path.dirname(list_pupil[0]), (sub, ses, run_num, task_type)))
+                pupil_file_paths.append((os.path.dirname(list_pupil[0]), (sub, ses, run_num, task_type, fnum)))
 
             has_eyemv = len(glob.glob(f'{pupil_path}/{task_type}_{run_num}/000/eye0.mp4')) == 1
             has_gaze = len(glob.glob(f'{pupil_path}/{task_type}_{run_num}/000/gaze.pldata')) == 1
 
-            run_data = [sub_num, ses_num, run_num, task_type, fnum, (has_pupil+has_eyemv+has_gaze)==3, has_log]
+            run_data = [sub_num, ses_num, run_num, task_type, fnum, has_pupil, has_gaze, has_eyemv, has_log]
             #df_files = df_files.append(pd.Series(run_data, index=df_files.columns), ignore_index=True)
             df_files = pd.concat([df_files, pd.DataFrame(np.array(run_data).reshape(1, -1), columns=df_files.columns)], ignore_index=True)
 
@@ -93,17 +94,16 @@ def export_and_plot(pupil_path, out_path):
     1. export gaze and pupil metrics from .pldata (pupil's) format to .npz format
     2. compile list of gaze and pupil positions (w timestamps and confidence), and export plots for visual QCing
     '''
-    sub, ses, run, task = pupil_path[1]
-
-    # note that gaze data includes pupil metrics from which each gaze was derived
-    seri_gaze = load_pldata_file(pupil_path[0], 'gaze')[0]
-
-    print(sub, ses, run, task, len(seri_gaze))
+    sub, ses, run, task, fnum = pupil_path[1]
 
     outpath_gaze = os.path.join(out_path, sub, ses)
-    gfile_path = f'{outpath_gaze}/{sub}_{task}_{ses}_{run}_gaze2D.npz'
+    gfile_path = f'{outpath_gaze}/{sub}_{ses}_{run}_{fnum}_{task}_gaze2D.npz'
 
     if not os.path.exists(gfile_path):
+        # note that gaze data includes pupil metrics from which each gaze was derived
+        seri_gaze = load_pldata_file(pupil_path[0], 'gaze')[0]
+        print(sub, ses, run, task, len(seri_gaze))
+
         # Convert serialized file to list of dictionaries...
         gaze_2plot_list = []
         deserialized_gaze = []
@@ -141,9 +141,8 @@ def export_and_plot(pupil_path, out_path):
         print(len(deserialized_gaze))
 
         if len(deserialized_gaze) > 0:
-            outpath_gaze = os.path.join(out_path, sub, ses)
             Path(outpath_gaze).mkdir(parents=True, exist_ok=True)
-            np.savez(f'{outpath_gaze}/{sub}_{task}_{ses}_{run}_gaze2D.npz', gaze2d = deserialized_gaze)
+            np.savez(gfile_path, gaze2d = deserialized_gaze)
 
             # create and export QC plots per run
             array_2plot = np.stack(gaze_2plot_list, axis=0)
@@ -152,24 +151,24 @@ def export_and_plot(pupil_path, out_path):
 
             axes[0].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 0], alpha=array_2plot[:, 5]*0.4)
             axes[0].set_ylim(-2, 2)
-            axes[0].set_title(f'sub-0{sub} {task} {ses} {run} gaze_x')
+            axes[0].set_title(f'{sub} {task} {ses} {run} gaze_x')
 
             axes[1].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 1], alpha=array_2plot[:, 5]*0.4)
             axes[1].set_ylim(-2, 2)
-            axes[1].set_title(f'sub-0{sub} {task} {ses} {run} gaze_y')
+            axes[1].set_title(f'{sub} {task} {ses} {run} gaze_y')
 
             axes[2].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 2], alpha=array_2plot[:, 5]*0.4)
             axes[2].set_ylim(-1, 1)
-            axes[2].set_title(f'sub-0{sub} {task} {ses} {run} pupil_x')
+            axes[2].set_title(f'{sub} {task} {ses} {run} pupil_x')
 
             axes[3].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 3], alpha=array_2plot[:, 5]*0.4)
             axes[3].set_ylim(-1, 1)
-            axes[3].set_title(f'sub-0{sub} {task} {ses} {run} pupil_y')
+            axes[3].set_title(f'{sub} {task} {ses} {run} pupil_y')
 
             outpath_fig = os.path.join(out_path, 'QC_gaze')
             Path(outpath_fig).mkdir(parents=True, exist_ok=True)
 
-            fig.savefig(f'{outpath_fig}/{sub}_{task}_{ses}_{run}_QCplot.png')
+            fig.savefig(f'{outpath_fig}/{sub}_{ses}_{run}_{fnum}_{task}_QCplot.png')
             plt.close()
 
 
