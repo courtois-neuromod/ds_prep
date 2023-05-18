@@ -61,6 +61,8 @@ def match_all_bolds(bids_path, biopac_path):
     sourcedata = bids_path / "sourcedata" / "physio"
     sourcedata.mkdir(parents=True, exist_ok=True)
     sessions_list = sorted(bids_path.glob("sub-*/ses-*"))
+    if len(sessions_list) < 1:
+        sessions_list = sorted(bids_path.glob("sub-*"))
     for session in sessions_list:
         session_bids_path = session.relative_to(bids_path)
         session_sourcedata = sourcedata / session_bids_path
