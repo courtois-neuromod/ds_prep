@@ -151,18 +151,22 @@ def export_and_plot(pupil_path, out_path):
 
             axes[0].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 0], alpha=array_2plot[:, 5]*0.4)
             axes[0].set_ylim(-2, 2)
+            axes[0].set_xlim(0, 350)
             axes[0].set_title(f'{sub} {task} {ses} {run} gaze_x')
 
             axes[1].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 1], alpha=array_2plot[:, 5]*0.4)
             axes[1].set_ylim(-2, 2)
+            axes[1].set_xlim(0, 350)
             axes[1].set_title(f'{sub} {task} {ses} {run} gaze_y')
 
             axes[2].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 2], alpha=array_2plot[:, 5]*0.4)
             axes[2].set_ylim(-1, 1)
+            axes[2].set_xlim(0, 350)
             axes[2].set_title(f'{sub} {task} {ses} {run} pupil_x')
 
             axes[3].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 3], alpha=array_2plot[:, 5]*0.4)
             axes[3].set_ylim(-1, 1)
+            axes[3].set_xlim(0, 350)
             axes[3].set_title(f'{sub} {task} {ses} {run} pupil_y')
 
             outpath_fig = os.path.join(out_path, 'QC_gaze')
