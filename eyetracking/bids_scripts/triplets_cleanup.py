@@ -400,7 +400,7 @@ def bidsify_EToutput(row, out_path):
 
     [sub, ses, fnum, task_type, run_num, appendix] = os.path.basename(row['events_path']).split('_')
     print(sub, ses, fnum, task_type, run_num)
-    
+
     run_event = pd.read_csv(row['events_path'], sep = '\t', header=0)
     run_gaze = np.load(row['gaze_path'], allow_pickle=True)['gaze2d']
 
@@ -428,6 +428,7 @@ def bidsify_EToutput(row, out_path):
 
     # Export drift-corrected gaze, realigned timestamps, and all other metrics (pupils, etc) to bids-compliant .tsv file
     # guidelines: https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-_eyetrackjson
+    '''
     outpath_gaze = os.path.join(out_path, sub, ses)
     col_names = ['eye_timestamp',
                  'eye1_x_coordinate', 'eye1_y_coordinate',
@@ -465,7 +466,22 @@ def bidsify_EToutput(row, out_path):
         # just in case session redone... (one case in sub-03)
         gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_eyetrack.tsv.gz'
     df_gaze.to_csv(gfile_path, sep='\t', header=True, index=False, compression='gzip')
+    '''
+    # .npz alternative to .tsv for now to test the code...
+    # concat w pandas is VERY ineffective
+    final_gaze_list = []
+    assert len(reset_gaze_list) == len(all_x_aligned)
+    for i in range(len(reset_gaze_list)):
+        gaze_pt = reset_gaze_list[i]
+        assert gaze_pt['reset_time'] == all_times[i]
+        gaze_pt['norm_pos_driftCorr'] = (all_x_aligned[i], all_y_aligned[i])
+        final_gaze_list.append(gaze_pt)
 
+    gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{run_num}_eyetrack.npz'
+    if os.path.exists(gfile_path):
+        # just in case session redone... (one case in sub-03)
+        gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_eyetrack.npz'
+    np.savez(gfile_path, gaze2d = final_gaze_list)
 
     # for each trial, capture all gaze and derive % of above-threshold gaze, add metric to events file and save
     run_event = assign_gazeConf2trial(run_event, all_times, all_conf)
