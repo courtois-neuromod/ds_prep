@@ -573,6 +573,9 @@ def main():
         - set timestamp to 0 = task onset, export in ms (integer)
         '''
         # load list of valid files (those deserialized and exported as npz in step 2 that passed QC)
+        outpath_report = os.path.join(out_path, 'QC_gaze')
+        Path(outpath_report).mkdir(parents=True, exist_ok=True)
+
         file_list = pd.read_csv(f'{outpath_report}/QCed_file_list.tsv', sep='\t', header=0)
         clean_list = file_list[file_list['DO_NOT_USE']!=1.0]
         clean_list['gaze_path'] = clean_list.apply(lambda row: create_gaze_path(row, out_path), axis=1)
