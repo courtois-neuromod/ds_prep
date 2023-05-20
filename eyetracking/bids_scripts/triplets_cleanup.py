@@ -509,7 +509,7 @@ def bidsify_EToutput(row, out_path):
     axes[4].set_xlim(0, 350)
     axes[4].set_title(f'{sub} {task} {ses} {run} ratio >0.9 confidence per trial')
 
-    fig.savefig(f'{outpath_fig}/{sub}_{ses}_{run}_{fnum}_{task}_DCplot.png')
+    fig.savefig(f'{outpath_fig}/{sub}_{ses}_{run_num}_{fnum}_{task_type}_DCplot.png')
     plt.close()
 
 
