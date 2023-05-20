@@ -428,8 +428,8 @@ def bidsify_EToutput(row, out_path):
 
     # Export drift-corrected gaze, realigned timestamps, and all other metrics (pupils, etc) to bids-compliant .tsv file
     # guidelines: https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-_eyetrackjson
-    '''
     outpath_gaze = os.path.join(out_path, sub, ses)
+    '''
     col_names = ['eye_timestamp',
                  'eye1_x_coordinate', 'eye1_y_coordinate',
                  'eye1_confidence',
