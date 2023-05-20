@@ -399,6 +399,8 @@ def bidsify_EToutput(row, out_path):
     onset_time = get_onset_time(log_path, row['run'], task)
 
     [sub, ses, fnum, task_type, run_num, appendix] = os.path.basename(row['events_path']).split('_')
+    print(sub, ses, fnum, task_type, run_num)
+    
     run_event = pd.read_csv(row['events_path'], sep = '\t', header=0)
     run_gaze = np.load(row['gaze_path'], allow_pickle=True)['gaze2d']
 
