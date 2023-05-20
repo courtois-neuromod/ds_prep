@@ -149,26 +149,13 @@ def export_and_plot(pupil_path, out_path):
             array_2plot = np.stack(gaze_2plot_list, axis=0)
 
             fig, axes = plt.subplots(4, 1, figsize=(7, 14))
+            plot_labels = ['gaze_x', 'gaze_y', 'pupil_x', 'pupil_x']
 
-            axes[0].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 0], alpha=array_2plot[:, 5]*0.4)
-            axes[0].set_ylim(-2, 2)
-            axes[0].set_xlim(0, 350)
-            axes[0].set_title(f'{sub} {task} {ses} {run} gaze_x')
-
-            axes[1].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 1], alpha=array_2plot[:, 5]*0.4)
-            axes[1].set_ylim(-2, 2)
-            axes[1].set_xlim(0, 350)
-            axes[1].set_title(f'{sub} {task} {ses} {run} gaze_y')
-
-            axes[2].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 2], alpha=array_2plot[:, 5]*0.4)
-            axes[2].set_ylim(-1, 1)
-            axes[2].set_xlim(0, 350)
-            axes[2].set_title(f'{sub} {task} {ses} {run} pupil_x')
-
-            axes[3].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, 3], alpha=array_2plot[:, 5]*0.4)
-            axes[3].set_ylim(-1, 1)
-            axes[3].set_xlim(0, 350)
-            axes[3].set_title(f'{sub} {task} {ses} {run} pupil_y')
+            for i in range(4):
+                axes[i].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, i], alpha=array_2plot[:, 5]*0.4)
+                axes[i].set_ylim(-2, 2)
+                axes[i].set_xlim(0, 350)
+                axes[i].set_title(f'{sub} {task} {ses} {run} {plot_labels[i]}')
 
             outpath_fig = os.path.join(out_path, 'QC_gaze')
             Path(outpath_fig).mkdir(parents=True, exist_ok=True)
@@ -305,6 +292,36 @@ def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, clean_conf
     return fix_dist_x, fix_dist_y, fix_times, fix_conf
 
 
+def assign_gazeConf2trial(df_ev, vals_times, vals_conf, conf_thresh=0.9):
+
+    gazeconf_per_trials = {}
+    j = 0
+
+    for i in range(df_ev.shape[0]):
+        trial_number = df_ev['TrialNumber'][i]
+
+        trial_onset = df_ev['onset'][i]
+        trial_offset = trial_onset + df_ev['duration'][i]
+
+        trial_confs = []
+        while j < len(vals_times) and vals_times[j] < trial_offset:
+            if vals_times[j] > trial_onset:
+                trial_confs.append(vals_conf[j])
+            j += 1
+
+        num_gaze = len(trial_confs)
+        if num_gaze > 0:
+            confRatio = np.sum(np.array(trial_confs) > conf_thresh)/num_gaze
+            gazeconf_per_trials[trial_number] = (confRatio, num_gaze)
+        else:
+            gazeconf_per_trials[trial_number] = (np.nan, 0)
+
+    df_ev['gaze_confidence_ratio'] = df_ev.apply(lambda row: gazeconf_per_trials[row['TrialNumber']][0], axis=1)
+    df_ev['gaze_count'] = df_ev.apply(lambda row: gazeconf_per_trials[row['TrialNumber']][1], axis=1)
+
+    return df_ev
+
+
 def median_clean(frame_times, dist_x, dist_y):
     '''
     Within bins of 1/100 the number of frames,
@@ -381,12 +398,14 @@ def bidsify_EToutput(row, out_path):
     log_path = row['log_path']
     onset_time = get_onset_time(log_path, row['run'], task)
 
+    [sub, ses, fnum, task_type, run_num, appendix] = os.path.basename(row['events_path']).split('_')
     run_event = pd.read_csv(row['events_path'], sep = '\t', header=0)
     run_gaze = np.load(row['gaze_path'], allow_pickle=True)['gaze2d']
 
     reset_gaze_list, all_vals, clean_vals  = reset_gaze_time(run_gaze, onset_time)
     # normalized position (x and y), time (s) from onset and confidence for all gaze
     all_x, all_y, all_times, all_conf = all_vals
+    all_times_arr = np.array(all_times)
     # distance from central fixation point for all gaze above confidence threshold
     clean_dist_x, clean_dist_y, clean_times, clean_conf = clean_vals
     # distance from central fixation for high-confidence gaze captured during periods of fixation (between trials)
@@ -405,9 +424,93 @@ def bidsify_EToutput(row, out_path):
     p_of_all_y = apply_poly(mf_fix_times, mf_fix_dist_y, deg_y, all_times_arr, anchors=anchors)
     all_y_aligned = np.array(all_y) - (p_of_all_y)
 
-    # TODO: export drift-corrected gaze, realigned timestamps, and all other metrics (pupils, etc) to bids-compliant .tsv file
-    # TODO: for each trial, capture all gaze and derive % of above-threshold gaze, add metric to events file and save ;
-    # could be added to get_fixation_gaze function to assign gaze confidence to each trial...
+    # Export drift-corrected gaze, realigned timestamps, and all other metrics (pupils, etc) to bids-compliant .tsv file
+    # guidelines: https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-_eyetrackjson
+    outpath_gaze = os.path.join(out_path, sub, ses)
+    col_names = ['eye_timestamp',
+                 'eye1_x_coordinate', 'eye1_y_coordinate',
+                 'eye1_confidence',
+                 'eye1_x_coordinate_driftCorr', 'eye1_y_coordinate_driftCorr',
+                 #'eye1_pupil_x_coordinate', 'eye1_pupil_y_coordinate',
+                 'eye1_pupil_diameter',
+                 #'eye1_pupil_ellipse_axes',
+                 #'eye1_pupil_ellipse_angle',
+                 #'eye1_pupil_ellipse_center'
+                 ]
+    df_gaze = pd.DataFrame(columns=col_names)
+
+    assert len(reset_gaze_list) == len(all_x_aligned)
+    for i in range(len(reset_gaze_list)):
+        gaze_pt = reset_gaze_list[i]
+        assert gaze_pt['reset_time'] == all_times[i]
+
+        gaze_pt_data = [
+                        gaze_pt['reset_time'], # in s
+                        #round(gaze_pt['reset_time']*1000, 0), # int, in ms
+                        gaze_pt['norm_pos'][0], gaze_pt['norm_pos'][1],
+                        gaze_pt['confidence'],
+                        all_x_aligned[i], all_y_aligned[i],
+                        #gaze_pt['base_data']['norm_pos'][0], gaze_pt['base_data']['norm_pos'][1],
+                        gaze_pt['base_data']['diameter'],
+                        #gaze_pt['base_data']['ellipse']['axes'],
+                        #gaze_pt['base_data']['ellipse']['angle'],
+                        #gaze_pt['base_data']['ellipse']['center'],
+        ]
+        df_gaze = pd.concat([df_gaze, pd.DataFrame(np.array(gaze_pt_data).reshape(1, -1), columns=df_gaze.columns)], ignore_index=True)
+
+    gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{run_num}_eyetrack.tsv.gz'
+    if os.path.exists(gfile_path):
+        # just in case session redone... (one case in sub-03)
+        gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_eyetrack.tsv.gz'
+    df_gaze.to_csv(gfile_path, sep='\t', header=True, index=False, compression='gzip')
+
+
+    # for each trial, capture all gaze and derive % of above-threshold gaze, add metric to events file and save
+    run_event = assign_gazeConf2trial(run_event, all_times, all_conf)
+    outpath_events = f'{out_path}/Events_files'
+    Path(outpath_events).mkdir(parents=True, exist_ok=True)
+    run_event.to_csv(f'{outpath_events}/{sub}_{ses}_{fnum}_{task_type}_{run_num}_events.tsv', sep='\t', header=True, index=False)
+
+    # export some additional plots to visulize the gaze drift correction and general QC.
+    outpath_fig = os.path.join(out_path, 'DC_gaze')
+    Path(outpath_fig).mkdir(parents=True, exist_ok=True)
+
+    fig, axes = plt.subplots(5, 1, figsize=(7, 17.5))
+    plot_labels = ['gaze_x', 'gaze_y', 'pupil_x', 'pupil_x']
+
+    axes[0].scatter(all_times, all_x, color='xkcd:blue', alpha=all_conf)
+    axes[0].scatter(all_times, all_x_aligned, color='xkcd:orange', alpha=all_conf)
+    axes[0].set_ylim(-2, 2)
+    axes[0].set_xlim(0, 350)
+    axes[0].set_title(f'{sub} {task} {ses} {run} gaze_x')
+
+    axes[1].scatter(all_times, all_y, color='xkcd:blue', alpha=all_conf)
+    axes[1].scatter(all_times, all_y_aligned, color='xkcd:orange', alpha=all_conf)
+    axes[1].set_ylim(-2, 2)
+    axes[1].set_xlim(0, 350)
+    axes[1].set_title(f'{sub} {task} {ses} {run} gaze_y')
+
+    axes[2].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=0.4)
+    axes[2].scatter(mf_fix_times, mf_fix_dist_x, s=20, alpha=0.4)
+    axes[2].plot(all_times_arr, p_of_all_x, color="xkcd:red", linewidth=2)
+    axes[2].set_ylim(-2, 2)
+    axes[2].set_xlim(0, 350)
+    axes[2].set_title(f'{sub} {task} {ses} {run} fix_distance_x')
+
+    axes[3].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=0.4)
+    axes[3].scatter(mf_fix_times, mf_fix_dist_x, s=20, alpha=0.4)
+    axes[3].plot(all_times_arr, p_of_all_x, color="xkcd:red", linewidth=2)
+    axes[3].set_ylim(-2, 2)
+    axes[3].set_xlim(0, 350)
+    axes[3].set_title(f'{sub} {task} {ses} {run} fix_distance_x')
+
+    axes[4].scatter(run_event['onset'].to_numpy()+2.0, run_event['gaze_confidence_ratio'].to_numpy())
+    axes[4].set_ylim(-0.1, 1.1)
+    axes[4].set_xlim(0, 350)
+    axes[4].set_title(f'{sub} {task} {ses} {run} ratio >0.9 confidence per trial')
+
+    fig.savefig(f'{outpath_fig}/{sub}_{ses}_{run}_{fnum}_{task}_DCplot.png')
+    plt.close()
 
 
 def main():
@@ -435,12 +538,12 @@ def main():
         for pupil_path in pupil_paths:
             export_and_plot(pupil_path, out_path)
 
-        '''
-        Step 3: manual QCing... rate quality of each run, log in spreadsheet
-        Compile clean list of runs to drift correct and bids-format
-        Save as QCed_file_list.tsv in "out_path" directory
-        Load to identify valid runs to be processed with steps 4 and 5
-        '''
+    '''
+    Step 3: manual QCing... rate quality of each run, log in spreadsheet
+    Compile clean list of runs to drift correct and bids-format
+    Save as QCed_file_list.tsv in "out_path" directory
+    Load to identify valid runs to be processed with steps 4 and 5
+    '''
 
     elif phase == 'B':
         '''
@@ -477,8 +580,6 @@ def main():
 
         # implements steps 4 and 5 on each run
         clean_list.apply(lambda row: bidsify_EToutput(row, out_path), axis=1)
-
-
 
 
 if __name__ == '__main__':
