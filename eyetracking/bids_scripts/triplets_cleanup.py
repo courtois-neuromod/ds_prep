@@ -538,12 +538,13 @@ def main():
         for pupil_path in pupil_paths:
             export_and_plot(pupil_path, out_path)
 
-    '''
-    Step 3: manual QCing... rate quality of each run, log in spreadsheet
-    Compile clean list of runs to drift correct and bids-format
-    Save as QCed_file_list.tsv in "out_path" directory
-    Load to identify valid runs to be processed with steps 4 and 5
-    '''
+
+        '''
+        Step 3: manual QCing... rate quality of each run, log in spreadsheet
+        Compile clean list of runs to drift correct and bids-format
+        Save as QCed_file_list.tsv in "out_path" directory
+        Load to identify valid runs to be processed with steps 4 and 5
+        '''
 
     elif phase == 'B':
         '''
