@@ -540,7 +540,7 @@ def bidsify_EToutput(row, out_path, conf_thresh):
             axes[3].set_xlim(0, 350)
             axes[3].set_title(f'{sub} {task_type} {ses} {run_num} fix_distance_y')
 
-            axes[4].scatter(run_event['onset'].to_numpy()+2.0, run_event['gaze_confidence_ratio'].to_numpy())
+            axes[4].scatter(run_event['onset'].to_numpy()+2.0, run_event[f'gaze_confidence_ratio_cThresh{gaze_threshold}'].to_numpy())
             axes[4].set_ylim(-0.1, 1.1)
             axes[4].set_xlim(0, 350)
             axes[4].set_title(f'{sub} {task_type} {ses} {run_num} ratio >{str(gaze_threshold)} confidence per trial')
