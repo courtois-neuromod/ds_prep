@@ -401,8 +401,7 @@ def bidsify_EToutput(row, out_path, conf_thresh):
     [sub, ses, fnum, task_type, run_num, appendix] = os.path.basename(row['events_path']).split('_')
     print(sub, ses, fnum, task_type, run_num)
     if not os.path.exists(f'{out_path}/DC_gaze/{sub}_{ses}_{run_num}_{fnum}_{task_type}_DCplot.png'):
-        #try:
-        if True:
+        try:
             onset_time = get_onset_time(log_path, row['run'], task)
 
             run_event = pd.read_csv(row['events_path'], sep = '\t', header=0)
@@ -547,8 +546,8 @@ def bidsify_EToutput(row, out_path, conf_thresh):
 
             fig.savefig(f'{outpath_fig}/{sub}_{ses}_{run_num}_{fnum}_{task_type}_DCplot.png')
             plt.close()
-        #except:
-        #    print('could not process')
+        except:
+            print('could not process')
 
 
 def main():
