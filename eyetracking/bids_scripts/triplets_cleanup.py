@@ -12,6 +12,7 @@ import argparse
 parser = argparse.ArgumentParser(description='clean up, label, QC and bids-formats the triplets eye tracking dataset')
 parser.add_argument('--in_path', type=str, required=True, help='absolute path to directory that contains all data (sourcedata)')
 parser.add_argument('--phase', type=str, required=True, choices=['A', 'B'])
+parser.add_argument('--cthresh', default=0.75, type=float, help='confidence threshold for high quality gaze to use for drift correction')
 parser.add_argument('--run_dir', default='', type=str, help='absolute path to main code directory')
 parser.add_argument('--out_path', type=str, default='./test.tsv', help='absolute path to output file')
 args = parser.parse_args()
@@ -316,8 +317,8 @@ def assign_gazeConf2trial(df_ev, vals_times, vals_conf, conf_thresh=0.9):
         else:
             gazeconf_per_trials[trial_number] = (np.nan, 0)
 
-    df_ev['gaze_confidence_ratio'] = df_ev.apply(lambda row: gazeconf_per_trials[row['TrialNumber']][0], axis=1)
-    df_ev['gaze_count'] = df_ev.apply(lambda row: gazeconf_per_trials[row['TrialNumber']][1], axis=1)
+    df_ev[f'gaze_confidence_ratio_cThresh{conf_thresh}'] = df_ev.apply(lambda row: gazeconf_per_trials[row['TrialNumber']][0], axis=1)
+    df_ev[f'gaze_count_cThresh{conf_thresh}'] = df_ev.apply(lambda row: gazeconf_per_trials[row['TrialNumber']][1], axis=1)
 
     return df_ev
 
@@ -389,14 +390,14 @@ def apply_poly(ref_times, distances, degree, all_times, anchors = [150, 150]):
     return p_of_all
 
 
-def bidsify_EToutput(row, out_path):
+def bidsify_EToutput(row, out_path, conf_thresh):
     '''
     Implement drift correction on gaze position and export pupil and gaze data in bids-compliant format
     '''
     task = row['task']
 
     log_path = row['log_path']
-    
+
     [sub, ses, fnum, task_type, run_num, appendix] = os.path.basename(row['events_path']).split('_')
     print(sub, ses, fnum, task_type, run_num)
     if not os.path.exists(f'{out_path}/DC_gaze/{sub}_{ses}_{run_num}_{fnum}_{task_type}_DCplot.png'):
@@ -406,7 +407,8 @@ def bidsify_EToutput(row, out_path):
             run_event = pd.read_csv(row['events_path'], sep = '\t', header=0)
             run_gaze = np.load(row['gaze_path'], allow_pickle=True)['gaze2d']
 
-            reset_gaze_list, all_vals, clean_vals  = reset_gaze_time(run_gaze, onset_time)
+            gaze_threshold = conf_thresh if row['use_lowThresh'] == 1.0 else 0.9
+            reset_gaze_list, all_vals, clean_vals  = reset_gaze_time(run_gaze, onset_time, gaze_threshold)
             # normalized position (x and y), time (s) from onset and confidence for all gaze
             all_x, all_y, all_times, all_conf = all_vals
             all_times_arr = np.array(all_times)
@@ -418,7 +420,10 @@ def bidsify_EToutput(row, out_path):
             # median filter removes gaze too far off from median gaze position within sliding window, for cleaner curves (remove non-fixation points)
             mf_fix_times, mf_fix_dist_x, mf_fix_dist_y = median_clean(fix_times, fix_dist_x, fix_dist_y)
 
-            deg_x, deg_y = 4, 4
+            if row['use_lowThresh'] == 1.0:
+                deg_x, deg_y = 1, 1 # keep polynomial simpler to guard against outliers
+            else:
+                deg_x, deg_y = 4, 4
             anchors = [0, 50]
             # fit polynomial through distance between fixation and target
             # and use it apply correction to all gaze (no confidence threshold applied)
@@ -431,18 +436,19 @@ def bidsify_EToutput(row, out_path):
             # Export drift-corrected gaze, realigned timestamps, and all other metrics (pupils, etc) to bids-compliant .tsv file
             # guidelines: https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-_eyetrackjson
             outpath_gaze = os.path.join(out_path, sub, ses)
-            '''
+
             col_names = ['eye_timestamp',
                          'eye1_x_coordinate', 'eye1_y_coordinate',
                          'eye1_confidence',
                          'eye1_x_coordinate_driftCorr', 'eye1_y_coordinate_driftCorr',
-                         #'eye1_pupil_x_coordinate', 'eye1_pupil_y_coordinate',
+                         'eye1_pupil_x_coordinate', 'eye1_pupil_y_coordinate',
                          'eye1_pupil_diameter',
-                         #'eye1_pupil_ellipse_axes',
-                         #'eye1_pupil_ellipse_angle',
-                         #'eye1_pupil_ellipse_center'
+                         'eye1_pupil_ellipse_axes',
+                         'eye1_pupil_ellipse_angle',
+                         'eye1_pupil_ellipse_center'
                          ]
-            df_gaze = pd.DataFrame(columns=col_names)
+            final_gaze_list = []
+            #df_gaze = pd.DataFrame(columns=col_names)
 
             assert len(reset_gaze_list) == len(all_x_aligned)
             for i in range(len(reset_gaze_list)):
@@ -455,19 +461,23 @@ def bidsify_EToutput(row, out_path):
                                 gaze_pt['norm_pos'][0], gaze_pt['norm_pos'][1],
                                 gaze_pt['confidence'],
                                 all_x_aligned[i], all_y_aligned[i],
-                                #gaze_pt['base_data']['norm_pos'][0], gaze_pt['base_data']['norm_pos'][1],
+                                gaze_pt['base_data']['norm_pos'][0], gaze_pt['base_data']['norm_pos'][1],
                                 gaze_pt['base_data']['diameter'],
-                                #gaze_pt['base_data']['ellipse']['axes'],
-                                #gaze_pt['base_data']['ellipse']['angle'],
-                                #gaze_pt['base_data']['ellipse']['center'],
+                                gaze_pt['base_data']['ellipse']['axes'],
+                                gaze_pt['base_data']['ellipse']['angle'],
+                                gaze_pt['base_data']['ellipse']['center'],
                 ]
-                df_gaze = pd.concat([df_gaze, pd.DataFrame(np.array(gaze_pt_data).reshape(1, -1), columns=df_gaze.columns)], ignore_index=True)
 
-            gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{run_num}_eyetrack.tsv.gz'
+                final_gaze_list.append(gaze_pt_data)
+                #df_gaze = pd.concat([df_gaze, pd.DataFrame(np.array(gaze_pt_data).reshape(1, -1), columns=df_gaze.columns)], ignore_index=True)
+
+            df_gaze = pd.DataFrame(np.array(final_gaze_list), columns=col_names)
+            gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{run_num}_conf{gaze_threshold}_eyetrack.tsv.gz'
             if os.path.exists(gfile_path):
                 # just in case session redone... (one case in sub-03)
-                gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_eyetrack.tsv.gz'
+                gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_conf{gaze_threshold}_eyetrack.tsv.gz'
             df_gaze.to_csv(gfile_path, sep='\t', header=True, index=False, compression='gzip')
+
             '''
             # .npz alternative to .tsv for now to test the code...
             # concat w pandas is VERY ineffective
@@ -479,14 +489,16 @@ def bidsify_EToutput(row, out_path):
                 gaze_pt['norm_pos_driftCorr'] = (all_x_aligned[i], all_y_aligned[i])
                 final_gaze_list.append(gaze_pt)
 
-            gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{run_num}_eyetrack.npz'
+            gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{run_num}_conf{gaze_threshold}_eyetrack.npz'
             if os.path.exists(gfile_path):
                 # just in case session redone... (one case in sub-03)
-                gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_eyetrack.npz'
+                gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_conf{gaze_threshold}_eyetrack.npz'
             np.savez(gfile_path, gaze2d = final_gaze_list)
+            '''
 
             # for each trial, capture all gaze and derive % of above-threshold gaze, add metric to events file and save
-            run_event = assign_gazeConf2trial(run_event, all_times, all_conf)
+            run_event = assign_gazeConf2trial(run_event, all_times, all_conf, conf_thresh=0.9)
+            run_event = assign_gazeConf2trial(run_event, all_times, all_conf, conf_thresh=0.75)
             outpath_events = f'{out_path}/Events_files'
             Path(outpath_events).mkdir(parents=True, exist_ok=True)
             run_event.to_csv(f'{outpath_events}/{sub}_{ses}_{fnum}_{task_type}_{run_num}_events.tsv', sep='\t', header=True, index=False)
@@ -517,17 +529,17 @@ def bidsify_EToutput(row, out_path):
             axes[2].set_xlim(0, 350)
             axes[2].set_title(f'{sub} {task_type} {ses} {run_num} fix_distance_x')
 
-            axes[3].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=0.4)
-            axes[3].scatter(mf_fix_times, mf_fix_dist_x, s=20, alpha=0.4)
-            axes[3].plot(all_times_arr, p_of_all_x, color="xkcd:red", linewidth=2)
+            axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=0.4)
+            axes[3].scatter(mf_fix_times, mf_fix_dist_y, s=20, alpha=0.4)
+            axes[3].plot(all_times_arr, p_of_all_y, color="xkcd:red", linewidth=2)
             axes[3].set_ylim(-2, 2)
             axes[3].set_xlim(0, 350)
-            axes[3].set_title(f'{sub} {task_type} {ses} {run_num} fix_distance_x')
+            axes[3].set_title(f'{sub} {task_type} {ses} {run_num} fix_distance_y')
 
             axes[4].scatter(run_event['onset'].to_numpy()+2.0, run_event['gaze_confidence_ratio'].to_numpy())
             axes[4].set_ylim(-0.1, 1.1)
             axes[4].set_xlim(0, 350)
-            axes[4].set_title(f'{sub} {task_type} {ses} {run_num} ratio >0.9 confidence per trial')
+            axes[4].set_title(f'{sub} {task_type} {ses} {run_num} ratio >{gaze_threshold} confidence per trial')
 
             fig.savefig(f'{outpath_fig}/{sub}_{ses}_{run_num}_{fnum}_{task_type}_DCplot.png')
             plt.close()
@@ -605,7 +617,8 @@ def main():
         clean_list['log_path'] = clean_list.apply(lambda row: create_event_path(row, in_path, log=True), axis=1)
 
         # implements steps 4 and 5 on each run
-        clean_list.apply(lambda row: bidsify_EToutput(row, out_path), axis=1)
+        conf_thresh = args.cthresh
+        clean_list.apply(lambda row: bidsify_EToutput(row, out_path, conf_thresh), axis=1)
 
 
 if __name__ == '__main__':
