@@ -407,7 +407,10 @@ def bidsify_EToutput(row, out_path, conf_thresh):
             run_event = pd.read_csv(row['events_path'], sep = '\t', header=0)
             run_gaze = np.load(row['gaze_path'], allow_pickle=True)['gaze2d']
 
-            gaze_threshold = conf_thresh if row['use_lowThresh'] == 1.0 else 0.9
+            if row['use_lowThresh']==1.0:
+                gaze_threshold = conf_thresh
+            else:
+                gaze_threshold = 0.9
             reset_gaze_list, all_vals, clean_vals  = reset_gaze_time(run_gaze, onset_time, gaze_threshold)
             # normalized position (x and y), time (s) from onset and confidence for all gaze
             all_x, all_y, all_times, all_conf = all_vals
@@ -539,7 +542,7 @@ def bidsify_EToutput(row, out_path, conf_thresh):
             axes[4].scatter(run_event['onset'].to_numpy()+2.0, run_event['gaze_confidence_ratio'].to_numpy())
             axes[4].set_ylim(-0.1, 1.1)
             axes[4].set_xlim(0, 350)
-            axes[4].set_title(f'{sub} {task_type} {ses} {run_num} ratio >{gaze_threshold} confidence per trial')
+            axes[4].set_title(f'{sub} {task_type} {ses} {run_num} ratio >{str(gaze_threshold)} confidence per trial')
 
             fig.savefig(f'{outpath_fig}/{sub}_{ses}_{run_num}_{fnum}_{task_type}_DCplot.png')
             plt.close()
