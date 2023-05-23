@@ -396,12 +396,13 @@ def bidsify_EToutput(row, out_path):
     task = row['task']
 
     log_path = row['log_path']
-    onset_time = get_onset_time(log_path, row['run'], task)
-
+    
     [sub, ses, fnum, task_type, run_num, appendix] = os.path.basename(row['events_path']).split('_')
     print(sub, ses, fnum, task_type, run_num)
     if not os.path.exists(f'{out_path}/DC_gaze/{sub}_{ses}_{run_num}_{fnum}_{task_type}_DCplot.png'):
         try:
+            onset_time = get_onset_time(log_path, row['run'], task)
+
             run_event = pd.read_csv(row['events_path'], sep = '\t', header=0)
             run_gaze = np.load(row['gaze_path'], allow_pickle=True)['gaze2d']
 
