@@ -475,7 +475,7 @@ def bidsify_EToutput(row, out_path, conf_thresh):
                 final_gaze_list.append(gaze_pt_data)
                 #df_gaze = pd.concat([df_gaze, pd.DataFrame(np.array(gaze_pt_data).reshape(1, -1), columns=df_gaze.columns)], ignore_index=True)
 
-            df_gaze = pd.DataFrame(np.array(final_gaze_list), columns=col_names)
+            df_gaze = pd.DataFrame(np.array(final_gaze_list, dtype=object), columns=col_names)
             gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{run_num}_conf{gaze_threshold}_eyetrack.tsv.gz'
             if os.path.exists(gfile_path):
                 # just in case session redone... (one case in sub-03)
