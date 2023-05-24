@@ -527,7 +527,7 @@ def export_bids(row, out_path):
         fnum = f'_{row["file_number"]}' if i > 0 else '' # to handle run duplicates
         bids_out_path = f'{out_path}/final_bids/{s}/{ses}/{s}_{ses}_{task_type}{fnum}_{run_num}_eyetrack.tsv.gz'
         Path(bids_out_path).mkdir(parents=True, exist_ok=True)
-        cmd = ['cp', bids_in_path[i], bids_out_path]
+        cmd = [f'cp {bids_in_path[i]} {bids_out_path}']
         subprocess.run(cmd, shell=True)
 
 
