@@ -4,7 +4,7 @@ source /data/neuromod/virtualenvs/eyetracking/bin/activate
 DATADIR="/unf/eyetracker/neuromod/triplets/sourcedata"
 RUNDIR="/home/mariestl/cneuromod/ds_prep/eyetracking"
 OUTDIR="/home/mariestl/cneuromod/eyetracking/triplets"
-PHASE="${1}" # A, B
+PHASE="${1}" # A, B, C
 
 python -m triplets_cleanup \
       --in_path="${DATADIR}" \

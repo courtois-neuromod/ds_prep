@@ -454,10 +454,10 @@ def bidsify_EToutput(row, out_path, conf_thresh):
                 #df_gaze = pd.concat([df_gaze, pd.DataFrame(np.array(gaze_pt_data).reshape(1, -1), columns=df_gaze.columns)], ignore_index=True)
 
             df_gaze = pd.DataFrame(np.array(final_gaze_list, dtype=object), columns=col_names)
-            gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{run_num}_conf{gaze_threshold}_eyetrack.tsv.gz'
+            gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{run_num}_eyetrack.tsv.gz'
             if os.path.exists(gfile_path):
                 # just in case session redone... (one case in sub-03)
-                gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_conf{gaze_threshold}_eyetrack.tsv.gz'
+                gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_eyetrack.tsv.gz'
             df_gaze.to_csv(gfile_path, sep='\t', header=True, index=False, compression='gzip')
 
 
@@ -510,6 +510,24 @@ def bidsify_EToutput(row, out_path, conf_thresh):
             plt.close()
         except:
             print('could not process')
+
+
+def export_bids(row, out_path):
+    '''
+    Dumb script to recopy data from runs that pass drift correction QC info final directory
+    '''
+    s = row['subject']
+    ses = row['session']
+    task_type = row['task']
+    run_num = row['run']
+    bids_in_path = glob.glob(f'{out_path}/{s}/{ses}/{s}_{ses}_{task_type}*_{run_num}*_eyetrack.tsv.gz')
+
+    for i in range(len(bids_in_path)):
+        fnum = f'_{row['file_number']}' if i > 0 else '' # to handle run duplicates
+        bids_out_path = f'{out_path}/final_bids/{s}/{ses}/{s}_{ses}_{task_type}{fnum}_{run_num}_eyetrack.tsv.gz'
+        Path(bids_out_path).mkdir(parents=True, exist_ok=True)
+        cmd = ['cp', bids_in_path[i], bids_out_path]
+        subprocess.run(cmd, shell=True)
 
 
 def main():
@@ -595,8 +613,14 @@ def main():
 
         TODO: Step 7: relabel final *eyetrack.tsv.gz files (remove file name) and save in final dataset
         '''
-        pass
-        
+        outpath_report = os.path.join(out_path, 'QC_gaze')
+        Path(outpath_report).mkdir(parents=True, exist_ok=True)
+
+        file_list = pd.read_csv(f'{outpath_report}/QCed_finalbids_list.tsv', sep='\t', header=0)
+        clean_list = file_list[file_list['DO_NOT_USE']!=1.0]
+        final_list = clean_list[clean_list['Fails_DriftCorr']!=1.0]
+        final_list.apply(lambda row: export_bids(row, out_path), axis=1)
+
 
 if __name__ == '__main__':
     sys.exit(main())
