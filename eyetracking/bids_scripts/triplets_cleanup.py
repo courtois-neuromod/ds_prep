@@ -8,6 +8,7 @@ matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 
 import argparse
+import subprocess
 
 parser = argparse.ArgumentParser(description='clean up, label, QC and bids-formats the triplets eye tracking dataset')
 parser.add_argument('--in_path', type=str, required=True, help='absolute path to directory that contains all data (sourcedata)')
