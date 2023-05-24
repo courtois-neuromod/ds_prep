@@ -11,7 +11,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description='clean up, label, QC and bids-formats the triplets eye tracking dataset')
 parser.add_argument('--in_path', type=str, required=True, help='absolute path to directory that contains all data (sourcedata)')
-parser.add_argument('--phase', type=str, required=True, choices=['A', 'B'])
+parser.add_argument('--phase', type=str, required=True, choices=['A', 'B', 'C'])
 parser.add_argument('--cthresh', default=0.75, type=float, help='confidence threshold for high quality gaze to use for drift correction')
 parser.add_argument('--run_dir', default='', type=str, help='absolute path to main code directory')
 parser.add_argument('--out_path', type=str, default='./test.tsv', help='absolute path to output file')
@@ -30,27 +30,6 @@ from file_methods import PLData_Writer, load_pldata_file, load_object, save_obje
 #from pupil_detector_plugins.pye3d_plugin import Pye3DPlugin
 #from gaze_mapping.gazer_3d.gazer_headset import Gazer3D
 
-
-# List CNeuromod1 datasets that include eyetracking data
-'''
-ds_specs = {
-    'emotionsvideos': {},
-    'floc': {},
-    'friends': {},
-    'friends_fix': {},
-    'harrypotter': {},
-    'mario': {},
-    'mario3': {},
-    'mariostars': {},
-    'movie10fix': {},
-    'narratives': {},
-    'petitprince': {},
-    'retino': {},
-    'shinobi': {},
-    'things': {},
-    'triplets': {}
-}
-'''
 
 
 def compile_file_list(in_path):
@@ -323,9 +302,9 @@ def assign_gazeConf2trial(df_ev, vals_times, vals_conf, conf_thresh=0.9):
     return df_ev
 
 
-def median_clean(frame_times, dist_x, dist_y):
+def median_clean(gz_times, dist_x, dist_y):
     '''
-    Within bins of 1/100 the number of frames,
+    Within bins of 1/100 the number of gaze,
     select only frames where distance between gaze and deepgaze falls within 0.6 stdev of the median
     These frames most likely reflect when deepgaze and gaze "look" at the same thing
     '''
@@ -354,7 +333,7 @@ def median_clean(frame_times, dist_x, dist_y):
             if dist_x[i] > current_medx - (gap*stdevx):
                 if dist_y[i] < current_medy + (gap*stdevy):
                     if dist_y[i] > current_medy - (gap*stdevx):
-                        filtered_times.append(frame_times[i])
+                        filtered_times.append(gz_times[i])
                         filtered_distx.append(dist_x[i])
                         filtered_disty.append(dist_y[i])
 
@@ -424,7 +403,7 @@ def bidsify_EToutput(row, out_path, conf_thresh):
             mf_fix_times, mf_fix_dist_x, mf_fix_dist_y = median_clean(fix_times, fix_dist_x, fix_dist_y)
 
             if row['use_lowThresh'] == 1.0:
-                deg_x, deg_y = 1, 1 # keep polynomial simpler to guard against outliers
+                deg_x, deg_y = 1, 1 # keep polynomial simpler to protect from outliers
             else:
                 deg_x, deg_y = 4, 4
             anchors = [0, 50]
@@ -481,23 +460,6 @@ def bidsify_EToutput(row, out_path, conf_thresh):
                 gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_conf{gaze_threshold}_eyetrack.tsv.gz'
             df_gaze.to_csv(gfile_path, sep='\t', header=True, index=False, compression='gzip')
 
-            '''
-            # .npz alternative to .tsv for now to test the code...
-            # concat w pandas is VERY ineffective
-            final_gaze_list = []
-            assert len(reset_gaze_list) == len(all_x_aligned)
-            for i in range(len(reset_gaze_list)):
-                gaze_pt = reset_gaze_list[i]
-                assert gaze_pt['reset_time'] == all_times[i]
-                gaze_pt['norm_pos_driftCorr'] = (all_x_aligned[i], all_y_aligned[i])
-                final_gaze_list.append(gaze_pt)
-
-            gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{run_num}_conf{gaze_threshold}_eyetrack.npz'
-            if os.path.exists(gfile_path):
-                # just in case session redone... (one case in sub-03)
-                gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_conf{gaze_threshold}_eyetrack.npz'
-            np.savez(gfile_path, gaze2d = final_gaze_list)
-            '''
 
             # for each trial, capture all gaze and derive % of above-threshold gaze, add metric to events file and save
             run_event = assign_gazeConf2trial(run_event, all_times, all_conf, conf_thresh=0.9)
@@ -603,10 +565,10 @@ def main():
         Note from log: it seems that the task onset is well synched to the MRI starting (launch eyetracking and task)
         GO signal can be used as run's "time 0" for gaze & pupils
 
-        Step 5: export to tsv.gz format following bids extension guidelines
-        - pupil size and confidence
-        - gaze position (before and after correction) and confidence;
-        - Add gaze position in different metrics? in pixels (on screen), and then in pixels (stimulus image), and then normalized screen
+        Step 5: export to tsv.gz format following proposed bids extension guidelines
+        https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-_eyetrackjson
+        - pupil timestamp, size (diameter) and confidence
+        - normalized gaze position (before and after drift correction);
         - set timestamp to 0 = task onset, export in ms (integer)
         '''
         # load list of valid files (those deserialized and exported as npz in step 2 that passed QC)
@@ -623,6 +585,18 @@ def main():
         conf_thresh = args.cthresh
         clean_list.apply(lambda row: bidsify_EToutput(row, out_path, conf_thresh), axis=1)
 
+
+    elif phase == 'C':
+        '''
+        TODO: Step 6: review plots from step 4 manually,
+        Flag runs that fail drift correction in a spreadsheet, to exclude them from the final dataset
+        Save as QCed_finalbids_list.tsv in "out_path" directory
+        Load file to identify valid runs to rename and export with step 7
+
+        TODO: Step 7: relabel final *eyetrack.tsv.gz files (remove file name) and save in final dataset
+        '''
+        pass
+        
 
 if __name__ == '__main__':
     sys.exit(main())
