@@ -193,6 +193,15 @@ def get_onset_time(log_path, run_num, task):
     return float(onset_time_dict[run_num])
 
 
+def get_onset_time_fromGaze(run_event, last_gaze_tstamp):
+    last_trial = run_event.iloc[-1]
+    # where 9 = added seconds at the end of run
+    run_duration = last_trial['onset'] + last_trial['duration'] + last_trial['isi'] + 9
+    onset_time = last_gaze_tstamp - run_duration
+
+    return onset_time
+
+
 def reset_gaze_time(gaze, onset_time, conf_thresh=0.9):
     '''
     Realign gaze timestamps based on the task & eyetracker onset (triggered by fMRI run start)
@@ -382,10 +391,13 @@ def bidsify_EToutput(row, out_path, conf_thresh):
     print(sub, ses, fnum, task_type, run_num)
     if not os.path.exists(f'{out_path}/DC_gaze/{sub}_{ses}_{run_num}_{fnum}_{task_type}_DCplot.png'):
         try:
-            onset_time = get_onset_time(log_path, row['run'], task)
+            #onset_time = get_onset_time(log_path, row['run'], task)
 
             run_event = pd.read_csv(row['events_path'], sep = '\t', header=0)
             run_gaze = np.load(row['gaze_path'], allow_pickle=True)['gaze2d']
+
+            # derive onset time from events file and last gaze, indep of log file / computer clock (need full set of pupils)
+            onset_time = get_onset_time_fromGaze(run_event, run_gaze[-1]['timestamp'])
 
             if row['use_lowThresh']==1.0:
                 gaze_threshold = conf_thresh
