@@ -18,19 +18,9 @@ parser.add_argument('--run_dir', default='', type=str, help='absolute path to ma
 parser.add_argument('--out_path', type=str, default='./test.tsv', help='absolute path to output file')
 args = parser.parse_args()
 
-#args.run_dir = /home/mariestl/cneuromod/ds_prep/eyetracking
 sys.path.append(os.path.join(args.run_dir, "pupil", "pupil_src", "shared_modules"))
-#sys.path.append(os.path.join("/home/labopb/Documents/Marie/neuromod/ds_prep/eyetracking", "pupil", "pupil_src", "shared_modules"))
 
-#from video_capture.file_backend import File_Source
 from file_methods import PLData_Writer, load_pldata_file, load_object, save_object
-#from gaze_producer.worker.fake_gpool import FakeGPool, FakeIPC
-
-#from pupil_detector_plugins.detector_2d_plugin import Detector2DPlugin
-#from gaze_mapping.gazer_2d import Gazer2D
-#from pupil_detector_plugins.pye3d_plugin import Pye3DPlugin
-#from gaze_mapping.gazer_3d.gazer_headset import Gazer3D
-
 
 
 def compile_file_list(in_path):
@@ -619,12 +609,12 @@ def main():
 
     elif phase == 'C':
         '''
-        TODO: Step 6: review plots from step 4 manually,
+        Step 6: review plots from step 4 manually,
         Flag runs that fail drift correction in a spreadsheet, to exclude them from the final dataset
         Save as QCed_finalbids_list.tsv in "out_path" directory
         Load file to identify valid runs to rename and export with step 7
 
-        TODO: Step 7: relabel final *eyetrack.tsv.gz files (remove file name) and save in final dataset
+        Step 7: relabel final *eyetrack.tsv.gz files (remove file name) and save in final dataset
         '''
         outpath_report = os.path.join(out_path, 'QC_gaze')
         Path(outpath_report).mkdir(parents=True, exist_ok=True)
