@@ -26,7 +26,7 @@ def compile_file_list(in_path):
     df_files = pd.DataFrame(columns=col_names)
 
     # on elm, for triplets : in_path = '/unf/eyetracker/neuromod/triplets/sourcedata'
-    ses_list = sorted(glob.glob(f'{in_path}/sub-*/ses-*'))
+    ses_list = sorted(glob.glob(f'{in_path}/sub-*/ses-0*'))
 
     pupil_file_paths = []
 
@@ -36,6 +36,7 @@ def compile_file_list(in_path):
         for event in events_list:
             ev_file = os.path.basename(event)
             [sub, ses, fnum, task_type, run_num, appendix] = ev_file.split('_')
+            assert sub in ['sub-01', 'sub-02', 'sub-03', 'sub-04', 'sub-05', 'sub-06']
             assert sub == sub_num
             assert ses_num == ses
 
