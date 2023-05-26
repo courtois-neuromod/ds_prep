@@ -36,24 +36,24 @@ def compile_file_list(in_path):
         for event in events_list:
             ev_file = os.path.basename(event)
             [sub, ses, fnum, task_type, run_num, appendix] = ev_file.split('_')
-            assert sub in ['sub-01', 'sub-02', 'sub-03', 'sub-04', 'sub-05', 'sub-06']
-            assert sub == sub_num
-            assert ses_num == ses
+            if sub in ['sub-01', 'sub-02', 'sub-03', 'sub-04', 'sub-05', 'sub-06']:
+                assert sub == sub_num
+                assert ses_num == ses
 
-            has_log = len(glob.glob(f'{ses_path}/{sub_num}_{ses_num}_{fnum}.log')) == 1
-            pupil_path = f'{ses_path}/{sub_num}_{ses_num}_{fnum}.pupil'
+                has_log = len(glob.glob(f'{ses_path}/{sub_num}_{ses_num}_{fnum}.log')) == 1
+                pupil_path = f'{ses_path}/{sub_num}_{ses_num}_{fnum}.pupil'
 
-            list_pupil = glob.glob(f'{pupil_path}/{task_type}_{run_num}/000/pupil.pldata')
-            has_pupil = len(list_pupil) == 1
-            if has_pupil:
-                pupil_file_paths.append((os.path.dirname(list_pupil[0]), (sub, ses, run_num, task_type, fnum)))
+                list_pupil = glob.glob(f'{pupil_path}/{task_type}_{run_num}/000/pupil.pldata')
+                has_pupil = len(list_pupil) == 1
+                if has_pupil:
+                    pupil_file_paths.append((os.path.dirname(list_pupil[0]), (sub, ses, run_num, task_type, fnum)))
 
-            has_eyemv = len(glob.glob(f'{pupil_path}/{task_type}_{run_num}/000/eye0.mp4')) == 1
-            has_gaze = len(glob.glob(f'{pupil_path}/{task_type}_{run_num}/000/gaze.pldata')) == 1
+                has_eyemv = len(glob.glob(f'{pupil_path}/{task_type}_{run_num}/000/eye0.mp4')) == 1
+                has_gaze = len(glob.glob(f'{pupil_path}/{task_type}_{run_num}/000/gaze.pldata')) == 1
 
-            run_data = [sub_num, ses_num, run_num, task_type, fnum, has_pupil, has_gaze, has_eyemv, has_log]
-            #df_files = df_files.append(pd.Series(run_data, index=df_files.columns), ignore_index=True)
-            df_files = pd.concat([df_files, pd.DataFrame(np.array(run_data).reshape(1, -1), columns=df_files.columns)], ignore_index=True)
+                run_data = [sub_num, ses_num, run_num, task_type, fnum, has_pupil, has_gaze, has_eyemv, has_log]
+                #df_files = df_files.append(pd.Series(run_data, index=df_files.columns), ignore_index=True)
+                df_files = pd.concat([df_files, pd.DataFrame(np.array(run_data).reshape(1, -1), columns=df_files.columns)], ignore_index=True)
 
     return df_files, pupil_file_paths
 
