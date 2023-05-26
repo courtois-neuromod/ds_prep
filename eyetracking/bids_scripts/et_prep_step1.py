@@ -66,6 +66,10 @@ def export_and_plot(pupil_path, out_path):
     '''
     sub, ses, run, task, fnum = pupil_path[1]
 
+    task_root = out_path.split('/')[-1]
+    if task_root == 'mario3':
+        task = 'mario3'
+
     outpath_gaze = os.path.join(out_path, sub, ses)
     gfile_path = f'{outpath_gaze}/{sub}_{ses}_{run}_{fnum}_{task}_gaze2D.npz'
 
