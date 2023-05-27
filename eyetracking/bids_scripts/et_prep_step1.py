@@ -58,13 +58,17 @@ def compile_file_list(in_path):
     return df_files, pupil_file_paths
 
 
-def export_and_plot(pupil_path, out_path):
+def export_and_plot(pupil_path, in_path, out_path):
     '''
     Function accomplishes two things:
     1. export gaze and pupil metrics from .pldata (pupil's) format to .npz format
     2. compile list of gaze and pupil positions (w timestamps and confidence), and export plots for visual QCing
     '''
     sub, ses, run, task, fnum = pupil_path[1]
+
+    ev_path = f'{in_path}/{sub}/{ses}/{sub}_{ses}_{fnum}_{task}_{run}_events.tsv'))
+    ev_lasttrial = pd.read_csv(ev_path, sep='\t', header=0).iloc[-1]
+    run_dur = int(ev_lasttrial['onset'] + 20)
 
     task_root = out_path.split('/')[-1]
     if task_root == 'mario3':
@@ -127,7 +131,7 @@ def export_and_plot(pupil_path, out_path):
             for i in range(4):
                 axes[i].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, i], alpha=array_2plot[:, 5]*0.4)
                 axes[i].set_ylim(-2, 2)
-                axes[i].set_xlim(0, 350)
+                axes[i].set_xlim(0, run_dur)
                 axes[i].set_title(f'{sub} {task} {ses} {run} {plot_labels[i]}')
 
             outpath_fig = os.path.join(out_path, 'QC_gaze')
@@ -158,7 +162,7 @@ def main():
     For each run, plot the raw gaze & pupil data and export chart(s) for QCing
     '''
     for pupil_path in pupil_paths:
-        export_and_plot(pupil_path, out_path)
+        export_and_plot(pupil_path, in_path, out_path)
 
 
     '''
