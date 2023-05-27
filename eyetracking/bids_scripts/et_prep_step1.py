@@ -66,7 +66,7 @@ def export_and_plot(pupil_path, in_path, out_path):
     '''
     sub, ses, run, task, fnum = pupil_path[1]
 
-    ev_path = f'{in_path}/{sub}/{ses}/{sub}_{ses}_{fnum}_{task}_{run}_events.tsv'))
+    ev_path = f'{in_path}/{sub}/{ses}/{sub}_{ses}_{fnum}_{task}_{run}_events.tsv'
     ev_lasttrial = pd.read_csv(ev_path, sep='\t', header=0).iloc[-1]
     run_dur = int(ev_lasttrial['onset'] + 20)
 
