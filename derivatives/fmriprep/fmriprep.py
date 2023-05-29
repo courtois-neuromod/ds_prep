@@ -16,7 +16,7 @@ PYBIDS_CACHE_PATH = ".pybids_cache"
 SLURM_JOB_DIR = "code"
 
 SMRIPREP_REQ = {"cpus": 8, "mem_per_cpu": 4096, "time": "24:00:00", "omp_nthreads": 8}
-FMRIPREP_REQ = {"cpus": 12, "mem_per_cpu": 4096, "time": "8:00:00", "omp_nthreads": 8}
+FMRIPREP_REQ = {"cpus": 12, "mem_per_cpu": 4096, "time": "12:00:00", "omp_nthreads": 8}
 
 BIDS_FILTERS_FILE = os.path.join(script_dir, "bids_filters.json")
 
@@ -74,6 +74,7 @@ if [ -d sourcedata/freesurfer ] ; then
   git -C sourcedata/freesurfer checkout -b $SLURM_JOB_NAME
 fi
 
+git submodule foreach  --recursive git-annex enableremote ria-beluga-storage
 
 """
 
@@ -355,7 +356,7 @@ def write_func_job(layout, subject, session, args):
                     f"--mem_mb {job_specs['mem_per_cpu']*job_specs['cpus']}",
                     "--fs-license-file", 'code/freesurfer.license',
                     # monitor resources to design a heuristic for runtime/cpu/ram of func data
-                    "--resource-monitor",
+                    #"--resource-monitor",
                     str(args.bids_path.relative_to(args.output_path)),
                     "./",
                     "participant",

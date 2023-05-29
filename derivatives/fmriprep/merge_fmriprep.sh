@@ -9,10 +9,10 @@ shopt -s nullglob
 all_sub_ses=(sub-*/ses-*)
 shopt -u nullglob
 
-for b in $(git branch -la | grep "remotes/$ria_store/fmriprep_" ) ; do
+for b in $(git branch -la | grep -E "remotes/$ria_store/.mriprep_.*.job$" ) ; do
     sub_ses_tmp=${b##*/}
     echo 'editing branch' $sub_ses_tmp
-    sub_ses_tmp=${sub_ses_tmp#fmriprep_study-*_}
+    sub_ses_tmp=${sub_ses_tmp#?mriprep_study-*_}
     sub_ses_tmp=${sub_ses_tmp%.job}
     sub_ses=${sub_ses_tmp/_/\/}
     # if the sub_ses already in the target branch, skip
@@ -25,9 +25,9 @@ for b in $(git branch -la | grep "remotes/$ria_store/fmriprep_" ) ; do
 done
 
 git checkout $current_branch
-for b in $(git branch -l | grep 'fmriprep_' ) ; do
+for b in $(git branch -l | grep '.mriprep_' ) ; do
     sub_ses_tmp=${b##*/}
-    sub_ses_tmp=${sub_ses_tmp#fmriprep_study-*_}
+    sub_ses_tmp=${sub_ses_tmp#?mriprep_study-*_}
     sub_ses_tmp=${sub_ses_tmp%.job}
     sub_ses=${sub_ses_tmp/_/\/}
     if [[ " ${all_sub_ses[*]} " =~ " ${sub_ses} " ]] ; then continue ; fi
