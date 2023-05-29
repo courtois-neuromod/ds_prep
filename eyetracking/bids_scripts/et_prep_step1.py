@@ -66,10 +66,6 @@ def export_and_plot(pupil_path, in_path, out_path):
     '''
     sub, ses, run, task, fnum = pupil_path[1]
 
-    ev_path = f'{in_path}/{sub}/{ses}/{sub}_{ses}_{fnum}_{task}_{run}_events.tsv'
-    ev_lasttrial = pd.read_csv(ev_path, sep='\t', header=0).iloc[-1]
-    run_dur = int(ev_lasttrial['onset'] + 20)
-
     task_root = out_path.split('/')[-1]
     if task_root == 'mario3':
         task = 'mario3'
@@ -117,6 +113,14 @@ def export_and_plot(pupil_path, in_path, out_path):
             gaze_2plot_list.append(gaze_2plot)
 
         print(len(deserialized_gaze))
+
+        try:
+            ev_path = f'{in_path}/{sub}/{ses}/{sub}_{ses}_{fnum}_{task}_{run}_events.tsv'
+            ev_lasttrial = pd.read_csv(ev_path, sep='\t', header=0).iloc[-1]
+            run_dur = int(ev_lasttrial['onset'] + 20)
+        except:
+            print('even file did not load, using default run duration')
+            run_dur = 500
 
         if len(deserialized_gaze) > 0:
             Path(outpath_gaze).mkdir(parents=True, exist_ok=True)
