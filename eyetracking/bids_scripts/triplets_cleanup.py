@@ -13,6 +13,7 @@ import subprocess
 parser = argparse.ArgumentParser(description='clean up, label, QC and bids-formats the triplets eye tracking dataset')
 parser.add_argument('--in_path', type=str, required=True, help='absolute path to directory that contains all data (sourcedata)')
 parser.add_argument('--phase', type=str, required=True, choices=['A', 'B', 'C'])
+parser.add_argument('--is_final', action='store_true', default=False, help='if true, export drift-corrected gaze into bids format')
 parser.add_argument('--run_dir', default='', type=str, help='absolute path to main code directory')
 parser.add_argument('--out_path', type=str, default='./test.tsv', help='absolute path to output file')
 args = parser.parse_args()
@@ -521,10 +522,13 @@ def bidsify_EToutput(row, out_path, is_final=False):
                     final_gaze_list.append(gaze_pt_data)
 
                 df_gaze = pd.DataFrame(np.array(final_gaze_list, dtype=object), columns=col_names)
-                gfile_path = f'{out_path}/{sub}/{ses}/{sub}_{ses}_{task_type}_{run_num}_eyetrack.tsv.gz'
+
+                bids_out_path = f'{out_path}/final_bids/{sub}/{ses}'
+                Path(bids_out_path).mkdir(parents=True, exist_ok=True)
+                gfile_path = f'{bids_out_path}/{sub}_{ses}_{task_type}_{run_num}_eyetrack.tsv.gz'
                 if os.path.exists(gfile_path):
                     # just in case session redone... (one case in sub-03); note: not bids...
-                    gfile_path = f'{out_path}/{sub}/{ses}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_eyetrack.tsv.gz'
+                    gfile_path = f'{bids_out_path}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_eyetrack.tsv.gz'
                 df_gaze.to_csv(gfile_path, sep='\t', header=True, index=False, compression='gzip')
 
             else:
@@ -595,6 +599,7 @@ def main():
     out_path = args.out_path
 
     phase = args.phase
+    if_final = args.is_final
 
     if phase == 'A':
         '''
@@ -660,7 +665,7 @@ def main():
         clean_list['infoplayer_path'] = clean_list.apply(lambda row: create_ip_path(row, in_path), axis=1)
 
         # implements steps 4 and 5 on each run
-        clean_list.apply(lambda row: bidsify_EToutput(row, out_path), axis=1)
+        clean_list.apply(lambda row: bidsify_EToutput(row, out_path, if_final), axis=1)
 
 
     elif phase == 'C':
