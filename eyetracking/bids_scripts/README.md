@@ -21,7 +21,7 @@ e.g.,
 
 Rate the quality of each run based on the graphs generated in step 1.\
 Rate the amount of drift on a 1-4 scale and log in a spreadsheet:
-- 1. minimal drift
+- 1. no visible drift
 - 2. slight drift
 - 3. major drift
 - 4. severe drift (gaze out of bound)  
