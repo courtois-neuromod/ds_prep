@@ -67,16 +67,15 @@ def export_and_plot(pupil_path, in_path, out_path):
     sub, ses, run, task, fnum = pupil_path[1]
 
     task_root = out_path.split('/')[-1]
-    if task_root == 'mario3':
-        task = 'task-mario3'
+    pseudo_task = 'task-mario3' if task_root == 'mario3' else task
 
     outpath_gaze = os.path.join(out_path, sub, ses)
-    gfile_path = f'{outpath_gaze}/{sub}_{ses}_{run}_{fnum}_{task}_gaze2D.npz'
+    gfile_path = f'{outpath_gaze}/{sub}_{ses}_{run}_{fnum}_{pseudo_task}_gaze2D.npz'
 
     if not os.path.exists(gfile_path):
         # note that gaze data includes pupil metrics from which each gaze was derived
         seri_gaze = load_pldata_file(pupil_path[0], 'gaze')[0]
-        print(sub, ses, run, task, len(seri_gaze))
+        print(sub, ses, run, pseudo_task, len(seri_gaze))
 
         # Convert serialized file to list of dictionaries...
         gaze_2plot_list = []
@@ -136,12 +135,12 @@ def export_and_plot(pupil_path, in_path, out_path):
                 axes[i].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, i], alpha=array_2plot[:, 5]*0.4)
                 axes[i].set_ylim(-2, 2)
                 axes[i].set_xlim(0, run_dur)
-                axes[i].set_title(f'{sub} {task} {ses} {run} {plot_labels[i]}')
+                axes[i].set_title(f'{sub} {pseudo_task} {ses} {run} {plot_labels[i]}')
 
             outpath_fig = os.path.join(out_path, 'QC_gaze')
             Path(outpath_fig).mkdir(parents=True, exist_ok=True)
 
-            fig.savefig(f'{outpath_fig}/{sub}_{ses}_{run}_{fnum}_{task}_QCplot.png')
+            fig.savefig(f'{outpath_fig}/{sub}_{ses}_{run}_{fnum}_{pseudo_task}_QCplot.png')
             plt.close()
 
 
