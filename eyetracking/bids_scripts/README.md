@@ -10,7 +10,7 @@ The script
 - converts gaze.pldata files to .npz format (to process in numpy independently of pupil labs classes)
 - exports plots of gaze and pupil positions over time (per run) to QC each run (flag camera freezes, missing pupils, excessive drift, etc)
 
-To lauch on elm, just specify the name of the dataset directory under /unf/eyetracker dataset
+To lauch on elm, just specify the name of the dataset directory under /unf/eyetracker dataset\
 e.g.,
 ```bash
 ./eyetracking/bids_scripts/launch_etprep_step1.sh triplets
@@ -27,7 +27,7 @@ Rate the amount of drift on a 1-4 scale and log in a spreadsheet:
 - 4. severe drift (gaze out of bound)  
 
 Compile a clean list of runs to drift-correct and bids-format (in step 3).
-Save this list as "QCed_file_list.tsv" in the "out_path/QC_gaz" directory.
+Save this list as "QCed_file_list.tsv" in the "out_path/QC_gaz" directory. Note that some runs might require parameters that differ from the default to correct for gaze drift. In QCed_file_list.tsv, the following parameters can be customized for each run : pupil confidence threshold, polynomial degree in x and y (to fit gaze mapping drift over time), and whether drift should be corrected based on the latest fixation (rather than with a polynomial fitted through the run's fixations).
 
 -----------
 
