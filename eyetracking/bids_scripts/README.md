@@ -27,7 +27,7 @@ Rate the amount of drift on a 1-4 scale and log in a spreadsheet:
 - 4. severe drift (gaze out of bound)  
 
 Compile a clean list of runs to drift-correct and bids-format (in step 3).
-Save this list as "QCed_file_list.tsv" in the "out_path/QC_gaz" directory. Note that some runs might require parameters that differ from the default to correct for gaze drift. In QCed_file_list.tsv, the following parameters can be customized for each run : pupil confidence threshold, polynomial degree in x and y (to fit gaze mapping drift over time), and whether drift should be corrected based on the latest fixation (rather than with a polynomial fitted through the run's fixations).
+Save this list as "QCed_file_list.tsv" in the "out_path/QC_gaze" directory. Note that some runs might require parameters that differ from the default to correct for gaze drift. In QCed_file_list.tsv, the following parameters can be customized for each run : pupil confidence threshold, polynomial degree in x and y (to fit gaze mapping drift over time), and whether drift should be corrected based on the latest fixation (rather than with a polynomial fitted through the run's fixations).
 
 -----------
 
