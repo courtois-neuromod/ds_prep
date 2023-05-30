@@ -1,4 +1,4 @@
-import os, glob, sys
+import os, glob, sys, json
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -13,7 +13,6 @@ import subprocess
 parser = argparse.ArgumentParser(description='clean up, label, QC and bids-formats the triplets eye tracking dataset')
 parser.add_argument('--in_path', type=str, required=True, help='absolute path to directory that contains all data (sourcedata)')
 parser.add_argument('--phase', type=str, required=True, choices=['A', 'B', 'C'])
-parser.add_argument('--cthresh', default=0.75, type=float, help='confidence threshold for high quality gaze to use for drift correction')
 parser.add_argument('--run_dir', default='', type=str, help='absolute path to main code directory')
 parser.add_argument('--out_path', type=str, default='./test.tsv', help='absolute path to output file')
 args = parser.parse_args()
@@ -149,47 +148,54 @@ def create_event_path(row, file_path, log=False):
     for each run, create path to events.tsv file
     '''
     s = row['subject']
-    ses =row['session']
+    ses = row['session']
     if log:
         return f'{file_path}/{s}/{ses}/{s}_{ses}_{row["file_number"]}.log'
     else:
         return f'{file_path}/{s}/{ses}/{s}_{ses}_{row["file_number"]}_{row["task"]}_{row["run"]}_events.tsv'
 
 
-def get_onset_time(log_path, run_num, task):
+def create_ip_path(row, file_path):
+    '''
+    for each run, create path to info.player.json file
+    '''
+    s = row['subject']
+    ses = row['session']
+    r = row['run']
+    t = row['task']
+    fnum = row['file_number']
+    return f'{file_path}/{s}/{ses}/{s}_{ses}_{fnum}.pupil/{t}_{r}/000/info.player.json'
+
+
+def get_onset_time(log_path, run_num, ip_path, gz_ts):
     onset_time_dict = {}
     rnum = 'run-00'
 
-    if task == 'task-wordsfamiliarity':
-        with open(log_path) as f:
-            lines = f.readlines()
-            for line in lines:
-                if "Imported data/language/triplets/words_designs" in line:
-                    rnum = line.split('\t')[-1].split(' ')[1].split('/')[-1].split('_')[-2]
-                elif "fMRI TTL 0" in line:
-                    onset_time = line.split('\t')[0]
-                    onset_time_dict[rnum] = onset_time
+    with open(log_path) as f:
+        lines = f.readlines()
+        for line in lines:
+            if "Imported data/language/triplets" in line:
+                rnum = line.split('\t')[-1].split(' ')[1].split('/')[-1].split('_')[-2]
+            elif "fMRI TTL 0" in line:
+                onset_time = line.split('\t')[0]
+                onset_time_dict[rnum] = onset_time
 
-    elif task == 'task-triplets':
-        with open(log_path) as f:
-            lines = f.readlines()
-            for line in lines:
-                if "Imported data/language/triplets/designs" in line:
-                    rnum = line.split('\t')[-1].split(' ')[1].split('/')[-1].split('_')[-2]
-                elif "fMRI TTL 0" in line:
-                    onset_time = line.split('\t')[0]
-                    onset_time_dict[rnum] = onset_time
+    o_time = float(onset_time_dict[run_num])
 
-    return float(onset_time_dict[run_num])
+    with open(ip_path, 'r') as f:
+        iplayer = json.load(f)
+    sync_ts = iplayer['start_time_synced_s']
+    syst_ts = iplayer['start_time_system_s']
 
+    is_sync_gz = (gz_ts-sync_ts)**2 < (gz_ts-syst_ts)**2
+    is_sync_ot = (o_time-sync_ts)**2 < (o_time-syst_ts)**2
+    if is_sync_gz != is_sync_ot:
+        if is_sync_ot:
+            o_time += (syst_ts - sync_ts)
+        else:
+            o_time += (sync_ts - syst_ts)
 
-def get_onset_time_fromGaze(run_event, last_gaze_tstamp):
-    last_trial = run_event.iloc[-1]
-    # where 9 = added seconds at the end of run
-    run_duration = last_trial['onset'] + last_trial['duration'] + last_trial['isi'] + 9
-    onset_time = last_gaze_tstamp - run_duration
-
-    return onset_time
+    return o_time
 
 
 def reset_gaze_time(gaze, onset_time, conf_thresh=0.9):
@@ -235,14 +241,14 @@ def reset_gaze_time(gaze, onset_time, conf_thresh=0.9):
     return reset_gaze_list, (all_x, all_y, all_times, all_conf), (clean_dist_x, clean_dist_y, clean_times, clean_conf)
 
 
-def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, clean_conf):
+def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, med_fix=False):
     '''
     Identify gaze that correspond to periods of fixation
+    if med_fix, export median gaze position for each fixation
     '''
     fix_dist_x = []
     fix_dist_y = []
     fix_times = []
-    fix_conf = []
 
     j = 0
 
@@ -252,27 +258,50 @@ def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, clean_conf
         fix_offset = trial_offset + df_ev['isi'][i]
         if i == 0:
             # add gaze from very first fixation at run onset (before first trial)
+            trial_fd_x = []
+            trial_fd_y = []
+            trial_ftimes = []
             while j < len(clean_times) and clean_times[j] < (trial_onset - 0.1):
                 if clean_times[j] > 3.0: # cut off first few seconds for cleaner fixations
-                    fix_dist_x.append(clean_dist_x[j])
-                    fix_dist_y.append(clean_dist_y[j])
-                    fix_times.append(clean_times[j])
-                    fix_conf.append(clean_conf[j])
+                    trial_fd_x.append(clean_dist_x[j])
+                    trial_fd_y.append(clean_dist_y[j])
+                    trial_ftimes.append(clean_times[j])
                 j += 1
+            if len(trial_fd_x) > 0:
+                if med_fix:
+                    fix_dist_x.append(np.median(trial_fd_x))
+                    fix_dist_y.append(np.median(trial_fd_y))
+                    fix_times.append(trial_ftimes[0])
+                else:
+                    fix_dist_x += trial_fd_x
+                    fix_dist_y += trial_fd_y
+                    fix_times += trial_ftimes
 
+        # add gaze from post-trial fixation period
+        trial_fd_x = []
+        trial_fd_y = []
+        trial_ftimes = []
         while j < len(clean_times) and clean_times[j] < fix_offset:
             # + 0.8 = 800ms (0.8s) after trial offset to account for saccade
             if clean_times[j] > (trial_offset + 0.8) and clean_times[j] < (fix_offset - 0.1):
-                fix_dist_x.append(clean_dist_x[j])
-                fix_dist_y.append(clean_dist_y[j])
-                fix_times.append(clean_times[j])
-                fix_conf.append(clean_conf[j])
+                trial_fd_x.append(clean_dist_x[j])
+                trial_fd_y.append(clean_dist_y[j])
+                trial_ftimes.append(clean_times[j])
             j += 1
+        if len(trial_fd_x) > 0:
+            if med_fix:
+                fix_dist_x.append(np.median(trial_fd_x))
+                fix_dist_y.append(np.median(trial_fd_y))
+                fix_times.append(trial_ftimes[0])
+            else:
+                fix_dist_x += trial_fd_x
+                fix_dist_y += trial_fd_y
+                fix_times += trial_ftimes
 
-    return fix_dist_x, fix_dist_y, fix_times, fix_conf
+    return fix_dist_x, fix_dist_y, fix_times
 
 
-def assign_gazeConf2trial(df_ev, vals_times, vals_conf, conf_thresh=0.9):
+def assign_gazeConf2trial(df_ev, vals_times, vals_conf, conf_thresh=0.9, add_count=True):
 
     gazeconf_per_trials = {}
     j = 0
@@ -297,9 +326,25 @@ def assign_gazeConf2trial(df_ev, vals_times, vals_conf, conf_thresh=0.9):
             gazeconf_per_trials[trial_number] = (np.nan, 0)
 
     df_ev[f'gaze_confidence_ratio_cThresh{conf_thresh}'] = df_ev.apply(lambda row: gazeconf_per_trials[row['TrialNumber']][0], axis=1)
-    df_ev[f'gaze_count_cThresh{conf_thresh}'] = df_ev.apply(lambda row: gazeconf_per_trials[row['TrialNumber']][1], axis=1)
+    if add_count:
+        df_ev[f'gaze_count_cThresh{conf_thresh}'] = df_ev.apply(lambda row: gazeconf_per_trials[row['TrialNumber']][1], axis=1)
 
     return df_ev
+
+
+def driftcorr_fromlast(fd_x, fd_y, f_times, all_x, all_y, all_times):
+    i = 0
+    j = 0
+    all_x_aligned = []
+    all_y_aligned = []
+
+    for i in range(len(all_times)):
+        if j < len(f_times)-1 and all_times[i] > f_times[j+1]:
+            j += 1
+        all_x_aligned.append(all_x[i] - fd_x[j])
+        all_y_aligned.append(all_y[i] - fd_y[j])
+
+    return all_x_aligned, all_y_aligned
 
 
 def median_clean(gz_times, dist_x, dist_y):
@@ -369,148 +414,159 @@ def apply_poly(ref_times, distances, degree, all_times, anchors = [150, 150]):
     return p_of_all
 
 
-def bidsify_EToutput(row, out_path, conf_thresh):
+def bidsify_EToutput(row, out_path, is_final=False):
     '''
     Implement drift correction on gaze position and export pupil and gaze data in bids-compliant format
+    DONE: implement method that can manage either of the two clocks for logged mri TTL 0 time, using info.player.json
+
+    TODO: implement alternative manner to drift correct based on latest fixation point, add boolean param to .tsv "clean" run list
+    TODO: add column to .tsv file to specify polynomial degrees other than the defaults
+    TODO: add column to .tsv file to specify pupil confidence value other than the default
+    TODO: don't export corrected gaze to .tsv in phase B: do it for phase C when final list is done, not to generate unecessary files (failed runs)
     '''
-    task = row['task']
-
-    log_path = row['log_path']
-
     [sub, ses, fnum, task_type, run_num, appendix] = os.path.basename(row['events_path']).split('_')
     print(sub, ses, fnum, task_type, run_num)
-    if not os.path.exists(f'{out_path}/DC_gaze/{sub}_{ses}_{run_num}_{fnum}_{task_type}_DCplot.png'):
-        try:
-            #onset_time = get_onset_time(log_path, row['run'], task)
 
+    if is_final:
+        outpath_events = f'{out_path}/Events_files'
+        Path(outpath_events).mkdir(parents=True, exist_ok=True)
+        out_file = f'{outpath_events}/{sub}_{ses}_{fnum}_{task_type}_{run_num}_events.tsv'
+    else:
+        outpath_fig = os.path.join(out_path, 'DC_gaze')
+        Path(outpath_fig).mkdir(parents=True, exist_ok=True)
+        out_file = f'{out_path}/DC_gaze/{sub}_{ses}_{run_num}_{fnum}_{task_type}_DCplot.png'
+
+    if not os.path.exists(out_file):
+        try:
             run_event = pd.read_csv(row['events_path'], sep = '\t', header=0)
             run_gaze = np.load(row['gaze_path'], allow_pickle=True)['gaze2d']
 
-            # derive onset time from events file and last gaze, indep of log file / computer clock (need full set of pupils)
-            onset_time = get_onset_time_fromGaze(run_event, run_gaze[-1]['timestamp'])
+            # identifies logged run start time (mri TTL 0) on clock that matches the gaze using info.player.json
+            onset_time = get_onset_time(row['log_path'], row['run'], row['infoplayer_path'], run_gaze[0]['timestamp'])
 
-            if row['use_lowThresh']==1.0:
-                gaze_threshold = conf_thresh
-            else:
-                gaze_threshold = 0.9
+            gaze_threshold = row['pupilConf_thresh'] if not pd.isna(row['pupilConf_thresh']) else 0.9
             reset_gaze_list, all_vals, clean_vals  = reset_gaze_time(run_gaze, onset_time, gaze_threshold)
             # normalized position (x and y), time (s) from onset and confidence for all gaze
             all_x, all_y, all_times, all_conf = all_vals
             all_times_arr = np.array(all_times)
             # distance from central fixation point for all gaze above confidence threshold
             clean_dist_x, clean_dist_y, clean_times, clean_conf = clean_vals
-            # distance from central fixation for high-confidence gaze captured during periods of fixation (between trials)
-            fix_dist_x, fix_dist_y, fix_times, fix_conf = get_fixation_gaze(run_event, clean_dist_x, clean_dist_y, clean_times, clean_conf)
-
-            # median filter removes gaze too far off from median gaze position within sliding window, for cleaner curves (remove non-fixation points)
-            mf_fix_times, mf_fix_dist_x, mf_fix_dist_y = median_clean(fix_times, fix_dist_x, fix_dist_y)
-
-            if row['use_lowThresh'] == 1.0:
-                deg_x, deg_y = 1, 1 # keep polynomial simpler to protect from outliers
-            else:
-                deg_x, deg_y = 4, 4
-            anchors = [0, 50]
-            # fit polynomial through distance between fixation and target
-            # and use it apply correction to all gaze (no confidence threshold applied)
-            p_of_all_x = apply_poly(mf_fix_times, mf_fix_dist_x, deg_x, all_times_arr, anchors=anchors)
-            all_x_aligned = np.array(all_x) - (p_of_all_x)
-
-            p_of_all_y = apply_poly(mf_fix_times, mf_fix_dist_y, deg_y, all_times_arr, anchors=anchors)
-            all_y_aligned = np.array(all_y) - (p_of_all_y)
-
-            # Export drift-corrected gaze, realigned timestamps, and all other metrics (pupils, etc) to bids-compliant .tsv file
-            # guidelines: https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-_eyetrackjson
-            outpath_gaze = os.path.join(out_path, sub, ses)
-
-            col_names = ['eye_timestamp',
-                         'eye1_x_coordinate', 'eye1_y_coordinate',
-                         'eye1_confidence',
-                         'eye1_x_coordinate_driftCorr', 'eye1_y_coordinate_driftCorr',
-                         'eye1_pupil_x_coordinate', 'eye1_pupil_y_coordinate',
-                         'eye1_pupil_diameter',
-                         'eye1_pupil_ellipse_axes',
-                         'eye1_pupil_ellipse_angle',
-                         'eye1_pupil_ellipse_center'
-                         ]
-            final_gaze_list = []
-            #df_gaze = pd.DataFrame(columns=col_names)
-
-            assert len(reset_gaze_list) == len(all_x_aligned)
-            for i in range(len(reset_gaze_list)):
-                gaze_pt = reset_gaze_list[i]
-                assert gaze_pt['reset_time'] == all_times[i]
-
-                gaze_pt_data = [
-                                gaze_pt['reset_time'], # in s
-                                #round(gaze_pt['reset_time']*1000, 0), # int, in ms
-                                gaze_pt['norm_pos'][0], gaze_pt['norm_pos'][1],
-                                gaze_pt['confidence'],
-                                all_x_aligned[i], all_y_aligned[i],
-                                gaze_pt['base_data']['norm_pos'][0], gaze_pt['base_data']['norm_pos'][1],
-                                gaze_pt['base_data']['diameter'],
-                                gaze_pt['base_data']['ellipse']['axes'],
-                                gaze_pt['base_data']['ellipse']['angle'],
-                                gaze_pt['base_data']['ellipse']['center'],
-                ]
-
-                final_gaze_list.append(gaze_pt_data)
-                #df_gaze = pd.concat([df_gaze, pd.DataFrame(np.array(gaze_pt_data).reshape(1, -1), columns=df_gaze.columns)], ignore_index=True)
-
-            df_gaze = pd.DataFrame(np.array(final_gaze_list, dtype=object), columns=col_names)
-            gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{run_num}_eyetrack.tsv.gz'
-            if os.path.exists(gfile_path):
-                # just in case session redone... (one case in sub-03)
-                gfile_path = f'{outpath_gaze}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_eyetrack.tsv.gz'
-            df_gaze.to_csv(gfile_path, sep='\t', header=True, index=False, compression='gzip')
-
 
             # for each trial, capture all gaze and derive % of above-threshold gaze, add metric to events file and save
             run_event = assign_gazeConf2trial(run_event, all_times, all_conf, conf_thresh=0.9)
-            run_event = assign_gazeConf2trial(run_event, all_times, all_conf, conf_thresh=0.75)
-            outpath_events = f'{out_path}/Events_files'
-            Path(outpath_events).mkdir(parents=True, exist_ok=True)
-            run_event.to_csv(f'{outpath_events}/{sub}_{ses}_{fnum}_{task_type}_{run_num}_events.tsv', sep='\t', header=True, index=False)
+            if gaze_threshold != 0.9:
+                run_event = assign_gazeConf2trial(run_event, all_times, all_conf, conf_thresh=gaze_threshold, add_count=False)
 
-            # export some additional plots to visulize the gaze drift correction and general QC.
-            outpath_fig = os.path.join(out_path, 'DC_gaze')
-            Path(outpath_fig).mkdir(parents=True, exist_ok=True)
+            if row['use_latestFix']==1.0:
+                '''
+                use latest point of fixation to realign the gaze
+                '''
+                fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze(run_event, clean_dist_x, clean_dist_y, clean_times, med_fix=True)
+                all_x_aligned, all_y_aligned = driftcorr_fromlast(fix_dist_x, fix_dist_y, fix_times, all_x, all_y, all_times)
+            else:
+                # distance from central fixation for high-confidence gaze captured during periods of fixation (between trials)
+                fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze(run_event, clean_dist_x, clean_dist_y, clean_times)
 
-            fig, axes = plt.subplots(5, 1, figsize=(7, 17.5))
-            plot_labels = ['gaze_x', 'gaze_y', 'pupil_x', 'pupil_x']
+                # median filter removes gaze too far off from median gaze position within sliding window, for cleaner curves (remove non-fixation points)
+                mf_fix_times, mf_fix_dist_x, mf_fix_dist_y = median_clean(fix_times, fix_dist_x, fix_dist_y)
 
-            axes[0].scatter(all_times, all_x, color='xkcd:blue', alpha=all_conf)
-            axes[0].scatter(all_times, all_x_aligned, color='xkcd:orange', alpha=all_conf)
-            axes[0].set_ylim(-2, 2)
-            axes[0].set_xlim(0, 350)
-            axes[0].set_title(f'{sub} {task_type} {ses} {run_num} gaze_x')
+                deg_x = int(row['polyDeg_x']) if not pd.isna(row['polyDeg_x']) else 4
+                deg_y = int(row['polyDeg_y']) if not pd.isna(row['polyDeg_y']) else 4
+                anchors = [0, 50]
+                # fit polynomial through distance between fixation and target
+                # and use it apply correction to all gaze (no confidence threshold applied)
+                p_of_all_x = apply_poly(mf_fix_times, mf_fix_dist_x, deg_x, all_times_arr, anchors=anchors)
+                all_x_aligned = np.array(all_x) - (p_of_all_x)
 
-            axes[1].scatter(all_times, all_y, color='xkcd:blue', alpha=all_conf)
-            axes[1].scatter(all_times, all_y_aligned, color='xkcd:orange', alpha=all_conf)
-            axes[1].set_ylim(-2, 2)
-            axes[1].set_xlim(0, 350)
-            axes[1].set_title(f'{sub} {task_type} {ses} {run_num} gaze_y')
+                p_of_all_y = apply_poly(mf_fix_times, mf_fix_dist_y, deg_y, all_times_arr, anchors=anchors)
+                all_y_aligned = np.array(all_y) - (p_of_all_y)
 
-            axes[2].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=0.4)
-            axes[2].scatter(mf_fix_times, mf_fix_dist_x, s=20, alpha=0.4)
-            axes[2].plot(all_times_arr, p_of_all_x, color="xkcd:red", linewidth=2)
-            axes[2].set_ylim(-2, 2)
-            axes[2].set_xlim(0, 350)
-            axes[2].set_title(f'{sub} {task_type} {ses} {run_num} fix_distance_x')
+            if is_final:
+                # export final events files w metrics on proportion of high confidence pupils per trial
+                run_event.to_csv(out_file, sep='\t', header=True, index=False)
 
-            axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=0.4)
-            axes[3].scatter(mf_fix_times, mf_fix_dist_y, s=20, alpha=0.4)
-            axes[3].plot(all_times_arr, p_of_all_y, color="xkcd:red", linewidth=2)
-            axes[3].set_ylim(-2, 2)
-            axes[3].set_xlim(0, 350)
-            axes[3].set_title(f'{sub} {task_type} {ses} {run_num} fix_distance_y')
+                # Export drift-corrected gaze, realigned timestamps, and all other metrics (pupils, etc) to bids-compliant .tsv file
+                # guidelines: https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-_eyetrackjson
+                col_names = ['eye_timestamp',
+                             'eye1_x_coordinate', 'eye1_y_coordinate',
+                             'eye1_confidence',
+                             'eye1_x_coordinate_driftCorr', 'eye1_y_coordinate_driftCorr',
+                             'eye1_pupil_x_coordinate', 'eye1_pupil_y_coordinate',
+                             'eye1_pupil_diameter',
+                             'eye1_pupil_ellipse_axes',
+                             'eye1_pupil_ellipse_angle',
+                             'eye1_pupil_ellipse_center'
+                             ]
 
-            axes[4].scatter(run_event['onset'].to_numpy()+2.0, run_event[f'gaze_confidence_ratio_cThresh{gaze_threshold}'].to_numpy())
-            axes[4].set_ylim(-0.1, 1.1)
-            axes[4].set_xlim(0, 350)
-            axes[4].set_title(f'{sub} {task_type} {ses} {run_num} ratio >{str(gaze_threshold)} confidence per trial')
+                final_gaze_list = []
 
-            fig.savefig(f'{outpath_fig}/{sub}_{ses}_{run_num}_{fnum}_{task_type}_DCplot.png')
-            plt.close()
+                assert len(reset_gaze_list) == len(all_x_aligned)
+                for i in range(len(reset_gaze_list)):
+                    gaze_pt = reset_gaze_list[i]
+                    assert gaze_pt['reset_time'] == all_times[i]
+
+                    gaze_pt_data = [
+                                    gaze_pt['reset_time'], # in s
+                                    #round(gaze_pt['reset_time']*1000, 0), # int, in ms
+                                    gaze_pt['norm_pos'][0], gaze_pt['norm_pos'][1],
+                                    gaze_pt['confidence'],
+                                    all_x_aligned[i], all_y_aligned[i],
+                                    gaze_pt['base_data']['norm_pos'][0], gaze_pt['base_data']['norm_pos'][1],
+                                    gaze_pt['base_data']['diameter'],
+                                    gaze_pt['base_data']['ellipse']['axes'],
+                                    gaze_pt['base_data']['ellipse']['angle'],
+                                    gaze_pt['base_data']['ellipse']['center'],
+                    ]
+
+                    final_gaze_list.append(gaze_pt_data)
+
+                df_gaze = pd.DataFrame(np.array(final_gaze_list, dtype=object), columns=col_names)
+                gfile_path = f'{out_path}/{sub}/{ses}/{sub}_{ses}_{task_type}_{run_num}_eyetrack.tsv.gz'
+                if os.path.exists(gfile_path):
+                    # just in case session redone... (one case in sub-03); note: not bids...
+                    gfile_path = f'{out_path}/{sub}/{ses}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_eyetrack.tsv.gz'
+                df_gaze.to_csv(gfile_path, sep='\t', header=True, index=False, compression='gzip')
+
+            else:
+                # export plots to visulize the gaze drift correction for last round of QC
+                fig, axes = plt.subplots(5, 1, figsize=(7, 17.5))
+                plot_labels = ['gaze_x', 'gaze_y', 'pupil_x', 'pupil_x']
+
+                axes[0].scatter(all_times, all_x, color='xkcd:blue', alpha=all_conf)
+                axes[0].scatter(all_times, all_x_aligned, color='xkcd:orange', alpha=all_conf)
+                axes[0].set_ylim(-2, 2)
+                axes[0].set_xlim(0, 350)
+                axes[0].set_title(f'{sub} {task_type} {ses} {run_num} gaze_x')
+
+                axes[1].scatter(all_times, all_y, color='xkcd:blue', alpha=all_conf)
+                axes[1].scatter(all_times, all_y_aligned, color='xkcd:orange', alpha=all_conf)
+                axes[1].set_ylim(-2, 2)
+                axes[1].set_xlim(0, 350)
+                axes[1].set_title(f'{sub} {task_type} {ses} {run_num} gaze_y')
+
+                axes[2].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=0.4)
+                axes[2].scatter(mf_fix_times, mf_fix_dist_x, s=20, alpha=0.4)
+                axes[2].plot(all_times_arr, p_of_all_x, color="xkcd:red", linewidth=2)
+                axes[2].set_ylim(-2, 2)
+                axes[2].set_xlim(0, 350)
+                axes[2].set_title(f'{sub} {task_type} {ses} {run_num} fix_distance_x')
+
+                axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=0.4)
+                axes[3].scatter(mf_fix_times, mf_fix_dist_y, s=20, alpha=0.4)
+                axes[3].plot(all_times_arr, p_of_all_y, color="xkcd:red", linewidth=2)
+                lb = np.min(mf_fix_dist_y)-0.1 if np.min(mf_fix_dist_y) < -2 else -2
+                hb = np.max(mf_fix_dist_y)+0.1 if np.max(mf_fix_dist_y) > 2 else 2
+                axes[3].set_ylim(lb, hb)
+                axes[3].set_xlim(0, 350)
+                axes[3].set_title(f'{sub} {task_type} {ses} {run_num} fix_distance_y')
+
+                axes[4].scatter(run_event['onset'].to_numpy()+2.0, run_event[f'gaze_confidence_ratio_cThresh{gaze_threshold}'].to_numpy())
+                axes[4].set_ylim(-0.1, 1.1)
+                axes[4].set_xlim(0, 350)
+                axes[4].set_title(f'{sub} {task_type} {ses} {run_num} ratio >{str(gaze_threshold)} confidence per trial')
+
+                fig.savefig(out_file)
+                plt.close()
         except:
             print('could not process')
 
@@ -601,10 +657,10 @@ def main():
         clean_list['gaze_path'] = clean_list.apply(lambda row: create_gaze_path(row, out_path), axis=1)
         clean_list['events_path'] = clean_list.apply(lambda row: create_event_path(row, in_path), axis=1)
         clean_list['log_path'] = clean_list.apply(lambda row: create_event_path(row, in_path, log=True), axis=1)
+        clean_list['infoplayer_path'] = clean_list.apply(lambda row: create_ip_path(row, in_path), axis=1)
 
         # implements steps 4 and 5 on each run
-        conf_thresh = args.cthresh
-        clean_list.apply(lambda row: bidsify_EToutput(row, out_path, conf_thresh), axis=1)
+        clean_list.apply(lambda row: bidsify_EToutput(row, out_path), axis=1)
 
 
     elif phase == 'C':
