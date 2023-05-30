@@ -120,7 +120,7 @@ def export_and_plot(pupil_path, in_path, out_path):
             run_dur = int(ev_lasttrial['onset'] + 20)
         except:
             print('even file did not load, using default run duration')
-            run_dur = 500
+            run_dur = 700
 
         if len(deserialized_gaze) > 0:
             Path(outpath_gaze).mkdir(parents=True, exist_ok=True)
