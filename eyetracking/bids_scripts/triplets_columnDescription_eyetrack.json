@@ -9,10 +9,10 @@
   "eye1_pupil_x_coordinate": "pupil position (x coordinate) normalized as a proportion of the width of the eye video frame. Bound = [0, 1], 0 = left)",
   "eye1_pupil_y_coordinate": "pupil position (y coordinate) normalized as a proportion of the height of the eye video frame. Bound = [0, 1], 0 = bottom)",
 
-  "eye1_pupil_diameter": "what metric?",
+  "eye1_pupil_diameter": "TODO: what metric?",
 
-  "eye1_pupil_ellipse_axes": "do I need this?",
+  "eye1_pupil_ellipse_axes": "TODO: do I need this?",
 
-  "eye1_pupil_ellipse_angle": "needed? insert metric, description",
-  "eye1_pupil_ellipse_center": "tupple; insert metric, description; seems to be in pixels"
+  "eye1_pupil_ellipse_angle": "TODO: needed? insert metric, description",
+  "eye1_pupil_ellipse_center": "TODO: tupple; insert metric, description; seems to be in pixels"
 }
