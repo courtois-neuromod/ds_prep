@@ -426,7 +426,6 @@ def bidsify_EToutput(row, out_path, is_final=False):
     TODO: don't export corrected gaze to .tsv in phase B: do it for phase C when final list is done, not to generate unecessary files (failed runs)
     '''
     [sub, ses, fnum, task_type, run_num, appendix] = os.path.basename(row['events_path']).split('_')
-    print(sub, ses, fnum, task_type, run_num)
 
     if is_final:
         outpath_events = f'{out_path}/Events_files'
@@ -438,6 +437,7 @@ def bidsify_EToutput(row, out_path, is_final=False):
         out_file = f'{out_path}/DC_gaze/{sub}_{ses}_{run_num}_{fnum}_{task_type}_DCplot.png'
 
     if not os.path.exists(out_file):
+        print(sub, ses, fnum, task_type, run_num)
         #if True:
         try:
             run_event = pd.read_csv(row['events_path'], sep = '\t', header=0)
