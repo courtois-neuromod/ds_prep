@@ -262,10 +262,12 @@ def reset_gaze_time(gaze, onset_time, conf_thresh=0.9):
     return reset_gaze_list, (all_x, all_y, all_times, all_conf), (clean_dist_x, clean_dist_y, clean_times, clean_conf)
 
 
-def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, med_fix=False):
+def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, med_fix=False, gap=0.6):
     '''
     Identify gaze that correspond to periods of fixation
     if med_fix, export median gaze position for each fixation
+
+    Otherwise, export gaze that fall within +- 0.6 stdev of the median in x and y during a fixation
     '''
     fix_dist_x = []
     fix_dist_y = []
@@ -289,14 +291,27 @@ def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, med_fix=Fa
                     trial_ftimes.append(clean_times[j])
                 j += 1
             if len(trial_fd_x) > 0:
+                med_x = np.median(trial_fd_x)
+                med_y = np.median(trial_fd_y)
+                trial_fd_x = np.array(trial_fd_x)
+                trial_fd_y = np.array(trial_fd_y)
+                trial_ftimes = np.array(trial_ftimes)
                 if med_fix:
-                    fix_dist_x.append(np.median(trial_fd_x))
-                    fix_dist_y.append(np.median(trial_fd_y))
+                    fix_dist_x.append(med_x)
+                    fix_dist_y.append(med_y)
                     fix_times.append(trial_ftimes[0])
                 else:
-                    fix_dist_x += trial_fd_x
-                    fix_dist_y += trial_fd_y
-                    fix_times += trial_ftimes
+                    stdevx= np.std(trial_fd_x)
+                    stdevy= np.std(trial_fd_y)
+                    f1 = trial_fd_x < med_x + (gap*stdevx)
+                    f2 = trial_fd_x > med_x - (gap*stdevx)
+                    f3 = trial_fd_y < med_y + (gap*stdevy)
+                    f4 = trial_fd_y > med_y - (gap*stdevy)
+                    gaze_filter = f1*f2*f3*f4
+                    if np.sum(gaze_filter) > 0:
+                        fix_dist_x += trial_fd_x[gaze_filter].tolist()
+                        fix_dist_y += trial_fd_y[gaze_filter].tolist()
+                        fix_times += trial_ftimes[gaze_filter].tolist()
 
         # add gaze from post-trial fixation period
         trial_fd_x = []
@@ -310,14 +325,27 @@ def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, med_fix=Fa
                 trial_ftimes.append(clean_times[j])
             j += 1
         if len(trial_fd_x) > 0:
+            med_x = np.median(trial_fd_x)
+            med_y = np.median(trial_fd_y)
+            trial_fd_x = np.array(trial_fd_x)
+            trial_fd_y = np.array(trial_fd_y)
+            trial_ftimes = np.array(trial_ftimes)
             if med_fix:
-                fix_dist_x.append(np.median(trial_fd_x))
-                fix_dist_y.append(np.median(trial_fd_y))
+                fix_dist_x.append(med_x)
+                fix_dist_y.append(med_y)
                 fix_times.append(trial_ftimes[0])
             else:
-                fix_dist_x += trial_fd_x
-                fix_dist_y += trial_fd_y
-                fix_times += trial_ftimes
+                stdevx= np.std(trial_fd_x)
+                stdevy= np.std(trial_fd_y)
+                f1 = trial_fd_x < med_x + (gap*stdevx)
+                f2 = trial_fd_x > med_x - (gap*stdevx)
+                f3 = trial_fd_y < med_y + (gap*stdevy)
+                f4 = trial_fd_y > med_y - (gap*stdevy)
+                gaze_filter = f1*f2*f3*f4
+                if np.sum(gaze_filter) > 0:
+                    fix_dist_x += trial_fd_x[gaze_filter].tolist()
+                    fix_dist_y += trial_fd_y[gaze_filter].tolist()
+                    fix_times += trial_ftimes[gaze_filter].tolist()
 
     return fix_dist_x, fix_dist_y, fix_times
 
@@ -371,7 +399,7 @@ def assign_Compliance2trial(df_ev, vals_times, vals_x, vals_y, task):
             trial_offset = fixation_offset
             gaze_count = df_ev['gaze_count'][i]
 
-        if task == 'task-emotionvideos':
+        elif task == 'task-emotionvideos':
             fixation_onset = df_ev['onset_fixation_flip'][i]
             fixation_offset = df_ev['onset_video_flip'][i]
             trial_offset = fixation_offset + df_ev['total_duration'][i]
@@ -591,24 +619,22 @@ def driftCorr_EToutput(row, out_path, is_final=False):
                 '''
                 use latest point of fixation to realign the gaze
                 '''
+                #TODO: adjust get_fixation_gaze and driftcorr_fromlast to other datasets
                 fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze(run_event, clean_dist_x, clean_dist_y, clean_times, med_fix=True)
                 all_x_aligned, all_y_aligned = driftcorr_fromlast(fix_dist_x, fix_dist_y, fix_times, all_x, all_y, all_times)
             else:
                 # distance from central fixation for high-confidence gaze captured during periods of fixation (between trials)
                 fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze(run_event, clean_dist_x, clean_dist_y, clean_times)
 
-                # median filter removes gaze too far off from median gaze position within sliding window, for cleaner curves (remove non-fixation points)
-                mf_fix_times, mf_fix_dist_x, mf_fix_dist_y = median_clean(fix_times, fix_dist_x, fix_dist_y)
-
                 deg_x = int(row['polyDeg_x']) if not pd.isna(row['polyDeg_x']) else 4
                 deg_y = int(row['polyDeg_y']) if not pd.isna(row['polyDeg_y']) else 4
                 anchors = [0, 50]
                 # fit polynomial through distance between fixation and target
                 # and use it apply correction to all gaze (no confidence threshold applied)
-                p_of_all_x = apply_poly(mf_fix_times, mf_fix_dist_x, deg_x, all_times_arr, anchors=anchors)
+                p_of_all_x = apply_poly(fix_times, fix_dist_x, deg_x, all_times_arr, anchors=anchors)
                 all_x_aligned = np.array(all_x) - (p_of_all_x)
 
-                p_of_all_y = apply_poly(mf_fix_times, mf_fix_dist_y, deg_y, all_times_arr, anchors=anchors)
+                p_of_all_y = apply_poly(fix_times, fix_dist_y, deg_y, all_times_arr, anchors=anchors)
                 all_y_aligned = np.array(all_y) - (p_of_all_y)
 
             if 'mario' in pseudo_task:
@@ -673,40 +699,48 @@ def driftCorr_EToutput(row, out_path, is_final=False):
             else:
                 # export plots to visulize the gaze drift correction for last round of QC
                 fig, axes = plt.subplots(5, 1, figsize=(7, 17.5))
-                plot_labels = ['gaze_x', 'gaze_y', 'pupil_x', 'pupil_x']
+                run_dur = int(run_event.iloc[-1]['onset'] + 20)
 
                 axes[0].scatter(all_times, all_x, color='xkcd:blue', alpha=all_conf)
                 axes[0].scatter(all_times, all_x_aligned, color='xkcd:orange', alpha=all_conf)
                 axes[0].set_ylim(-2, 2)
-                axes[0].set_xlim(0, 350)
-                axes[0].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_x')
+                axes[0].set_xlim(0, run_dur)
+                axes[0].set_title(f'{sub} {task_type} {ses} {run_num} gaze_x')
 
                 axes[1].scatter(all_times, all_y, color='xkcd:blue', alpha=all_conf)
                 axes[1].scatter(all_times, all_y_aligned, color='xkcd:orange', alpha=all_conf)
                 axes[1].set_ylim(-2, 2)
-                axes[1].set_xlim(0, 350)
-                axes[1].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_y')
+                axes[1].set_xlim(0, run_dur)
+                axes[1].set_title(f'{sub} {task_type} {ses} {run_num} gaze_y')
 
-                axes[2].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=0.4)
-                axes[2].scatter(mf_fix_times, mf_fix_dist_x, s=20, alpha=0.4)
-                axes[2].plot(all_times_arr, p_of_all_x, color="xkcd:red", linewidth=2)
+                if row['use_latestFix']==1.0:
+                    axes[2].scatter(clean_times, clean_dist_x, color='xkcd:blue', s=20, alpha=0.4)
+                    axes[2].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=1.0)
+                else:
+                    axes[2].scatter(fix_times, fix_dist_x, color='xkcd:blue', s=20, alpha=0.4)
+                    #axes[2].scatter(mf_fix_times, mf_fix_dist_x, s=20, alpha=0.4)
+                    axes[2].plot(all_times_arr, p_of_all_x, color="xkcd:red", linewidth=2)
                 axes[2].set_ylim(-2, 2)
-                axes[2].set_xlim(0, 350)
-                axes[2].set_title(f'{sub} {pseudo_task} {ses} {run_num} fix_distance_x')
+                axes[2].set_xlim(0, run_dur)
+                axes[2].set_title(f'{sub} {task_type} {ses} {run_num} fix_distance_x')
 
-                axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=0.4)
-                axes[3].scatter(mf_fix_times, mf_fix_dist_y, s=20, alpha=0.4)
-                axes[3].plot(all_times_arr, p_of_all_y, color="xkcd:red", linewidth=2)
-                lb = np.min(mf_fix_dist_y)-0.1 if np.min(mf_fix_dist_y) < -2 else -2
-                hb = np.max(mf_fix_dist_y)+0.1 if np.max(mf_fix_dist_y) > 2 else 2
+                if row['use_latestFix']==1.0:
+                    axes[3].scatter(clean_times, clean_dist_y, color='xkcd:blue', s=20, alpha=0.4)
+                    axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=1.0)
+                else:
+                    axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=0.4)
+                    #axes[3].scatter(mf_fix_times, mf_fix_dist_y, s=20, alpha=0.4)
+                    axes[3].plot(all_times_arr, p_of_all_y, color="xkcd:red", linewidth=2)
+                lb = np.min(fix_dist_y)-0.1 if np.min(fix_dist_y) < -2 else -2
+                hb = np.max(fix_dist_y)+0.1 if np.max(fix_dist_y) > 2 else 2
                 axes[3].set_ylim(lb, hb)
-                axes[3].set_xlim(0, 350)
-                axes[3].set_title(f'{sub} {pseudo_task} {ses} {run_num} fix_distance_y')
+                axes[3].set_xlim(0, run_dur)
+                axes[3].set_title(f'{sub} {task_type} {ses} {run_num} fix_distance_y')
 
                 axes[4].scatter(run_event['onset'].to_numpy()+2.0, run_event[f'gaze_confidence_ratio_cThresh{gaze_threshold}'].to_numpy())
                 axes[4].set_ylim(-0.1, 1.1)
-                axes[4].set_xlim(0, 350)
-                axes[4].set_title(f'{sub} {pseudo_task} {ses} {run_num} ratio >{str(gaze_threshold)} confidence per trial')
+                axes[4].set_xlim(0, run_dur)
+                axes[4].set_title(f'{sub} {task_type} {ses} {run_num} ratio >{str(gaze_threshold)} confidence per trial')
 
                 fig.savefig(out_file)
                 plt.close()
