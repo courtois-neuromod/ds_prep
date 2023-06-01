@@ -594,7 +594,7 @@ def bidsify_EToutput(row, out_path, is_final=False):
                     axes[3].scatter(clean_times, clean_dist_y, color='xkcd:blue', s=20, alpha=0.4)
                     axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=1.0)
                 else:
-                    axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=0.4)
+                    axes[3].scatter(fix_times, fix_dist_y, color='xkcd:blue', s=20, alpha=0.4)
                     #axes[3].scatter(mf_fix_times, mf_fix_dist_y, s=20, alpha=0.4)
                     axes[3].plot(all_times_arr, p_of_all_y, color="xkcd:red", linewidth=2)
                 lb = np.min(fix_dist_y)-0.1 if np.min(fix_dist_y) < -2 else -2

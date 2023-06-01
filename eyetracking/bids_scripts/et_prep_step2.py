@@ -262,7 +262,7 @@ def reset_gaze_time(gaze, onset_time, conf_thresh=0.9):
     return reset_gaze_list, (all_x, all_y, all_times, all_conf), (clean_dist_x, clean_dist_y, clean_times, clean_conf)
 
 
-def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, med_fix=False, gap=0.6):
+def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, task, med_fix=False, gap=0.6):
     '''
     Identify gaze that correspond to periods of fixation
     if med_fix, export median gaze position for each fixation
@@ -276,26 +276,42 @@ def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, med_fix=Fa
     j = 0
 
     for i in range(df_ev.shape[0]):
-        trial_onset = df_ev['onset'][i]
-        trial_offset = trial_onset + df_ev['duration'][i]
-        fix_offset = trial_offset + df_ev['isi'][i]
-        if i == 0:
-            # add gaze from very first fixation at run onset (before first trial)
+        has_fixation = True
+        if 'mario' in task:
+            if df_ev['trial_type'][i] != 'fixation_dot':
+                has_fixation = False
+
+        if has_fixation:
+            if task == 'task-thingsmemory' or 'mario' in task:
+                fixation_onset = df_ev['onset'][i]
+                fixation_offset = trial_onset + df_ev['duration'][i]
+                #trial_offset = fixation_offset
+
+            elif task == 'task-emotionvideos':
+                fixation_onset = df_ev['onset_fixation_flip'][i]
+                fixation_offset = df_ev['onset_video_flip'][i]
+                #trial_offset = fixation_offset + df_ev['total_duration'][i]
+
+            elif task in ['task-wordsfamiliarity', 'task-triplets']:
+                fixation_onset = df_ev['onset'][i] - 3.0 if i == 0 else df_ev['onset'][i-1] + df_ev['duration'][i-1]
+                fixation_offset = df_ev['onset'][i]
+                #trial_offset = fixation_offset + df_ev['duration'][i]
+
+            # add gaze from pre-trial fixation period
             trial_fd_x = []
             trial_fd_y = []
             trial_ftimes = []
-            while j < len(clean_times) and clean_times[j] < (trial_onset - 0.1):
-                if clean_times[j] > 3.0: # cut off first few seconds for cleaner fixations
+            while j < len(clean_times) and clean_times[j] < fixation_offset:
+                # + 0.8 = 800ms (0.8s) after trial offset to account for saccade
+                if clean_times[j] > (fixation_onset + 0.8) and clean_times[j] < (fixation_offset - 0.1):
                     trial_fd_x.append(clean_dist_x[j])
                     trial_fd_y.append(clean_dist_y[j])
                     trial_ftimes.append(clean_times[j])
                 j += 1
+
             if len(trial_fd_x) > 0:
                 med_x = np.median(trial_fd_x)
                 med_y = np.median(trial_fd_y)
-                trial_fd_x = np.array(trial_fd_x)
-                trial_fd_y = np.array(trial_fd_y)
-                trial_ftimes = np.array(trial_ftimes)
                 if med_fix:
                     fix_dist_x.append(med_x)
                     fix_dist_y.append(med_y)
@@ -303,6 +319,9 @@ def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, med_fix=Fa
                 else:
                     stdevx= np.std(trial_fd_x)
                     stdevy= np.std(trial_fd_y)
+                    trial_fd_x = np.array(trial_fd_x)
+                    trial_fd_y = np.array(trial_fd_y)
+                    trial_ftimes = np.array(trial_ftimes)
                     f1 = trial_fd_x < med_x + (gap*stdevx)
                     f2 = trial_fd_x > med_x - (gap*stdevx)
                     f3 = trial_fd_y < med_y + (gap*stdevy)
@@ -312,40 +331,6 @@ def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, med_fix=Fa
                         fix_dist_x += trial_fd_x[gaze_filter].tolist()
                         fix_dist_y += trial_fd_y[gaze_filter].tolist()
                         fix_times += trial_ftimes[gaze_filter].tolist()
-
-        # add gaze from post-trial fixation period
-        trial_fd_x = []
-        trial_fd_y = []
-        trial_ftimes = []
-        while j < len(clean_times) and clean_times[j] < fix_offset:
-            # + 0.8 = 800ms (0.8s) after trial offset to account for saccade
-            if clean_times[j] > (trial_offset + 0.8) and clean_times[j] < (fix_offset - 0.1):
-                trial_fd_x.append(clean_dist_x[j])
-                trial_fd_y.append(clean_dist_y[j])
-                trial_ftimes.append(clean_times[j])
-            j += 1
-        if len(trial_fd_x) > 0:
-            med_x = np.median(trial_fd_x)
-            med_y = np.median(trial_fd_y)
-            trial_fd_x = np.array(trial_fd_x)
-            trial_fd_y = np.array(trial_fd_y)
-            trial_ftimes = np.array(trial_ftimes)
-            if med_fix:
-                fix_dist_x.append(med_x)
-                fix_dist_y.append(med_y)
-                fix_times.append(trial_ftimes[0])
-            else:
-                stdevx= np.std(trial_fd_x)
-                stdevy= np.std(trial_fd_y)
-                f1 = trial_fd_x < med_x + (gap*stdevx)
-                f2 = trial_fd_x > med_x - (gap*stdevx)
-                f3 = trial_fd_y < med_y + (gap*stdevy)
-                f4 = trial_fd_y > med_y - (gap*stdevy)
-                gaze_filter = f1*f2*f3*f4
-                if np.sum(gaze_filter) > 0:
-                    fix_dist_x += trial_fd_x[gaze_filter].tolist()
-                    fix_dist_y += trial_fd_y[gaze_filter].tolist()
-                    fix_times += trial_ftimes[gaze_filter].tolist()
 
     return fix_dist_x, fix_dist_y, fix_times
 
@@ -428,7 +413,7 @@ def assign_Compliance2trial(df_ev, vals_times, vals_x, vals_y, task):
     return df_ev
 
 
-def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, conf_thresh=0.9):
+def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, conf_thresh=0.9, add_count=True):
 
     bk2_times = {}
     bk2_name = None
@@ -453,6 +438,7 @@ def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, c
 
         if trial_type == 'fixation_dot':
             trial_comp = []
+            trial_conf = []
             trial_offset = trial_onset + df_ev['duration'][i]
 
             while j < len(vals_times) and vals_times[j] < trial_offset:
@@ -461,15 +447,17 @@ def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, c
                     x_comp = abs(vals_x[j] - 0.5) < (1/17.5)
                     y_comp = abs(vals_y[j] - 0.5) < (1/14.0)
                     trial_comp.append(x_comp and y_comp)
+                    trial_conf.append(vals_conf[j] > conf_thresh)
                 j += 1
             num_gaze = len(trial_comp)
             if num_gaze > 0:
                 fix_compliance.append(np.sum(trial_comp)/num_gaze)
                 gaze_per_trial.append(num_gaze)
+                gaze_confidence.append(np.sum(trial_conf)/num_gaze)
             else:
                 fix_compliance.append(np.nan)
                 gaze_per_trial.append(np.nan)
-            gaze_confidence.append(np.nan)
+                gaze_confidence.append(np.nan)
 
 
         elif trial_type == 'gym-retro_game':
@@ -496,7 +484,15 @@ def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, c
             gaze_per_trial.append(np.nan)
             fix_compliance.append(np.nan)
 
-    # TODO:  insert 3 arrays as new columns in df_ev
+    # Insert 3 new columns in df_ev
+    df_ev.insert(loc=df_ev.shape[1]-2, column=f'gaze_confidence_ratio_cThresh{conf_thresh}',
+                 value=gaze_confidence, allow_duplicates=True)
+    if add_count:
+        df_ev.insert(loc=df_ev.shape[1]-2, column='gaze_count',
+                     value=gaze_per_trial, allow_duplicates=True)
+        df_ev.insert(loc=df_ev.shape[1]-2, column='fixation_compliance_ratio',
+                     value=fix_compliance, allow_duplicates=True)
+
     return df_ev
 
 
@@ -513,44 +509,6 @@ def driftcorr_fromlast(fd_x, fd_y, f_times, all_x, all_y, all_times):
         all_y_aligned.append(all_y[i] - fd_y[j])
 
     return all_x_aligned, all_y_aligned
-
-
-def median_clean(gz_times, dist_x, dist_y):
-    '''
-    Within bins of 1/100 the number of gaze,
-    select only frames where distance between gaze and deepgaze falls within 0.6 stdev of the median
-    These frames most likely reflect when deepgaze and gaze "look" at the same thing
-    '''
-    jump = int(len(dist_x)/100)
-    idx = 0
-    gap = 0.6 # interval of distances included around median, in stdev
-
-    filtered_times = []
-    filtered_distx = []
-    filtered_disty = []
-
-    current_medx = np.median(np.array(dist_x)[idx:idx+jump])
-    current_medy = np.median(np.array(dist_y)[idx:idx+jump])
-    stdevx = np.std(np.array(dist_x)[idx:idx+jump])
-    stdevy = np.std(np.array(dist_y)[idx:idx+jump])
-
-    for i in range(len(dist_x)):
-        if i > (idx + jump):
-            idx += 1
-            current_medx = np.median(np.array(dist_x)[idx:idx+jump])
-            current_medy = np.median(np.array(dist_y)[idx:idx+jump])
-            stdevx = np.std(np.array(dist_x)[idx:idx+jump])
-            stdevy = np.std(np.array(dist_y)[idx:idx+jump])
-
-        if dist_x[i] < current_medx + (gap*stdevx):
-            if dist_x[i] > current_medx - (gap*stdevx):
-                if dist_y[i] < current_medy + (gap*stdevy):
-                    if dist_y[i] > current_medy - (gap*stdevx):
-                        filtered_times.append(gz_times[i])
-                        filtered_distx.append(dist_x[i])
-                        filtered_disty.append(dist_y[i])
-
-    return filtered_times, filtered_distx, filtered_disty
 
 
 def apply_poly(ref_times, distances, degree, all_times, anchors = [150, 150]):
@@ -620,15 +578,15 @@ def driftCorr_EToutput(row, out_path, is_final=False):
                 use latest point of fixation to realign the gaze
                 '''
                 #TODO: adjust get_fixation_gaze and driftcorr_fromlast to other datasets
-                fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze(run_event, clean_dist_x, clean_dist_y, clean_times, med_fix=True)
+                fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze(run_event, clean_dist_x, clean_dist_y, clean_times, pseudo_task, med_fix=True)
                 all_x_aligned, all_y_aligned = driftcorr_fromlast(fix_dist_x, fix_dist_y, fix_times, all_x, all_y, all_times)
             else:
                 # distance from central fixation for high-confidence gaze captured during periods of fixation (between trials)
-                fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze(run_event, clean_dist_x, clean_dist_y, clean_times)
+                fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze(run_event, clean_dist_x, clean_dist_y, clean_times, pseudo_task)
 
                 deg_x = int(row['polyDeg_x']) if not pd.isna(row['polyDeg_x']) else 4
                 deg_y = int(row['polyDeg_y']) if not pd.isna(row['polyDeg_y']) else 4
-                anchors = [0, 50]
+                anchors = [0, 0]#[0, 50]
                 # fit polynomial through distance between fixation and target
                 # and use it apply correction to all gaze (no confidence threshold applied)
                 p_of_all_x = apply_poly(fix_times, fix_dist_x, deg_x, all_times_arr, anchors=anchors)
@@ -639,6 +597,8 @@ def driftCorr_EToutput(row, out_path, is_final=False):
 
             if 'mario' in pseudo_task:
                 run_event = assign_gzMetrics2trial_mario(run_event, all_times, all_conf, all_x_aligned, all_y_aligned, conf_thresh=0.9)
+                if gaze_threshold != 0.9:
+                    run_event = assign_gzMetrics2trial_mario(run_event, all_times, all_conf, all_x_aligned, all_y_aligned, conf_thresh=gaze_threshold, add_count=False)
             else:
                 # for each trial, derive % of above-threshold gaze and add metric to events file
                 run_event = assign_gazeConf2trial(run_event, all_times, all_conf, task_type, conf_thresh=0.9)
@@ -705,42 +665,42 @@ def driftCorr_EToutput(row, out_path, is_final=False):
                 axes[0].scatter(all_times, all_x_aligned, color='xkcd:orange', alpha=all_conf)
                 axes[0].set_ylim(-2, 2)
                 axes[0].set_xlim(0, run_dur)
-                axes[0].set_title(f'{sub} {task_type} {ses} {run_num} gaze_x')
+                axes[0].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_x')
 
                 axes[1].scatter(all_times, all_y, color='xkcd:blue', alpha=all_conf)
                 axes[1].scatter(all_times, all_y_aligned, color='xkcd:orange', alpha=all_conf)
                 axes[1].set_ylim(-2, 2)
                 axes[1].set_xlim(0, run_dur)
-                axes[1].set_title(f'{sub} {task_type} {ses} {run_num} gaze_y')
+                axes[1].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_y')
 
                 if row['use_latestFix']==1.0:
                     axes[2].scatter(clean_times, clean_dist_x, color='xkcd:blue', s=20, alpha=0.4)
                     axes[2].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=1.0)
                 else:
                     axes[2].scatter(fix_times, fix_dist_x, color='xkcd:blue', s=20, alpha=0.4)
-                    #axes[2].scatter(mf_fix_times, mf_fix_dist_x, s=20, alpha=0.4)
                     axes[2].plot(all_times_arr, p_of_all_x, color="xkcd:red", linewidth=2)
                 axes[2].set_ylim(-2, 2)
                 axes[2].set_xlim(0, run_dur)
-                axes[2].set_title(f'{sub} {task_type} {ses} {run_num} fix_distance_x')
+                axes[2].set_title(f'{sub} {pseudo_task} {ses} {run_num} fix_distance_x')
 
                 if row['use_latestFix']==1.0:
                     axes[3].scatter(clean_times, clean_dist_y, color='xkcd:blue', s=20, alpha=0.4)
                     axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=1.0)
                 else:
-                    axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=0.4)
-                    #axes[3].scatter(mf_fix_times, mf_fix_dist_y, s=20, alpha=0.4)
+                    axes[3].scatter(fix_times, fix_dist_y, color='xkcd:blue', s=20, alpha=0.4)
                     axes[3].plot(all_times_arr, p_of_all_y, color="xkcd:red", linewidth=2)
                 lb = np.min(fix_dist_y)-0.1 if np.min(fix_dist_y) < -2 else -2
                 hb = np.max(fix_dist_y)+0.1 if np.max(fix_dist_y) > 2 else 2
                 axes[3].set_ylim(lb, hb)
                 axes[3].set_xlim(0, run_dur)
-                axes[3].set_title(f'{sub} {task_type} {ses} {run_num} fix_distance_y')
+                axes[3].set_title(f'{sub} {pseudo_task} {ses} {run_num} fix_distance_y')
 
+                if 'mario' in pseudo_task:
+                    run_event = run_event[run_event['trial_type'].to_numpy() == 'gym-retro_game']
                 axes[4].scatter(run_event['onset'].to_numpy()+2.0, run_event[f'gaze_confidence_ratio_cThresh{gaze_threshold}'].to_numpy())
                 axes[4].set_ylim(-0.1, 1.1)
                 axes[4].set_xlim(0, run_dur)
-                axes[4].set_title(f'{sub} {task_type} {ses} {run_num} ratio >{str(gaze_threshold)} confidence per trial')
+                axes[4].set_title(f'{sub} {pseudo_task} {ses} {run_num} ratio >{str(gaze_threshold)} confidence per trial')
 
                 fig.savefig(out_file)
                 plt.close()
