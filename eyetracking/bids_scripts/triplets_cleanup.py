@@ -563,13 +563,16 @@ def bidsify_EToutput(row, out_path, is_final=False):
                 if row['use_latestFix']==1.0:
                     axes[3].scatter(clean_times, clean_dist_y, color='xkcd:blue', s=20, alpha=0.4)
                     axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=0.4)
+                    lb = np.min(fix_dist_y)-0.1 if np.min(fix_dist_y) < -2 else -2
+                    hb = np.max(fix_dist_y)+0.1 if np.max(fix_dist_y) > 2 else 2
+                    axes[3].set_ylim(lb, hb)
                 else:
                     axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=0.4)
                     axes[3].scatter(mf_fix_times, mf_fix_dist_y, s=20, alpha=0.4)
                     axes[3].plot(all_times_arr, p_of_all_y, color="xkcd:red", linewidth=2)
-                lb = np.min(mf_fix_dist_y)-0.1 if np.min(mf_fix_dist_y) < -2 else -2
-                hb = np.max(mf_fix_dist_y)+0.1 if np.max(mf_fix_dist_y) > 2 else 2
-                axes[3].set_ylim(lb, hb)
+                    lb = np.min(mf_fix_dist_y)-0.1 if np.min(mf_fix_dist_y) < -2 else -2
+                    hb = np.max(mf_fix_dist_y)+0.1 if np.max(mf_fix_dist_y) > 2 else 2
+                    axes[3].set_ylim(lb, hb)
                 axes[3].set_xlim(0, 350)
                 axes[3].set_title(f'{sub} {task_type} {ses} {run_num} fix_distance_y')
 
