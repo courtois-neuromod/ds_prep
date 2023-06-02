@@ -478,6 +478,7 @@ def driftCorr_EToutput(row, out_path, is_final=False):
             try:
                 onset_time = get_onset_time(row['log_path'], row['run'], row['infoplayer_path'], run_gaze[0]['timestamp'])
             except:
+                print('cannot obtain onset time')
                 onset_time = run_gaze[10]['timestamp']
 
             gaze_threshold = row['pupilConf_thresh'] if not pd.isna(row['pupilConf_thresh']) else 0.9
