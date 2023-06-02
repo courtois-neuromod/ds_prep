@@ -86,9 +86,12 @@ def create_ip_path(row, file_path):
 def get_onset_time(log_path, run_num, ip_path, gz_ts):
     onset_time_dict = {}
     TTL_0 = -1
+    has_lines = True
 
     with open(log_path) as f:
         lines = f.readlines()
+        if len(lines) == 0:
+            has_lines = False
         for line in lines:
             if "fMRI TTL 0" in line:
                 TTL_0 = line.split('\t')[0]
@@ -105,20 +108,24 @@ def get_onset_time(log_path, run_num, ip_path, gz_ts):
                 rnum = run2task_mapping['retino'][line.split(': ')[-2]]
                 onset_time_dict[rnum] = float(TTL_0)
 
-    o_time = onset_time_dict[run_num]
+    if has_lines:
+        o_time = onset_time_dict[run_num]
 
-    with open(ip_path, 'r') as f:
-        iplayer = json.load(f)
-    sync_ts = iplayer['start_time_synced_s']
-    syst_ts = iplayer['start_time_system_s']
+        with open(ip_path, 'r') as f:
+            iplayer = json.load(f)
+        sync_ts = iplayer['start_time_synced_s']
+        syst_ts = iplayer['start_time_system_s']
 
-    is_sync_gz = (gz_ts-sync_ts)**2 < (gz_ts-syst_ts)**2
-    is_sync_ot = (o_time-sync_ts)**2 < (o_time-syst_ts)**2
-    if is_sync_gz != is_sync_ot:
-        if is_sync_ot:
-            o_time += (syst_ts - sync_ts)
-        else:
-            o_time += (sync_ts - syst_ts)
+        is_sync_gz = (gz_ts-sync_ts)**2 < (gz_ts-syst_ts)**2
+        is_sync_ot = (o_time-sync_ts)**2 < (o_time-syst_ts)**2
+        if is_sync_gz != is_sync_ot:
+            if is_sync_ot:
+                o_time += (syst_ts - sync_ts)
+            else:
+                o_time += (sync_ts - syst_ts)
+    else:
+        print('empty log file, onset time estimated from gaze timestamp')
+        o_time = gz_ts
 
     return o_time
 
@@ -475,11 +482,7 @@ def driftCorr_EToutput(row, out_path, is_final=False):
             run_gaze = np.load(row['gaze_path'], allow_pickle=True)['gaze2d']
 
             # identifies logged run start time (mri TTL 0) on clock that matches the gaze using info.player.json
-            try:
-                onset_time = get_onset_time(row['log_path'], row['run'], row['infoplayer_path'], run_gaze[0]['timestamp'])
-            except:
-                print('cannot obtain onset time')
-                onset_time = run_gaze[10]['timestamp']
+            onset_time = get_onset_time(row['log_path'], row['run'], row['infoplayer_path'], run_gaze[10]['timestamp'])
 
             gaze_threshold = row['pupilConf_thresh'] if not pd.isna(row['pupilConf_thresh']) else 0.9
             reset_gaze_list, all_vals, clean_vals  = reset_gaze_time(run_gaze, onset_time, gaze_threshold)
