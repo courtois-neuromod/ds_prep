@@ -374,7 +374,7 @@ def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, c
                     trial_conf.append(vals_conf[j] > conf_thresh)
                 j += 1
 
-            num_gaze = len(trial_confs)
+            num_gaze = len(trial_conf)
             if num_gaze > 0:
                 gaze_confidence.append(np.sum(trial_conf)/num_gaze)
                 gaze_per_trial.append(num_gaze)
