@@ -597,13 +597,13 @@ def driftCorr_EToutput(row, out_path, is_final=False):
                 run_dur = int(run_event.iloc[-1]['onset'] + 20)
 
                 axes[0].scatter(all_times, all_x, s=10, color='xkcd:light grey', alpha=all_conf)
-                axes[0].scatter(all_times, all_x_aligned, color=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
+                axes[0].scatter(all_times, all_x_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
                 axes[0].set_ylim(-2, 2)
                 axes[0].set_xlim(0, run_dur)
                 axes[0].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_x')
 
                 axes[1].scatter(all_times, all_y, color='xkcd:light grey', alpha=all_conf)
-                axes[1].scatter(all_times, all_y_aligned, color=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
+                axes[1].scatter(all_times, all_y_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
                 axes[1].set_ylim(-2, 2)
                 axes[1].set_xlim(0, run_dur)
                 axes[1].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_y')
