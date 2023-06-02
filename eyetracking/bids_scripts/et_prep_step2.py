@@ -20,6 +20,23 @@ def get_arguments():
     return args
 
 
+# Assign run number to subtasks for retino and fLoc based on order in which they were administered
+# TODO: coordinate w Basile to make sure the run numbers match those of the bold files
+# https://github.com/courtois-neuromod/task_stimuli/blob/main/src/sessions/ses-retino.py
+# https://github.com/courtois-neuromod/task_stimuli/blob/main/src/sessions/ses-floc.py
+run2task_mapping = {
+    'retino': {
+        'task-wedges': 'run-01',
+        'task-rings': 'run-02',
+        'task-bar': 'run-03'
+    },
+    'floc': {
+        'task-flocdef': 'run-01',
+        'task-flocalt': 'run-02'
+    }
+}
+
+
 def create_gaze_path(row, file_path):
     '''
     for each run, create path to deserialized gaze file
@@ -44,7 +61,10 @@ def create_event_path(row, file_path, log=False):
     if log:
         return f'{file_path}/{s}/{ses}/{s}_{ses}_{row["file_number"]}.log'
     else:
-        return f'{file_path}/{s}/{ses}/{s}_{ses}_{row["file_number"]}_{row["task"]}_{row["run"]}_events.tsv'
+        if row['task'] in ['task-bar', 'task-rings', 'task-wedges', 'task-flocdef', 'task-flocalt']:
+            return f'{file_path}/{s}/{ses}/{s}_{ses}_{row["file_number"]}_{row["task"]}_events.tsv'
+        else:
+            return f'{file_path}/{s}/{ses}/{s}_{ses}_{row["file_number"]}_{row["task"]}_{row["run"]}_events.tsv'
 
 
 def create_ip_path(row, file_path):
@@ -56,7 +76,11 @@ def create_ip_path(row, file_path):
     r = row['run']
     t = row['task']
     fnum = row['file_number']
-    return f'{file_path}/{s}/{ses}/{s}_{ses}_{fnum}.pupil/{t}_{r}/000/info.player.json'
+
+    if row['task'] in ['task-bar', 'task-rings', 'task-wedges', 'task-flocdef', 'task-flocalt']:
+        return f'{file_path}/{s}/{ses}/{s}_{ses}_{fnum}.pupil/{t}/000/info.player.json'
+    else:
+        return f'{file_path}/{s}/{ses}/{s}_{ses}_{fnum}.pupil/{t}_{r}/000/info.player.json'
 
 
 def get_onset_time(log_path, run_num, ip_path, gz_ts):
@@ -73,6 +97,12 @@ def get_onset_time(log_path, run_num, ip_path, gz_ts):
                 onset_time_dict[rnum] = float(TTL_0)
             elif "class 'src.tasks.videogame.VideoGameMultiLevel'" in line:
                 rnum = line.split(': ')[-2].split('_')[-1]
+                onset_time_dict[rnum] = float(TTL_0)
+            elif "class 'src.tasks.localizers.FLoc'" in line:
+                rnum = run2task_mapping['floc'][line.split(': ')[-2]]
+                onset_time_dict[rnum] = float(TTL_0)
+            elif "class 'src.tasks.retinotopy.Retinotopy'" in line:
+                rnum = run2task_mapping['retino'][line.split(': ')[-2]]
                 onset_time_dict[rnum] = float(TTL_0)
 
     o_time = onset_time_dict[run_num]
@@ -91,7 +121,6 @@ def get_onset_time(log_path, run_num, ip_path, gz_ts):
             o_time += (sync_ts - syst_ts)
 
     return o_time
-
 
 
 def reset_gaze_time(gaze, onset_time, conf_thresh=0.9):
@@ -201,7 +230,7 @@ def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, task, med_
                     f2 = trial_fd_x > med_x - (gap*stdevx)
                     f3 = trial_fd_y < med_y + (gap*stdevy)
                     f4 = trial_fd_y > med_y - (gap*stdevy)
-                    gaze_filter = f1*f2*f3*f4
+                    gaze_filter = (f1*f2*f3*f4).astype(bool)
                     if np.sum(gaze_filter) > 0:
                         fix_dist_x += trial_fd_x[gaze_filter].tolist()
                         fix_dist_y += trial_fd_y[gaze_filter].tolist()
@@ -417,9 +446,16 @@ def apply_poly(ref_times, distances, degree, all_times, anchors = [150, 150]):
 
 def driftCorr_EToutput(row, out_path, is_final=False):
 
-    [sub, ses, fnum, task_type, run_num, appendix] = os.path.basename(row['events_path']).split('_')
-
     task_root = out_path.split('/')[-1]
+
+    if task_root in ['retino', 'floc']:
+        skip_run_num = True
+        [sub, ses, fnum, task_type, appendix] = os.path.basename(row['events_path']).split('_')
+        run_num = run2task_mapping[task_root][task_type]
+    else:
+        skip_run_num = False
+        [sub, ses, fnum, task_type, run_num, appendix] = os.path.basename(row['events_path']).split('_')
+
     pseudo_task = 'task-mario3' if task_root == 'mario3' else task_type
     print(sub, ses, fnum, pseudo_task, run_num)
 
@@ -451,19 +487,39 @@ def driftCorr_EToutput(row, out_path, is_final=False):
             if row['use_latestFix']==1.0:
                 '''
                 use latest point of fixation to realign the gaze
+                Note: this approach cannot be used for tasks for which continuous fixation is required (e.g., floc, retinotopy)
                 '''
-                #TODO: adjust get_fixation_gaze and driftcorr_fromlast to other datasets
                 fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze(run_event, clean_dist_x, clean_dist_y, clean_times, pseudo_task, med_fix=True)
                 all_x_aligned, all_y_aligned = driftcorr_fromlast(fix_dist_x, fix_dist_y, fix_times, all_x, all_y, all_times)
             else:
-                # distance from central fixation for high-confidence gaze captured during periods of fixation (between trials)
-                fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze(run_event, clean_dist_x, clean_dist_y, clean_times, pseudo_task)
-
                 deg_x = int(row['polyDeg_x']) if not pd.isna(row['polyDeg_x']) else 4
                 deg_y = int(row['polyDeg_y']) if not pd.isna(row['polyDeg_y']) else 4
                 anchors = [0, 0]#[0, 50]
+
+                # if retino or floc, continuous fixation means that all gaze are fixations
+                # remove 3-9s of gaze data at begining and end for stability
+                if task_root in ['retino', 'floc']:
+                    otime = 6 if task_root == 'floc' else 3
+                    fix_dist_x, fix_dist_y, fix_times = clean_dist_x[250*otime:-(250*9)], clean_dist_y[250*otime:-(250*9)], clean_times[250*otime:-(250*9)]
+
+                    # remove fixation points > 0.15 (normalized screen) from polynomial to remove outliers
+                    p_of_fix_x = apply_poly(fix_times, fix_dist_x, deg_x, np.array(fix_times), anchors=anchors)
+                    p_of_fix_y = apply_poly(fix_times, fix_dist_y, deg_y, np.array(fix_times), anchors=anchors)
+
+                    x_filter = np.absolute(np.array(fix_dist_x) - p_of_fix_x) < 0.15
+                    y_filter = np.absolute(np.array(fix_dist_y) - p_of_fix_y) < 0.15
+                    fix_filter = (x_filter * y_filter).astype(bool)
+
+                    fix_dist_x = fix_dist_x[fix_filter]
+                    fix_dist_y = fix_dist_y[fix_filter]
+                    fix_times = fix_times[fix_filter]
+
+                else:
+                    # distance from central fixation for high-confidence gaze captured during periods of fixation (between trials)
+                    fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze(run_event, clean_dist_x, clean_dist_y, clean_times, pseudo_task)
+
                 # fit polynomial through distance between fixation and target
-                # and use it apply correction to all gaze (no confidence threshold applied)
+                # use poly curve to apply correction to all gaze (no confidence threshold applied)
                 p_of_all_x = apply_poly(fix_times, fix_dist_x, deg_x, all_times_arr, anchors=anchors)
                 all_x_aligned = np.array(all_x) - (p_of_all_x)
 
@@ -474,7 +530,7 @@ def driftCorr_EToutput(row, out_path, is_final=False):
                 run_event = assign_gzMetrics2trial_mario(run_event, all_times, all_conf, all_x_aligned, all_y_aligned, conf_thresh=0.9)
                 if gaze_threshold != 0.9:
                     run_event = assign_gzMetrics2trial_mario(run_event, all_times, all_conf, all_x_aligned, all_y_aligned, conf_thresh=gaze_threshold, add_count=False)
-            else:
+            elif task_root not in ['retino', 'floc']:
                 # for each trial, derive % of above-threshold gaze and add metric to events file
                 run_event = assign_gazeConf2trial(run_event, all_times, all_conf, task_type, conf_thresh=0.9)
                 if gaze_threshold != 0.9:
