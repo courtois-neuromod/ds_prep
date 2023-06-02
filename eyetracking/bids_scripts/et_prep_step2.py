@@ -20,131 +20,6 @@ def get_arguments():
     return args
 
 
-def compile_file_list(in_path):
-
-    col_names = ['subject', 'session', 'run', 'task', 'file_number', 'has_pupil', 'has_gaze', 'has_eyemovie', 'has_log']
-    df_files = pd.DataFrame(columns=col_names)
-
-    # on elm, for triplets : in_path = '/unf/eyetracker/neuromod/triplets/sourcedata'
-    ses_list = sorted(glob.glob(f'{in_path}/sub-*/ses-0*'))
-
-    pupil_file_paths = []
-
-    for ses_path in ses_list:
-        [sub_num, ses_num] = ses_path.split('/')[-2:]
-        events_list = sorted(glob.glob(f'{ses_path}/*task*events.tsv'))
-        for event in events_list:
-            ev_file = os.path.basename(event)
-            [sub, ses, fnum, task_type, run_num, appendix] = ev_file.split('_')
-            if sub in ['sub-01', 'sub-02', 'sub-03', 'sub-04', 'sub-05', 'sub-06']:
-                assert sub == sub_num
-                assert ses_num == ses
-
-                has_log = len(glob.glob(f'{ses_path}/{sub_num}_{ses_num}_{fnum}.log')) == 1
-                pupil_path = f'{ses_path}/{sub_num}_{ses_num}_{fnum}.pupil'
-
-                list_pupil = glob.glob(f'{pupil_path}/{task_type}_{run_num}/000/pupil.pldata')
-                has_pupil = len(list_pupil) == 1
-                if has_pupil:
-                    pupil_file_paths.append((os.path.dirname(list_pupil[0]), (sub, ses, run_num, task_type, fnum)))
-
-                has_eyemv = len(glob.glob(f'{pupil_path}/{task_type}_{run_num}/000/eye0.mp4')) == 1
-                has_gaze = len(glob.glob(f'{pupil_path}/{task_type}_{run_num}/000/gaze.pldata')) == 1
-
-                run_data = [sub_num, ses_num, run_num, task_type, fnum, has_pupil, has_gaze, has_eyemv, has_log]
-                #df_files = df_files.append(pd.Series(run_data, index=df_files.columns), ignore_index=True)
-                df_files = pd.concat([df_files, pd.DataFrame(np.array(run_data).reshape(1, -1), columns=df_files.columns)], ignore_index=True)
-
-    return df_files, pupil_file_paths
-
-
-def export_and_plot(pupil_path, in_path, out_path):
-    '''
-    Function accomplishes two things:
-    1. export gaze and pupil metrics from .pldata (pupil's) format to .npz format
-    2. compile list of gaze and pupil positions (w timestamps and confidence), and export plots for visual QCing
-    '''
-    sub, ses, run, task, fnum = pupil_path[1]
-
-    task_root = out_path.split('/')[-1]
-    if task_root == 'mario3':
-        task = 'mario3'
-
-    outpath_gaze = os.path.join(out_path, sub, ses)
-    gfile_path = f'{outpath_gaze}/{sub}_{ses}_{run}_{fnum}_{task}_gaze2D.npz'
-
-    if not os.path.exists(gfile_path):
-        # note that gaze data includes pupil metrics from which each gaze was derived
-        seri_gaze = load_pldata_file(pupil_path[0], 'gaze')[0]
-        print(sub, ses, run, task, len(seri_gaze))
-
-        # Convert serialized file to list of dictionaries...
-        gaze_2plot_list = []
-        deserialized_gaze = []
-
-        for gaze in seri_gaze:
-            gaze_data = {}
-            gaze_2plot = np.empty(6) # [gaze_x, gaze_y, pupil_x, pupil_y, timestamp, confidence]
-            for key in gaze.keys():
-                if key != 'base_data': # gaze data
-                    if key == 'norm_pos':
-                        gaze_2plot[0: 2] = [gaze[key][0], gaze[key][1]]
-                    elif key == 'timestamp':
-                        gaze_2plot[4] = gaze[key]
-                    elif key == 'confidence':
-                        gaze_2plot[5] = gaze[key]
-                    gaze_data[key] = gaze[key]
-                else: # pupil data from which gaze was derived
-                    gaze_pupil_data = {}
-                    gaze_pupil = gaze[key][0]
-                    for k in gaze_pupil.keys():
-                        if k != 'ellipse':
-                            if k == 'norm_pos':
-                                gaze_2plot[2: 4] = [gaze_pupil[k][0], gaze_pupil[k][1]]
-                            gaze_pupil_data[k] = gaze_pupil[k]
-                        else:
-                            gaze_pupil_ellipse_data = {}
-                            for sk in gaze_pupil[k].keys():
-                                gaze_pupil_ellipse_data[sk] = gaze_pupil[k][sk]
-                            gaze_pupil_data[k] = gaze_pupil_ellipse_data
-                    gaze_data[key] = gaze_pupil_data
-
-            deserialized_gaze.append(gaze_data)
-            gaze_2plot_list.append(gaze_2plot)
-
-        print(len(deserialized_gaze))
-
-        try:
-            ev_path = f'{in_path}/{sub}/{ses}/{sub}_{ses}_{fnum}_{task}_{run}_events.tsv'
-            ev_lasttrial = pd.read_csv(ev_path, sep='\t', header=0).iloc[-1]
-            run_dur = int(ev_lasttrial['onset'] + 20)
-        except:
-            print('even file did not load, using default run duration')
-            run_dur = 700
-
-        if len(deserialized_gaze) > 0:
-            Path(outpath_gaze).mkdir(parents=True, exist_ok=True)
-            np.savez(gfile_path, gaze2d = deserialized_gaze)
-
-            # create and export QC plots per run
-            array_2plot = np.stack(gaze_2plot_list, axis=0)
-
-            fig, axes = plt.subplots(4, 1, figsize=(7, 14))
-            plot_labels = ['gaze_x', 'gaze_y', 'pupil_x', 'pupil_x']
-
-            for i in range(4):
-                axes[i].scatter(array_2plot[:, 4]-array_2plot[:, 4][0], array_2plot[:, i], alpha=array_2plot[:, 5]*0.4)
-                axes[i].set_ylim(-2, 2)
-                axes[i].set_xlim(0, run_dur)
-                axes[i].set_title(f'{sub} {task} {ses} {run} {plot_labels[i]}')
-
-            outpath_fig = os.path.join(out_path, 'QC_gaze')
-            Path(outpath_fig).mkdir(parents=True, exist_ok=True)
-
-            fig.savefig(f'{outpath_fig}/{sub}_{ses}_{run}_{fnum}_{task}_QCplot.png')
-            plt.close()
-
-
 def create_gaze_path(row, file_path):
     '''
     for each run, create path to deserialized gaze file
@@ -155,7 +30,7 @@ def create_gaze_path(row, file_path):
 
     task_root = file_path.split('/')[-1]
     if task_root == 'mario3':
-        task = 'mario3'
+        task = 'task-mario3'
 
     return f'{file_path}/{s}/{ses}/{s}_{ses}_{row["run"]}_{row["file_number"]}_{task}_gaze2D.npz'
 
@@ -661,34 +536,34 @@ def driftCorr_EToutput(row, out_path, is_final=False):
                 fig, axes = plt.subplots(5, 1, figsize=(7, 17.5))
                 run_dur = int(run_event.iloc[-1]['onset'] + 20)
 
-                axes[0].scatter(all_times, all_x, color='xkcd:blue', alpha=all_conf)
-                axes[0].scatter(all_times, all_x_aligned, color='xkcd:orange', alpha=all_conf)
+                axes[0].scatter(all_times, all_x, s=10, color='xkcd:light grey', alpha=all_conf)
+                axes[0].scatter(all_times, all_x_aligned, color=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
                 axes[0].set_ylim(-2, 2)
                 axes[0].set_xlim(0, run_dur)
                 axes[0].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_x')
 
-                axes[1].scatter(all_times, all_y, color='xkcd:blue', alpha=all_conf)
-                axes[1].scatter(all_times, all_y_aligned, color='xkcd:orange', alpha=all_conf)
+                axes[1].scatter(all_times, all_y, color='xkcd:light grey', alpha=all_conf)
+                axes[1].scatter(all_times, all_y_aligned, color=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
                 axes[1].set_ylim(-2, 2)
                 axes[1].set_xlim(0, run_dur)
                 axes[1].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_y')
 
+                axes[2].scatter(clean_times, clean_dist_x, color='xkcd:light blue', s=20, alpha=0.2)
                 if row['use_latestFix']==1.0:
-                    axes[2].scatter(clean_times, clean_dist_x, color='xkcd:blue', s=20, alpha=0.4)
                     axes[2].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=1.0)
                 else:
-                    axes[2].scatter(fix_times, fix_dist_x, color='xkcd:blue', s=20, alpha=0.4)
-                    axes[2].plot(all_times_arr, p_of_all_x, color="xkcd:red", linewidth=2)
+                    axes[2].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=0.4)
+                    axes[2].plot(all_times_arr, p_of_all_x, color="xkcd:black", linewidth=2)
                 axes[2].set_ylim(-2, 2)
                 axes[2].set_xlim(0, run_dur)
                 axes[2].set_title(f'{sub} {pseudo_task} {ses} {run_num} fix_distance_x')
 
+                axes[3].scatter(clean_times, clean_dist_y, color='xkcd:light blue', s=20, alpha=0.2)
                 if row['use_latestFix']==1.0:
-                    axes[3].scatter(clean_times, clean_dist_y, color='xkcd:blue', s=20, alpha=0.4)
                     axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=1.0)
                 else:
-                    axes[3].scatter(fix_times, fix_dist_y, color='xkcd:blue', s=20, alpha=0.4)
-                    axes[3].plot(all_times_arr, p_of_all_y, color="xkcd:red", linewidth=2)
+                    axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=0.4)
+                    axes[3].plot(all_times_arr, p_of_all_y, color="xkcd:black", linewidth=2)
                 lb = np.min(fix_dist_y)-0.1 if np.min(fix_dist_y) < -2 else -2
                 hb = np.max(fix_dist_y)+0.1 if np.max(fix_dist_y) > 2 else 2
                 axes[3].set_ylim(lb, hb)
