@@ -188,7 +188,7 @@ def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, task, med_
         if has_fixation:
             if task == 'task-thingsmemory' or 'mario' in task:
                 fixation_onset = df_ev['onset'][i]
-                fixation_offset = trial_onset + df_ev['duration'][i]
+                fixation_offset = fixation_onset + df_ev['duration'][i]
                 #trial_offset = fixation_offset
 
             elif task == 'task-emotionvideos':
