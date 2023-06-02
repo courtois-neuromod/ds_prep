@@ -173,14 +173,15 @@ def export_and_plot(pupil_path, in_path, out_path):
         print(len(deserialized_gaze))
 
         try:
-            if task_root in ['retino', 'floc']:
-                ev_path = f'{in_path}/{sub}/{ses}/{sub}_{ses}_{fnum}_{task}_events.tsv'
-            elif task_root == 'friends':
+            if task_root == 'friends':
                 run_dur = 770
             else:
-                ev_path = f'{in_path}/{sub}/{ses}/{sub}_{ses}_{fnum}_{task}_{run}_events.tsv'
-            ev_lasttrial = pd.read_csv(ev_path, sep='\t', header=0).iloc[-1]
-            run_dur = int(ev_lasttrial['onset'] + 20)
+                if task_root in ['retino', 'floc']:
+                    ev_path = f'{in_path}/{sub}/{ses}/{sub}_{ses}_{fnum}_{task}_events.tsv'
+                else:
+                    ev_path = f'{in_path}/{sub}/{ses}/{sub}_{ses}_{fnum}_{task}_{run}_events.tsv'
+                ev_lasttrial = pd.read_csv(ev_path, sep='\t', header=0).iloc[-1]
+                run_dur = int(ev_lasttrial['onset'] + 20)
         except:
             print('even file did not load, using default run duration')
             run_dur = 700
