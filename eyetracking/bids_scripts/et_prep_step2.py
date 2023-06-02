@@ -469,13 +469,16 @@ def driftCorr_EToutput(row, out_path, is_final=False):
         out_file = f'{out_path}/DC_gaze/{sub}_{ses}_{run_num}_{fnum}_{pseudo_task}_DCplot.png'
 
     if not os.path.exists(out_file):
-        #if True:
-        try:
+        if True:
+        #try:
             run_event = pd.read_csv(row['events_path'], sep = '\t', header=0)
             run_gaze = np.load(row['gaze_path'], allow_pickle=True)['gaze2d']
 
             # identifies logged run start time (mri TTL 0) on clock that matches the gaze using info.player.json
-            onset_time = get_onset_time(row['log_path'], row['run'], row['infoplayer_path'], run_gaze[0]['timestamp'])
+            try:
+                onset_time = get_onset_time(row['log_path'], row['run'], row['infoplayer_path'], run_gaze[0]['timestamp'])
+            except:
+                onset_time = run_gaze[10]['timestamp']
 
             gaze_threshold = row['pupilConf_thresh'] if not pd.isna(row['pupilConf_thresh']) else 0.9
             reset_gaze_list, all_vals, clean_vals  = reset_gaze_time(run_gaze, onset_time, gaze_threshold)
@@ -636,8 +639,8 @@ def driftCorr_EToutput(row, out_path, is_final=False):
 
                 fig.savefig(out_file)
                 plt.close()
-        except:
-            print('could not process')
+        #except:
+        #    print('could not process')
 
 
 def main():
