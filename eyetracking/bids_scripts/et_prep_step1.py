@@ -37,7 +37,7 @@ run2task_mapping = {
 
 def compile_file_list(in_path):
 
-    col_names = ['subject', 'session', 'run', 'task', 'file_number', 'has_pupil', 'has_gaze', 'has_eyemovie', 'has_log']
+    col_names = ['subject', 'session', 'run', 'task', 'file_number', 'has_pupil', 'has_gaze', 'has_eyemovie', 'has_log', 'empty_log']
     df_files = pd.DataFrame(columns=col_names)
 
     task_root = in_path.split('/')[-2]
@@ -63,7 +63,14 @@ def compile_file_list(in_path):
                     assert sub == sub_num
                     assert ses_num == ses
 
-                    has_log = len(glob.glob(f'{ses_path}/{sub_num}_{ses_num}_{fnum}.log')) == 1
+                    log_list = glob.glob(f'{ses_path}/{sub_num}_{ses_num}_{fnum}.log')
+                    has_log = len(log_list) == 1
+                    if has_log:
+                        with open(log_list[0]) as f:
+                            lines = f.readlines()
+                            empty_log = len(lines) == 0
+                    else:
+                        empty_log = True
 
                     list_pupil = glob.glob(f'{epfile}/pupil.pldata')
                     has_pupil = len(list_pupil) == 1
@@ -73,7 +80,7 @@ def compile_file_list(in_path):
                     has_eyemv = len(glob.glob(f'{epfile}/eye0.mp4')) == 1
                     has_gaze = len(glob.glob(f'{epfile}/gaze.pldata')) == 1
 
-                    run_data = [sub_num, ses_num, run_num, task_type, fnum, has_pupil, has_gaze, has_eyemv, has_log]
+                    run_data = [sub_num, ses_num, run_num, task_type, fnum, has_pupil, has_gaze, has_eyemv, has_log, empty_log]
                     df_files = pd.concat([df_files, pd.DataFrame(np.array(run_data).reshape(1, -1), columns=df_files.columns)], ignore_index=True)
 
         else:
@@ -94,7 +101,14 @@ def compile_file_list(in_path):
                         assert sub == sub_num
                         assert ses_num == ses
 
-                        has_log = len(glob.glob(f'{ses_path}/{sub_num}_{ses_num}_{fnum}.log')) == 1
+                        log_list = glob.glob(f'{ses_path}/{sub_num}_{ses_num}_{fnum}.log')
+                        has_log = len(log_list) == 1
+                        if has_log:
+                            with open(log_list[0]) as f:
+                                lines = f.readlines()
+                                empty_log = len(lines) == 0
+                        else:
+                            empty_log = True
 
                         if skip_run_num:
                             pupil_path = f'{ses_path}/{sub_num}_{ses_num}_{fnum}.pupil/{task_type}/000'
@@ -109,7 +123,7 @@ def compile_file_list(in_path):
                         has_eyemv = len(glob.glob(f'{pupil_path}/eye0.mp4')) == 1
                         has_gaze = len(glob.glob(f'{pupil_path}/gaze.pldata')) == 1
 
-                        run_data = [sub_num, ses_num, run_num, task_type, fnum, has_pupil, has_gaze, has_eyemv, has_log]
+                        run_data = [sub_num, ses_num, run_num, task_type, fnum, has_pupil, has_gaze, has_eyemv, has_log, empty_log]
                         df_files = pd.concat([df_files, pd.DataFrame(np.array(run_data).reshape(1, -1), columns=df_files.columns)], ignore_index=True)
                 except:
                     print(f'cannot process {ev_file}')
