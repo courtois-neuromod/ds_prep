@@ -30,7 +30,7 @@ SINGULARITY_CMD_BASE = " ".join(
     [
         "datalad containers-run "
         "-m 'fMRIPrep_{subject_session}'",
-        "-n containers/bids-fmriprep",
+        "-n bids-fmriprep",
     ] + [
         "--input sourcedata/templateflow/tpl-%s/"% tpl for tpl in REQUIRED_TEMPLATES
     ] + [

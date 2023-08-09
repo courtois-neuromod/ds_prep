@@ -29,6 +29,6 @@ datalad save -m 'setup dataset gitattribute gitignore and install freesurfer lic
 
 datalad install -d . -s $source_ds sourcedata/$ds_name
 
-datalad create-sibling-ria  --alias $ds_name.fmriprep -s $ria_name $ria_store --shared 640
+datalad create-sibling-ria  --alias $ds_name.fmriprep -s $ria_name $ria_store --shared 620
 datalad push --to $ria_name
 git -C $(git remote get-url $ria_name) symbolic-ref HEAD refs/heads/$(git branch --show-current)
