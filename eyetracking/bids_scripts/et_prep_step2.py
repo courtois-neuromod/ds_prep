@@ -740,8 +740,8 @@ def driftCorr_EToutput(row, out_path, is_final=False):
 
                 fig.savefig(out_file)
                 plt.close()
-        except:
-            print('could not process')
+        #except:
+        #    print('could not process')
 
 
 def main():
