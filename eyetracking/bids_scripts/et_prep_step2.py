@@ -291,7 +291,7 @@ def assign_Compliance2trial(df_ev, vals_times, vals_x, vals_y, task, deg_va=1):
 
         if task == 'task-thingsmemory':
             fixation_onset = df_ev['onset'][i]
-            fixation_offset = trial_onset + df_ev['duration'][i]
+            fixation_offset = fixation_onset + df_ev['duration'][i]
             trial_offset = fixation_offset
             gaze_count = df_ev['gaze_count'][i]
 
