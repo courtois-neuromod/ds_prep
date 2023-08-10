@@ -197,7 +197,7 @@ def export_and_plot(pupil_path, in_path, out_path):
                 ev_lasttrial = pd.read_csv(ev_path, sep='\t', header=0).iloc[-1]
                 run_dur = int(ev_lasttrial['onset'] + 20)
         except:
-            print('even file did not load, using default run duration')
+            print('event file did not load, using default run duration')
             run_dur = 700
 
         if len(deserialized_gaze) > 0:

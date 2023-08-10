@@ -281,7 +281,7 @@ def assign_gazeConf2trial(df_ev, vals_times, vals_conf, task, conf_thresh=0.9, a
     return df_ev
 
 
-def assign_Compliance2trial(df_ev, vals_times, vals_x, vals_y, task):
+def assign_Compliance2trial(df_ev, vals_times, vals_x, vals_y, task, deg_va=1):
 
     fixCompliance_per_trials = {}
     j = 0
@@ -309,8 +309,8 @@ def assign_Compliance2trial(df_ev, vals_times, vals_x, vals_y, task):
         while j < len(vals_times) and vals_times[j] < trial_offset:
             if vals_times[j] > fixation_onset and vals_times[j] < fixation_offset:
                 # is gaze within 1 degree of visual angle of central fixation in x and y?
-                x_comp = abs(vals_x[j] - 0.5) < (1/17.5)
-                y_comp = abs(vals_y[j] - 0.5) < (1/14.0)
+                x_comp = abs(vals_x[j] - 0.5) < (deg_va/17.5)
+                y_comp = abs(vals_y[j] - 0.5) < (deg_va/14.0)
                 trial_comp.append(x_comp and y_comp)
             j += 1
 
@@ -319,7 +319,7 @@ def assign_Compliance2trial(df_ev, vals_times, vals_x, vals_y, task):
             assert gaze_count == num_gaze
         fixCompliance_per_trials[trial_number] = np.sum(trial_comp)/num_gaze if num_gaze > 0 else np.nan
 
-    df_ev['fixation_compliance_ratio'] = df_ev.apply(lambda row: fixCompliance_per_trials[row['TrialNumber']], axis=1)
+    df_ev[f'fixation_compliance_ratio_deg{deg_va}'] = df_ev.apply(lambda row: fixCompliance_per_trials[row['TrialNumber']], axis=1)
 
     return df_ev
 
@@ -339,7 +339,9 @@ def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, c
             bk2_name = df_ev['stim_file'][i]
 
     gaze_confidence = []
-    fix_compliance = []
+    fix_compliance = [[], [], [], []]
+    #fix_compliance_2 = []
+    #fix_compliance_3 = []
     gaze_per_trial = []
 
     j = 0
@@ -348,25 +350,30 @@ def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, c
         trial_type = df_ev['trial_type'][i]
 
         if trial_type == 'fixation_dot':
-            trial_comp = []
+            trial_comp = [[], [], [], []]
+            #trial_comp_2 = []
+            #trial_comp_3 = []
             trial_conf = []
             trial_offset = trial_onset + df_ev['duration'][i]
 
             while j < len(vals_times) and vals_times[j] < trial_offset:
                 if vals_times[j] > trial_onset:
-                    # is gaze within 1 degree of visual angle of central fixation in x and y?
-                    x_comp = abs(vals_x[j] - 0.5) < (1/17.5)
-                    y_comp = abs(vals_y[j] - 0.5) < (1/14.0)
-                    trial_comp.append(x_comp and y_comp)
+                    # is gaze within 1, 2, 3 degrees of visual angle of central fixation in x and y?
+                    for k, deg_val in enumerate([0.5, 1, 2, 3]):
+                        x_comp = abs(vals_x[j] - 0.5) < (deg_val/17.5)
+                        y_comp = abs(vals_y[j] - 0.5) < (deg_val/14.0)
+                        trial_comp[k].append(x_comp and y_comp)
                     trial_conf.append(vals_conf[j] > conf_thresh)
                 j += 1
-            num_gaze = len(trial_comp)
+            num_gaze = len(trial_comp_1)
             if num_gaze > 0:
-                fix_compliance.append(np.sum(trial_comp)/num_gaze)
+                for k, deg_val in enumerate([0.5, 1, 2, 3]):
+                    fix_compliance[k].append(np.sum(trial_comp[k])/num_gaze)
                 gaze_per_trial.append(num_gaze)
                 gaze_confidence.append(np.sum(trial_conf)/num_gaze)
             else:
-                fix_compliance.append(np.nan)
+                for k, deg_val in enumerate([0.5, 1, 2, 3]):
+                    fix_compliance[k].append(np.nan)
                 gaze_per_trial.append(np.nan)
                 gaze_confidence.append(np.nan)
 
@@ -388,12 +395,14 @@ def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, c
             else:
                 gaze_confidence.append(np.nan)
                 gaze_per_trial.append(np.nan)
-            fix_compliance.append(np.nan)
+            for k, deg_val in enumerate([0.5, 1, 2, 3]):
+                fix_compliance[k].append(np.nan)
 
         else:
             gaze_confidence.append(np.nan)
             gaze_per_trial.append(np.nan)
-            fix_compliance.append(np.nan)
+            for k, deg_val in enumerate([0.5, 1, 2, 3]):
+                fix_compliance[k].append(np.nan)
 
     # Insert 3 new columns in df_ev
     df_ev.insert(loc=df_ev.shape[1]-2, column=f'gaze_confidence_ratio_cThresh{conf_thresh}',
@@ -401,8 +410,9 @@ def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, c
     if add_count:
         df_ev.insert(loc=df_ev.shape[1]-2, column='gaze_count',
                      value=gaze_per_trial, allow_duplicates=True)
-        df_ev.insert(loc=df_ev.shape[1]-2, column='fixation_compliance_ratio',
-                     value=fix_compliance, allow_duplicates=True)
+        for k, deg_val in enumerate([0.5, 1, 2, 3]):
+            df_ev.insert(loc=df_ev.shape[1]-2, column=f'fixation_compliance_ratio_deg{deg_val}',
+                         value=fix_compliance[k], allow_duplicates=True)
 
     return df_ev
 
@@ -502,7 +512,7 @@ def driftCorr_EToutput(row, out_path, is_final=False):
             else:
                 deg_x = int(row['polyDeg_x']) if not pd.isna(row['polyDeg_x']) else 4
                 deg_y = int(row['polyDeg_y']) if not pd.isna(row['polyDeg_y']) else 4
-                anchors = [0, 0]#[0, 50]
+                anchors = [0, 1]#[0, 50]
 
                 # if retino or floc, continuous fixation means that all gaze are fixations
                 # remove 3-9s of gaze data at begining and end for stability
@@ -544,7 +554,9 @@ def driftCorr_EToutput(row, out_path, is_final=False):
                 if gaze_threshold != 0.9:
                     run_event = assign_gazeConf2trial(run_event, all_times, all_conf, task_type, conf_thresh=gaze_threshold, add_count=False)
                 # Measure fixation compliance during trial (THINGS) or during preceeding fixation
-                run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type)
+                run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 1)
+                run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 2)
+                run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 3)
 
             if is_final:
                 # export final events files w metrics on proportion of high confidence pupils per trial
@@ -597,6 +609,90 @@ def driftCorr_EToutput(row, out_path, is_final=False):
 
             else:
                 # export plots to visulize the gaze drift correction for last round of QC
+                if 'mario' in pseudo_task:
+                    mosaic = """
+                        AB
+                        CD
+                        EF
+                        GH
+                    """
+                    fs = (15, 14.0)
+                elif task_root in ['retino', 'floc']:
+                    mosaic = """
+                        CD
+                        EF
+                    """
+                    fs = (15, 7.0)
+                else:
+                    mosaic = """
+                        AB
+                        CD
+                        EF
+                    """
+                    fs = (15, 10.5)
+
+                fig = plt.figure(constrained_layout=True, figsize=fs)
+                ax_dict = fig.subplot_mosaic(mosaic)
+                run_dur = int(run_event.iloc[-1]['onset'] + 20)
+
+                if task_root not in ['retino', 'floc']:
+                    if 'mario' in pseudo_task:
+                        m_trialtype = run_event['trial_type'].to_numpy()
+                        m_filter = ((m_trialtype == 'gym-retro_game') + (m_trialtype == 'fixation_dot')).astype(bool)
+                        run_event = run_event[m_filter]
+                        #run_event = run_event[run_event['trial_type'].to_numpy() == 'gym-retro_game']
+                    ax_dict["A"].scatter(run_event['onset'].to_numpy(), run_event[f'gaze_confidence_ratio_cThresh{gaze_threshold}'].to_numpy())
+                    ax_dict["A"].set_ylim(-0.1, 1.1)
+                    ax_dict["A"].set_xlim(0, run_dur)
+                    ax_dict["A"].set_title(f'{sub} {pseudo_task} {ses} {run_num} ratio >{str(gaze_threshold)} confidence per trial')
+
+                    if 'mario' in pseudo_task:
+                        run_event = run_event[run_event['trial_type'].to_numpy() == 'fixation_dot']
+                    ax_dict["B"].scatter(run_event['onset'].to_numpy(), run_event['fixation_compliance_ratio_deg1'].to_numpy())
+                    ax_dict["B"].set_ylim(-0.1, 1.1)
+                    ax_dict["B"].set_xlim(-0.1, run_dur)
+                    ax_dict["B"].set_title(f'{sub} {pseudo_task} {ses} {run_num} fixation compliance per trial')
+
+                ax_dict["C"].scatter(all_times, all_x, s=10, color='xkcd:light grey', alpha=all_conf)
+                ax_dict["C"].scatter(all_times, all_x_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
+                ax_dict["C"].set_ylim(-2, 2)
+                ax_dict["C"].set_xlim(0, run_dur)
+                ax_dict["C"].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_x')
+
+                ax_dict["D"].scatter(all_times, all_y, color='xkcd:light grey', alpha=all_conf)
+                ax_dict["D"].scatter(all_times, all_y_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
+                ax_dict["D"].set_ylim(-2, 2)
+                ax_dict["D"].set_xlim(0, run_dur)
+                ax_dict["D"].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_y')
+
+                ax_dict["E"].scatter(clean_times, clean_dist_x, color='xkcd:light blue', s=20, alpha=0.2)
+                if row['use_latestFix']==1.0:
+                    ax_dict["E"].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=1.0)
+                else:
+                    ax_dict["E"].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=0.4)
+                    ax_dict["E"].plot(all_times_arr, p_of_all_x, color="xkcd:black", linewidth=2)
+                    # TODO: if mario, compute and plot enveloppes?
+                ax_dict["E"].set_ylim(-2, 2)
+                ax_dict["E"].set_xlim(0, run_dur)
+                ax_dict["E"].set_title(f'{sub} {pseudo_task} {ses} {run_num} fix_distance_x')
+
+                ax_dict["F"].scatter(clean_times, clean_dist_y, color='xkcd:light blue', s=20, alpha=0.2)
+                if row['use_latestFix']==1.0:
+                    ax_dict["F"].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=1.0)
+                else:
+                    ax_dict["F"].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=0.4)
+                    ax_dict["F"].plot(all_times_arr, p_of_all_y, color="xkcd:black", linewidth=2)
+                    # TODO: if mario, compute and plot enveloppes?
+                lb = np.min(fix_dist_y)-0.1 if np.min(fix_dist_y) < -2 else -2
+                hb = np.max(fix_dist_y)+0.1 if np.max(fix_dist_y) > 2 else 2
+                ax_dict["F"].set_ylim(lb, hb)
+                ax_dict["F"].set_xlim(0, run_dur)
+                ax_dict["F"].set_title(f'{sub} {pseudo_task} {ses} {run_num} fix_distance_y')
+
+
+                # TODO: if mario, compute and plot enveloppe-corrected gaze and fixation points...
+
+                '''
                 fig, axes = plt.subplots(5, 1, figsize=(7, 17.5))
                 run_dur = int(run_event.iloc[-1]['onset'] + 20)
 
@@ -640,6 +736,7 @@ def driftCorr_EToutput(row, out_path, is_final=False):
                 axes[4].set_ylim(-0.1, 1.1)
                 axes[4].set_xlim(0, run_dur)
                 axes[4].set_title(f'{sub} {pseudo_task} {ses} {run_num} ratio >{str(gaze_threshold)} confidence per trial')
+                '''
 
                 fig.savefig(out_file)
                 plt.close()
@@ -649,7 +746,7 @@ def driftCorr_EToutput(row, out_path, is_final=False):
 
 def main():
     '''
-    This ccript applies drift correction to gaze based on known periods of fixations (ground truth).
+    This script applies drift correction to gaze based on known periods of fixations (ground truth).
     The default approach is to draw a polynomial of deg=4 (in x and y) through the distance between the mapped gaze
     and known target positions during periods of fixations plotted over time (throughout a run's duration).
 
