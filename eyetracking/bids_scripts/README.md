@@ -33,10 +33,44 @@ Save this list as "QCed_file_list.tsv" in the "out_path/QC_gaze" directory. Note
 
 **Step 3. Correct Drift and export plots of drift-corrected gaze**
 
+Script: eyetracking/bids_scripts/et_prep_step2.py
+
+The script
+- performs drift correction on runs of gaze data according to parameters specified in QCed_file_list.tsv
+- exports plots of raw and corrected gaze positions to QC each run (flag runs that fail drift correction)
+
+To lauch on elm, just specify the name of the dataset directory under /unf/eyetracker dataset\
+e.g.,
+```bash
+./eyetracking/bids_scripts/launch_etprep_step2_iterate.sh triplets
+```
 -----------
 
 **Step 4. Offline quality check: drift corrected gaze**
 
+Rate the drift correction success for each run based on the graphs generated in step 3.\
+Determine whether drift correction passes or fails.
+
+For failed runs, wadjust drift correction parameters (from the default). In QCed_file_list.tsv, the following parameters can be customized for each run : pupil confidence threshold, polynomial degree in x and y (to fit gaze mapping drift over time), and whether drift should be corrected based on the latest fixation (rather than with a polynomial fitted through the run's fixations).
+
+Iterate on steps 3 and 4 until a run is well-corrected (Pass_DriftCorr), or until it is considered beyond fixing (Fails_DriftCorr).
+
+Compile a final list of runs to drift-correct and bids-format (in step 5).
+Save this list as "QCed_file_list_final.tsv" in the "out_path/QC_gaze" directory.
+
 -----------
 
 **Step 5. Export gaze and pupil metrics in bids-compliant format**
+
+Script: eyetracking/bids_scripts/et_prep_step2.py
+
+The script
+- performs drift correction on runs of gaze data according to parameters specified in QCed_file_list.tsv
+- exports eyetracking data in bids-compliant format (.tsv.gz), according to the following proposed bids extension guidelines:
+https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-eyetrackjson
+
+To lauch on elm, just specify the name of the dataset directory under /unf/eyetracker dataset\
+e.g.,
+```bash
+./eyetracking/bids_scripts/launch_etprep_step2_final.sh triplets
+```

@@ -477,7 +477,7 @@ def driftCorr_EToutput(row, out_path, is_final=False):
     print(sub, ses, fnum, pseudo_task, run_num)
 
     if is_final:
-        outpath_events = f'{out_path}/Events_files'
+        outpath_events = f'{out_path}/Events_files_enhanced'
         Path(outpath_events).mkdir(parents=True, exist_ok=True)
         out_file = f'{outpath_events}/{sub}_{ses}_{fnum}_{pseudo_task}_{run_num}_events.tsv'
     else:
@@ -599,7 +599,7 @@ def driftCorr_EToutput(row, out_path, is_final=False):
 
                 df_gaze = pd.DataFrame(np.array(final_gaze_list, dtype=object), columns=col_names)
 
-                bids_out_path = f'{out_path}/final_bids/{sub}/{ses}'
+                bids_out_path = f'{out_path}/final_bids_DriftCor/{sub}/{ses}'
                 Path(bids_out_path).mkdir(parents=True, exist_ok=True)
                 gfile_path = f'{bids_out_path}/{sub}_{ses}_{pseudo_task}_{run_num}_eyetrack.tsv.gz'
                 if os.path.exists(gfile_path):
