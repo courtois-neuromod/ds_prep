@@ -465,9 +465,9 @@ def bidsify_EToutput(row, out_path):
     bids_out_path = f'{out_path}/final_bids/{sub}/{ses}'
     Path(bids_out_path).mkdir(parents=True, exist_ok=True)
     gfile_path = f'{bids_out_path}/{sub}_{ses}_{pseudo_task}_{run_num}_eyetrack.tsv.gz'
-        if os.path.exists(gfile_path):
-            # just in case session's run is done twice... note: not bids...
-            gfile_path = f'{bids_out_path}/{sub}_{ses}_{pseudo_task}_{fnum}_{run_num}_eyetrack.tsv.gz'
+    if os.path.exists(gfile_path):
+        # just in case session's run is done twice... note: not bids...
+        gfile_path = f'{bids_out_path}/{sub}_{ses}_{pseudo_task}_{fnum}_{run_num}_eyetrack.tsv.gz'
 
     #if True:
     try:
