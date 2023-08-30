@@ -17,7 +17,7 @@ datalad install -d . -s ${ria_store}#~templateflow ./sourcedata/templateflow
 datalad install -d . -s ${ria_store}#~repronim/containers ./containers
 git -C containers remote rename origin ria-beluga #rename to ria-beluga to be more explicit
 datalad run  -m "Freeze fmriprep container version" containers/scripts/freeze_versions --save-dataset=. bids-fmriprep=$fmriprep_version
-datalad push -d containers --to ria-beluga # push changes to the RIA for the freeze commit to exists there
+#datalad push -d containers --to ria-beluga # push changes to the RIA for the freeze commit to exists there
 
 datalad install -d . -s ${ria_store}#~cneuromod.anat.smriprep sourcedata/smriprep
 
