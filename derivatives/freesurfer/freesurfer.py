@@ -21,7 +21,7 @@ SINGULARITY_CMD_BASE = " ".join(
     [
         "datalad containers-run "
         "-m 'fMRIPrep_{subject_session}'",
-        "-n containers/bids-freesurfer",
+        "-n bids-freesurfer",
     ] + [
         "--output .",
     ]
@@ -30,8 +30,8 @@ SINGULARITY_CMD_BASE = " ".join(
 slurm_preamble = """#!/bin/bash
 #SBATCH --account={slurm_account}
 #SBATCH --job-name={jobname}.job
-#SBATCH --output={derivatives_path}/code/{jobname}.out
-#SBATCH --error={derivatives_path}/code/{jobname}.err
+#SBATCH --output=./code/{jobname}.out
+#SBATCH --error=./code/{jobname}.err
 #SBATCH --time={time}
 #SBATCH --cpus-per-task={cpus}
 #SBATCH --mem-per-cpu={mem_per_cpu}M
@@ -41,7 +41,7 @@ slurm_preamble = """#!/bin/bash
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user={email}
 
- 
+
 set -e -u -x
 
 """
@@ -52,10 +52,10 @@ export LOCAL_DATASET=$SLURM_TMPDIR/${{SLURM_JOB_NAME//-/}}/
 flock --verbose {ds_lockfile} datalad clone {output_repo} $LOCAL_DATASET
 cd $LOCAL_DATASET
 datalad get -s ria-beluga-storage -J 4 -n -r -R1 . # get sourcedata/* containers
-git submodule foreach --recursive git annex dead here
+git annex dead here
 git checkout -b $SLURM_JOB_NAME
 
-git submodule foreach  --recursive git-annex enableremote ria-beluga-storage
+git submodule foreach  --recursive bash -c "git-annex enableremote ria-beluga-storage || true"
 
 """
 
@@ -70,7 +70,7 @@ def load_bidsignore(bids_root, mode="python"):
         if mode == 'python':
             import re
             import fnmatch
-            
+
             return tuple(
                 [
                     re.compile(fnmatch.translate(bi))
@@ -91,7 +91,7 @@ def write_freesurfer_job(layout, subject, session, args):
     derivatives_path = os.path.realpath(os.path.abspath(args.output_path))
 
     study = os.path.basename(layout.root)
-    
+
     job_specs = dict(
         study=study,
         subject=subject,
@@ -115,7 +115,7 @@ def write_freesurfer_job(layout, subject, session, args):
         f.write(slurm_preamble.format(**job_specs))
         f.write(datalad_pre.format(**job_specs))
 
-        
+
         f.write(
             " ".join(
                 [
@@ -123,15 +123,12 @@ def write_freesurfer_job(layout, subject, session, args):
                     # too large scope, but only a few MB unnecessary pulled
                     "--input 'sourcedata/{study}/{subject_session}/anat/*_T1w.nii.gz'".format(**job_specs),
                     "--input 'sourcedata/{study}/{subject_session}/anat/*_T2w.nii.gz'".format(**job_specs),
-                    "--input 'sourcedata/{study}/{subject_session}/anat/*_FLAIR.nii.gz'".format(**job_specs),
                     "--",
                     str(args.bids_path.relative_to(args.output_path)),
                     "./",
                     "participant",
                     f"--steps {args.step}",
-                    "--refine_pial",
-                    "--reconstruction_label norm",
-                    "--refine_pial_reconstruction_label norm",
+                    "--refine_pial T2",
                     "--hires_mode enable",
                     f"--participant_label {subject}",
                     f"--session_label {session}" if session else "",
