@@ -55,7 +55,7 @@ def infotoids(seqinfos, outdir):
     subject_id = 'unknown'
     session_id = 'unknown'
 
-    rema = re.match("(([^_]*)_)?(([^_]*)_)?p([0-9]*)_([a-zA-Z]*)([0-9]*)", patient_name)
+    rema = re.match("(([^_]*)_)?(([^_]*)_)?p([0-9]*)_([a-zA-Z0-9]*)([0-9]{3})", patient_name)
     if rema is None:
         rema = re.match("(([^_]*)_)?(([^_]*)_)?(dev)_([a-zA-Z]*)([0-9]*)", patient_name)
     if rema:
@@ -415,7 +415,7 @@ def dedup_bids_extra(info, bids_infos):
             for extra in ["rec", "part"]:
 
                 bids_extra_values = [bids_infos[sid][1].get(extra) for sid in series_ids]
-
+                lgr.info(f'{extra} values {bids_extra_values}')
                 if len(set(bids_extra_values)) < 2:
                     continue #does not differentiate series
 
