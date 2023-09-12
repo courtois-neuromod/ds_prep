@@ -11,6 +11,7 @@ import datalad.api
 from datalad.support.annexrepo import AnnexRepo
 from deepbrain import Extractor
 import scipy.ndimage.morphology
+from PIL import Image
 
 from dipy.align.imaffine import (
     transform_centers_of_mass,
@@ -71,6 +72,11 @@ def parse_args():
         "--debug-images",
         action="store_true",
         help="Output debug images in the current directory",
+    )
+    parser.add_argument(
+        "--output-pngs-path",
+        type=Path,
+        help="Output reports images to the specified directory",
     )
     parser.add_argument(
         "--ref-bids-filters",
@@ -214,12 +220,12 @@ def main():
     subject_list = (
         args.participant_label if args.participant_label else bids.layout.Query.ANY
     )
-    session_list = args.session_label if args.session_label else bids.layout.Query.ANY
     filters = dict(
         subject=subject_list,
-        session=session_list,
         **args.ref_bids_filters,
         extension=['nii','nii.gz'])
+    if args.session_label:
+        filters['session'] = args.session_label
     deface_ref_images = layout.get(**filters)
 
     if not len(deface_ref_images):
@@ -274,7 +280,8 @@ def main():
             output_debug_images(tmpl_image, ref_image, ref2tpl_affine)
 
         series_to_deface = []
-        for filters in args.other_bids_filters:
+        filters_to_deface = args.other_bids_filters if isinstance(args.other_bids_filters, list) else [args.other_bids_filters]
+        for filters in filters_to_deface:
             series_to_deface.extend(
                 layout.get(
                     extension=["nii", "nii.gz"],
@@ -319,11 +326,22 @@ def main():
                     warped_mask.to_filename(warped_mask_path)
                     new_files.append(warped_mask_path)
 
+            masked_volume = np.asanyarray(serie_nb.dataobj) * np.asanyarray(warped_mask.dataobj)
+
             masked_serie = nb.Nifti1Image(
-                np.asanyarray(serie_nb.dataobj) * np.asanyarray(warped_mask.dataobj),
+                masked_volume,
                 serie_nb.affine,
                 serie_nb.header,
             )
+
+            if args.output_pngs_path:
+                args.output_pngs_path.mkdir(parents=True, exist_ok=True)
+                slice = masked_volume[masked_volume.shape[0]//2,:,:]
+                im = Image.fromarray((slice * (255/slice.max())).astype(np.uint8)).rotate(90)
+                png_output_path = args.output_pngs_path / (Path(serie.path).stem + '.png')
+                logging.info(f"saving report slice {png_output_path}")
+                im.save(png_output_path)
+
             masked_serie.to_filename(serie.path)
             modified_files.append(serie.path)
 
