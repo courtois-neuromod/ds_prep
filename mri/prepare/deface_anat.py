@@ -250,7 +250,7 @@ def main():
 
     for ref_image in deface_ref_images:
         subject = ref_image.entities["subject"]
-        session = ref_image.entities["session"]
+        session = ref_image.entities.get("session", None)
 
         datalad.api.get(ref_image.path)
         ref_image_nb = ref_image.get_image()
