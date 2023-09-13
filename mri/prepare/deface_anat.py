@@ -241,6 +241,8 @@ def main():
     # if the MNI template image is not available locally
     if not os.path.exists(os.path.realpath(mni_path)):
         datalad.api.get(mni_path, dataset=datalad.api.Dataset(script_dir + "/../../"))
+    if not os.path.exists(os.path.realpath(mni_mask_path)):
+        datalad.api.get(mni_mask_path, dataset=datalad.api.Dataset(script_dir + "/../../"))
     tmpl_image = nb.load(mni_path)
     tmpl_image_mask = nb.load(mni_mask_path)
     tmpl_defacemask = generate_deface_ear_mask(tmpl_image)
