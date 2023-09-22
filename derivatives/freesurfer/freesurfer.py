@@ -20,7 +20,7 @@ FREESURFER_REQ = {"cpus": 4, "mem_per_cpu": 4096, "time": "24:00:00", "omp_nthre
 SINGULARITY_CMD_BASE = " ".join(
     [
         "datalad containers-run "
-        "-m 'fMRIPrep_{subject_session}'",
+        "-m 'freesurfer_{subject_session}'",
         "-n containers/bids-freesurfer",
     ] + [
         "--output .",
@@ -111,6 +111,17 @@ def write_freesurfer_job(layout, subject, session, args):
 
     pybids_cache_path = os.path.join(layout.root, PYBIDS_CACHE_PATH)
 
+    if args.step == 'cross-sectional':
+        inputs = [
+            "--input 'sourcedata/{study}/{subject_session}/anat/*_T1w.nii.gz'".format(**job_specs),
+            "--input 'sourcedata/{study}/{subject_session}/anat/*_T2w.nii.gz'".format(**job_specs),
+            "--input 'sourcedata/{study}/{subject_session}/anat/*_FLAIR.nii.gz'".format(**job_specs),
+        ]
+    else: #template or long
+        inputs = ["--input 'sub-{subject}*/'".format(**job_specs)]
+        
+        
+
     with open(job_path, "w") as f:
         f.write(slurm_preamble.format(**job_specs))
         f.write(datalad_pre.format(**job_specs))
@@ -121,17 +132,15 @@ def write_freesurfer_job(layout, subject, session, args):
                 [
                     SINGULARITY_CMD_BASE.format(**job_specs),
                     # too large scope, but only a few MB unnecessary pulled
-                    "--input 'sourcedata/{study}/{subject_session}/anat/*_T1w.nii.gz'".format(**job_specs),
-                    "--input 'sourcedata/{study}/{subject_session}/anat/*_T2w.nii.gz'".format(**job_specs),
-                    "--input 'sourcedata/{study}/{subject_session}/anat/*_FLAIR.nii.gz'".format(**job_specs),
+                    *inputs,
                     "--",
                     str(args.bids_path.relative_to(args.output_path)),
                     "./",
                     "participant",
                     f"--steps {args.step}",
                     "--refine_pial",
-                    "--reconstruction_label norm",
-                    "--refine_pial_reconstruction_label norm",
+#                    "--reconstruction_label norm",
+#                    "--refine_pial_reconstruction_label norm",
                     "--hires_mode enable",
                     f"--participant_label {subject}",
                     f"--session_label {session}" if session else "",
