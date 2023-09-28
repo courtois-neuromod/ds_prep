@@ -18,9 +18,9 @@ def get_arguments():
 
 def main():
     '''
-    This script exports raw bids-compliant gaze and pupil metrics (no drift correction in .tsv.gz format,
-    according to the following proposed bids extension guidelines:
-    https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-_eyetrackjson
+    This script inserts trial-wise eye-tracking QC metrics into events files for the THINGS dataset.
+    It inserts these metrics into event files whose behavioural metrics were corrected
+    to account for sessions administered out of order.
     '''
 
     args = get_arguments()
