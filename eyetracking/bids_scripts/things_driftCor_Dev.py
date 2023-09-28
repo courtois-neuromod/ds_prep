@@ -445,7 +445,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
     task_root = out_path.split('/')[-1]
 
     [sub, ses, fnum, task_type, run_num, appendix] = os.path.basename(row['events_path']).split('_')
-    print(sub, ses, fnum, pseudo_task, run_num)
+    print(sub, ses, fnum, task_type, run_num)
 
     if phase_num in [1, 2]:
         outpath_fig = os.path.join(out_path, 'TEST_gaze')
