@@ -1,6 +1,8 @@
 import os, glob, sys, json
 import pandas as pd
 import numpy as np
+from scipy.spatial.distance import pdist
+
 from pathlib import Path
 
 import matplotlib
