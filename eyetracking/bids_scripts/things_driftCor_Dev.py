@@ -440,6 +440,63 @@ def apply_poly(ref_times, distances, degree, all_times, anchors = [150, 150]):
     return p_of_all
 
 
+def get_trial_distances(df_ev, x, y, times, confs):
+    '''
+    Reset gaze time in relation to trial onset
+    Calculate distance from center (0.5, 0.5) for each trial gaze
+
+    Export within-trial position (x and y), distance to center, relative time stamp and confidence
+    '''
+
+    assert len(x) == len(y)
+    assert len(x) == len(times)
+    assert len(x) == len(confs)
+
+    dist_in_pix = 4164 # in pixels
+    m_vecpos = np.array([0., 0., dist_in_pix])
+
+    all_dist = []
+    all_x = []
+    all_y = []
+    all_times = []
+    all_confs = []
+
+    j = 0
+
+    for i in range(df_ev.shape[0]):
+        trial_onset = df_ev['onset'][i]
+        trial_offset = trial_onset + df_ev['duration'][i] + 1.49
+
+        # add gaze from trial period
+        trial_pos = []
+        trial_times = []
+        trial_confs = []
+        while j < len(times) and times[j] < trial_offset:
+            if times[j] > trial_onset and times[j] < trial_offset:
+                trial_pos.append((x[j], y[j]))
+                trial_times.append(times[j] - trial_onset)
+                trial_confs.append(confs[j])
+            j += 1
+
+        if len(trial_pos) > 0:
+            gaze = (np.array(trial_pos) - 0.5)*(1280, 1024)
+            gaze_vecpos = np.concatenate((gaze, np.repeat(dist_in_pix, len(gaze)).reshape((-1, 1))), axis=1)
+
+            trial_distances = []
+            for gz_vec in gaze_vecpos:
+                vectors = np.stack((m_vecpos, gz_vec), axis=0)
+                distance = np.rad2deg(np.arccos(1.0 - pdist(vectors, metric='cosine')))[0]
+                trial_distances.append(distance)
+
+            all_dist += trial_distances
+            all_x += gaze[:, 0].tolist()
+            all_y += gaze[:, 1].tolist()
+            all_times += trial_times
+            all_confs += trial_confs
+
+    return all_dist, all_x, all_y, all_times, all_confs
+
+
 def driftCorr_ETtests(row, out_path, phase_num=1):
 
     task_root = out_path.split('/')[-1]
@@ -476,8 +533,8 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
             '''
             Phase 1: plot drift-corrected gaze based on median from within trial, within ISI, within trial + ISI, and w polynomial
             '''
-            if phase_num == 1:
-                plot_vals = {}
+            plot_vals = {}
+            if phase_num in [1, 2]:
 
                 fix_dist_x_img, fix_dist_y_img, fix_times_img = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "image", med_fix=True)
                 all_x_aligned_img, all_y_aligned_img = driftcorr_fromlast(fix_dist_x_img, fix_dist_y_img, fix_times_img, all_x, all_y, all_times)
@@ -515,6 +572,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                     'fix_dist_y': fix_dist_y_img_isi,
                 }
 
+            if phase_num == 1:
                 deg_x = int(row['polyDeg_x']) if not pd.isna(row['polyDeg_x']) else 4
                 deg_y = int(row['polyDeg_y']) if not pd.isna(row['polyDeg_y']) else 4
                 anchors = [0, 1]#[0, 50]
@@ -641,8 +699,95 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                 fig.savefig(out_file)
                 plt.close()
 
+            elif phase_num  == 2:
+                plot_vals2 = {}
 
-            elif phase_num in [2, 3]:
+                trial_dist_img, trial_x_img, trial_y_img, trial_time_img, trial_conf_img = get_trial_distances(run_event, all_x_aligned_img, all_y_aligned_img, all_times, all_conf)
+                plot_vals2['LF_img'] = {
+                    'refs': ["A", "B", "C", "D"],
+                    'trial_dist': trial_dist_img,
+                    'trial_x': trial_x_img,
+                    'trial_y': trial_y_img,
+                    'trial_time': trial_time_img,
+                    'trial_conf': trial_conf_img,
+                }
+
+                trial_dist_isi, trial_x_isi, trial_y_isi, trial_time_isi, trial_conf_isi = get_trial_distances(run_event, all_x_aligned_isi, all_y_aligned_isi, all_times, all_conf)
+                plot_vals2['LF_isi'] = {
+                    'refs': ["E", "F", "G", "H"],
+                    'trial_dist': trial_dist_isi,
+                    'trial_x': trial_x_isi,
+                    'trial_y': trial_y_isi,
+                    'trial_time': trial_time_isi,
+                    'trial_conf': trial_conf_isi,
+                }
+
+                trial_dist_img_isi, trial_x_img_isi, trial_y_img_isi, trial_time_img_isi, trial_conf_img_isi = get_trial_distances(run_event,
+                                                                                                                                   all_x_aligned_img_isi,
+                                                                                                                                   all_y_aligned_img_isi,
+                                                                                                                                   all_times,
+                                                                                                                                   all_conf,
+                                                                                                                                   )
+                plot_vals2['LF_img_isi'] = {
+                    'refs': ["I", "J", "K", "L"],
+                    'trial_dist': trial_dist_img_isi,
+                    'trial_x': trial_x_img_isi,
+                    'trial_y': trial_y_img_isi,
+                    'trial_time': trial_time_img_isi,
+                    'trial_conf': trial_conf_img_isi,
+                }
+
+                # TODO: generate second series of figures.
+                # Within trial: plot drift_corrected gaze position over trial's timeline, for image and isi
+                # Also plot other metrics: position in x and y, confidence (more blinks during ISI? more mvt in image?),
+                # Plot: distribution of standard deviations during image, and during ISI
+                # Plot: distance between consecutive median points of fixation
+                # export plots to visualize the gaze drift correction for last round of QC
+                mosaic = """
+                    AEI
+                    BFJ
+                    CGK
+                    DHL
+                """
+                fs = (20, 14.0)
+
+                fig = plt.figure(constrained_layout=True, figsize=fs)
+                ax_dict = fig.subplot_mosaic(mosaic)
+                run_dur = int(run_event.iloc[-1]['onset'] + 20)
+
+                for key in plot_vals2:
+                    refs = plot_vals2[key]['refs']
+                    trial_dist = plot_vals2[key]['trial_dist']
+                    trial_x = plot_vals2[key]['trial_x']
+                    trial_y = plot_vals2[key]['trial_y']
+                    trial_time = plot_vals2[key]['trial_time']
+                    trial_conf = plot_vals2[key]['trial_conf']
+
+                    ax_dict[refs[0]].scatter(trial_time, trial_x, c=trial_conf, s=10, cmap='terrain_r', alpha=0.1)
+                    ax_dict[refs[0]].plot([2.98, 2.98], [-2, 2], color="xkcd:red", linewidth=2)
+                    ax_dict[refs[0]].set_ylim(-2, 2)
+                    ax_dict[refs[0]].set_title(f'{sub} {ses} {run_num} {key} gaze_x')
+
+                    ax_dict[refs[1]].scatter(trial_time, trial_y, c=trial_conf, s=10, cmap='terrain_r', alpha=0.1)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[0]].plot([2.98, 2.98], [-2, 2], color="xkcd:red", linewidth=2)
+                    ax_dict[refs[1]].set_ylim(-2, 2)
+                    ax_dict[refs[1]].set_title(f'{sub} {ses} {run_num} {key} gaze_y')
+
+                    ax_dict[refs[2]].scatter(trial_time, trial_dist, c=trial_conf, s=10, cmap='terrain_r', alpha=0.1)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[0]].plot([2.98, 2.98], [-2, 2], color="xkcd:red", linewidth=2)
+                    ax_dict[refs[2]].set_ylim(-0.1, 7)
+                    ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} {key} gaze_dist (deg)')
+
+                    ax_dict[refs[2]].scatter(trial_time, trial_conf, c=trial_conf, s=10, cmap='terrain_r', alpha=0.1)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[0]].plot([2.98, 2.98], [-2, 2], color="xkcd:red", linewidth=2)
+                    ax_dict[refs[2]].set_ylim(-0.1, 1.1)
+                    ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} {key} gaze_conf')
+
+                fig.savefig(out_file)
+                plt.close()
+
+
+            elif phase_num  == 3:
                 # TODO: update below to reflect best drift-correction practice
                 if row['use_latestFix']==1.0:
                     '''
@@ -667,15 +812,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                     p_of_all_y = apply_poly(fix_times, fix_dist_y, deg_y, all_times_arr, anchors=anchors)
                     all_y_aligned = np.array(all_y) - (p_of_all_y)
 
-                if phase_num == 2:
-                    pass
-                    # TODO: generate second series of figures.
-                    # Within trial: plot drift_corrected gaze position over trial's timeline, for image and isi
-                    # Also plot other metrics: position in x and y, confidence (more blinks during ISI? more mvt in image?),
-                    # Plot: distribution of standard deviations during image, and during ISI
-                    # Plot: distance between consecutive median points of fixation
 
-                elif phase_num == 3:
                     # TODO: fix old code below to export bids-compliant DriftCorr gaze and QC metrics in events files
                     '''
                     Potentially: correction will be anchored on fixation during preceeding ISI (ISI_0)
