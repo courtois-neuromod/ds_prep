@@ -514,8 +514,8 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
         out_file = f'{outpath_events}/{sub}_{ses}_{fnum}_{task_type}_{run_num}_events.tsv'
 
     if not os.path.exists(out_file):
-        #if True:
-        try:
+        if True:
+        #try:
             run_event = pd.read_csv(row['events_path'], sep = '\t', header=0)
             run_gaze = np.load(row['gaze_path'], allow_pickle=True)['gaze2d']
 
@@ -946,8 +946,8 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                 fig.savefig(out_file)
                 plt.close()
                 '''
-        except:
-            print('could not process')
+        #except:
+        #    print('could not process')
 
 
 def main():
