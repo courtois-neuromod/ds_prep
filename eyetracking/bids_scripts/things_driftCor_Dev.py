@@ -507,7 +507,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
     [sub, ses, fnum, task_type, run_num, appendix] = os.path.basename(row['events_path']).split('_')
     print(sub, ses, fnum, task_type, run_num)
 
-    if phase_num in [1, 2]:
+    if phase_num in [1, 2, 3]:
         outpath_fig = os.path.join(out_path, 'TEST_gaze')
         Path(outpath_fig).mkdir(parents=True, exist_ok=True)
         out_file = f'{outpath_fig}/TESTplot_phase{phase_num}_{sub}_{ses}_{run_num}_{fnum}_{task_type}.png'
