@@ -537,7 +537,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
             Phase 1: plot drift-corrected gaze based on median from within trial, within ISI, within trial + ISI, and w polynomial
             '''
             plot_vals = {}
-            if phase_num in [1, 2]:
+            if phase_num in [1, 2, 3]:
 
                 fix_dist_x_img, fix_dist_y_img, fix_times_img = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "image", med_fix=True)
                 all_x_aligned_img, all_y_aligned_img = driftcorr_fromlast(fix_dist_x_img, fix_dist_y_img, fix_times_img, all_x, all_y, all_times)
@@ -575,7 +575,6 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                     'fix_dist_y': fix_dist_y_img_isi,
                 }
 
-            if phase_num == 1:
                 deg_x = int(row['polyDeg_x']) if not pd.isna(row['polyDeg_x']) else 4
                 deg_y = int(row['polyDeg_y']) if not pd.isna(row['polyDeg_y']) else 4
                 anchors = [0, 1]#[0, 50]
@@ -640,6 +639,8 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                     'p_of_all_y': p_of_all_y_pimg_isi,
                 }
 
+
+            if phase_num == 1:
                 # export plots to visualize the gaze drift correction for last round of QC
                 mosaic = """
                     AEIMQU
@@ -791,34 +792,111 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
 
 
             elif phase_num  == 3:
-                # TODO: update below to reflect best drift-correction practice
-                if row['use_latestFix']==1.0:
-                    '''
-                    use latest point of fixation to realign the gaze
-                    Note: this approach cannot be used for tasks for which continuous fixation is required (e.g., floc, retinotopy)
-                    '''
-                    fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "image", med_fix=True)
-                    all_x_aligned, all_y_aligned = driftcorr_fromlast(fix_dist_x, fix_dist_y, fix_times, all_x, all_y, all_times)
-                else:
-                    deg_x = int(row['polyDeg_x']) if not pd.isna(row['polyDeg_x']) else 4
-                    deg_y = int(row['polyDeg_y']) if not pd.isna(row['polyDeg_y']) else 4
-                    anchors = [0, 1]#[0, 50]
+                plot_vals2 = {}
 
-                    # distance from central fixation for high-confidence gaze captured during periods of fixation (between trials)
-                    fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "image")
+                trial_dist_img, trial_x_img, trial_y_img, trial_time_img, trial_conf_img = get_trial_distances(run_event, all_x_aligned_pimg, all_y_aligned_pimg, all_times, all_conf)
+                plot_vals2['Poly_img'] = {
+                    'refs': ["A", "B", "C", "D"],
+                    'trial_dist': trial_dist_img,
+                    'trial_x': trial_x_img,
+                    'trial_y': trial_y_img,
+                    'trial_time': trial_time_img,
+                    'trial_conf': trial_conf_img,
+                }
 
-                    # fit polynomial through distance between fixation and target
-                    # use poly curve to apply correction to all gaze (no confidence threshold applied)
-                    p_of_all_x = apply_poly(fix_times, fix_dist_x, deg_x, all_times_arr, anchors=anchors)
-                    all_x_aligned = np.array(all_x) - (p_of_all_x)
+                trial_dist_isi, trial_x_isi, trial_y_isi, trial_time_isi, trial_conf_isi = get_trial_distances(run_event, all_x_aligned_pisi, all_y_aligned_pisi, all_times, all_conf)
+                plot_vals2['Poly_isi'] = {
+                    'refs': ["E", "F", "G", "H"],
+                    'trial_dist': trial_dist_isi,
+                    'trial_x': trial_x_isi,
+                    'trial_y': trial_y_isi,
+                    'trial_time': trial_time_isi,
+                    'trial_conf': trial_conf_isi,
+                }
 
-                    p_of_all_y = apply_poly(fix_times, fix_dist_y, deg_y, all_times_arr, anchors=anchors)
-                    all_y_aligned = np.array(all_y) - (p_of_all_y)
+                trial_dist_img_isi, trial_x_img_isi, trial_y_img_isi, trial_time_img_isi, trial_conf_img_isi = get_trial_distances(run_event,
+                                                                                                                                   all_x_aligned_pimg_isi,
+                                                                                                                                   all_y_aligned_pimg_isi,
+                                                                                                                                   all_times,
+                                                                                                                                   all_conf,
+                                                                                                                                   )
+                plot_vals2['Poly_img_isi'] = {
+                    'refs': ["I", "J", "K", "L"],
+                    'trial_dist': trial_dist_img_isi,
+                    'trial_x': trial_x_img_isi,
+                    'trial_y': trial_y_img_isi,
+                    'trial_time': trial_time_img_isi,
+                    'trial_conf': trial_conf_img_isi,
+                }
+
+                # TODO: generate second series of figures.
+                # Within trial: plot drift_corrected gaze position over trial's timeline, for image and isi
+                # Also plot other metrics: position in x and y, confidence (more blinks during ISI? more mvt in image?),
+                # Plot: distribution of standard deviations during image, and during ISI
+                # Plot: distance between consecutive median points of fixation
+                # export plots to visualize the gaze drift correction for last round of QC
+                mosaic = """
+                    AEI
+                    BFJ
+                    CGK
+                    DHL
+                """
+                fs = (20, 14.0)
+
+                fig = plt.figure(constrained_layout=True, figsize=fs)
+                ax_dict = fig.subplot_mosaic(mosaic)
+                run_dur = int(run_event.iloc[-1]['onset'] + 20)
+
+                for key in plot_vals2:
+                    refs = plot_vals2[key]['refs']
+                    trial_dist = plot_vals2[key]['trial_dist']
+                    trial_x = plot_vals2[key]['trial_x']
+                    trial_y = plot_vals2[key]['trial_y']
+                    trial_time = plot_vals2[key]['trial_time']
+                    trial_conf = plot_vals2[key]['trial_conf']
+
+                    ax_dict[refs[0]].scatter(trial_time, trial_x, c=trial_conf, s=10, cmap='terrain_r', alpha=0.15)
+                    ax_dict[refs[0]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
+                    ax_dict[refs[0]].set_ylim(-0.2, 1.2)
+                    ax_dict[refs[0]].set_title(f'{sub} {ses} {run_num} {key} gaze_x')
+
+                    ax_dict[refs[1]].scatter(trial_time, trial_y, c=trial_conf, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[1]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
+                    ax_dict[refs[1]].set_ylim(-0.2, 1.2)
+                    ax_dict[refs[1]].set_title(f'{sub} {ses} {run_num} {key} gaze_y')
+
+                    ax_dict[refs[2]].scatter(trial_time, trial_dist, c=trial_conf, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[2]].plot([2.98, 2.98], [-0.1, 7], color="xkcd:red", linewidth=2)
+                    ax_dict[refs[2]].set_ylim(-0.1, 7)
+                    ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} {key} gaze_dist (deg)')
+
+                    ax_dict[refs[3]].scatter(trial_time, trial_conf, c=trial_conf, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[3]].plot([2.98, 2.98], [-0.1, 1.1], color="xkcd:red", linewidth=2)
+                    ax_dict[refs[3]].set_ylim(-0.1, 1.1)
+                    ax_dict[refs[3]].set_title(f'{sub} {ses} {run_num} {key} gaze_conf')
+
+                fig.savefig(out_file)
+                plt.close()
 
 
-                    # TODO: fix old code below to export bids-compliant DriftCorr gaze and QC metrics in events files
-                    '''
-                    Potentially: correction will be anchored on fixation during preceeding ISI (ISI_0)
+            elif phase_num  == 4:
+
+                fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "image+isi", med_fix=True)
+                all_x_aligned, all_y_aligned = driftcorr_fromlast(fix_dist_x, fix_dist_y, fix_times, all_x, all_y, all_times)
+
+                run_event = add_metrics_2events(
+                                                run_event,
+                                                all_times,
+                                                all_conf,
+                                                all_x_aligned,
+                                                all_y_aligned,
+                                                task_type,
+                                                conf_thresh=0.9,
+                                                )
+
+                # TODO: fix old code below to export bids-compliant DriftCorr gaze and QC metrics in events files
+                '''
+                Potentially: correction will be anchored on fixation during preceeding ISI (ISI_0)
                     TODO: insert trialwise QC metrics in events file to evaluate quality of fixation
                     - gaze confidence ratio (of 0.9, 0.8, 0.7) during image (signal quality)
                     - gaze confidence ratio during preceding ISI (ISI_0)
@@ -835,120 +913,66 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                     - fixation compliance ratio:
                         assuming high drift corr conf index, compute ratio of
                         gaze positioned within 1, 2 or 3 deg of vis angle from central fixation during image presentation
-                    '''
-
-                    if 'mario' in task_type:
-                        run_event = assign_gzMetrics2trial_mario(run_event, all_times, all_conf, all_x_aligned, all_y_aligned, conf_thresh=0.9)
-                        if gaze_threshold != 0.9:
-                            run_event = assign_gzMetrics2trial_mario(run_event, all_times, all_conf, all_x_aligned, all_y_aligned, conf_thresh=gaze_threshold, add_count=False)
-                    elif task_root not in ['retino', 'floc']:
-                        # for each trial, derive % of above-threshold gaze and add metric to events file
-                        run_event = assign_gazeConf2trial(run_event, all_times, all_conf, task_type, conf_thresh=0.9)
-                        if gaze_threshold != 0.9:
-                            run_event = assign_gazeConf2trial(run_event, all_times, all_conf, task_type, conf_thresh=gaze_threshold, add_count=False)
-                        # Measure fixation compliance during trial (THINGS) or during preceeding fixation
-                        run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 1)
-                        run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 2)
-                        run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 3)
-
-                    # export final events files w metrics on proportion of high confidence pupils per trial
-                    run_event.to_csv(out_file, sep='\t', header=True, index=False)
-
-                    # Export drift-corrected gaze, realigned timestamps, and all other metrics (pupils, etc) to bids-compliant .tsv file
-                    # guidelines: https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-_eyetrackjson
-                    col_names = ['eye_timestamp',
-                                 'eye1_x_coordinate', 'eye1_y_coordinate',
-                                 'eye1_confidence',
-                                 'eye1_x_coordinate_driftCorr', 'eye1_y_coordinate_driftCorr',
-                                 'eye1_pupil_x_coordinate', 'eye1_pupil_y_coordinate',
-                                 'eye1_pupil_diameter',
-                                 'eye1_pupil_ellipse_axes',
-                                 'eye1_pupil_ellipse_angle',
-                                 'eye1_pupil_ellipse_center'
-                                 ]
-
-                    final_gaze_list = []
-
-                    assert len(reset_gaze_list) == len(all_x_aligned)
-                    for i in range(len(reset_gaze_list)):
-                        gaze_pt = reset_gaze_list[i]
-                        assert gaze_pt['reset_time'] == all_times[i]
-
-                        gaze_pt_data = [
-                                        gaze_pt['reset_time'], # in s
-                                        #round(gaze_pt['reset_time']*1000, 0), # int, in ms
-                                        gaze_pt['norm_pos'][0], gaze_pt['norm_pos'][1],
-                                        gaze_pt['confidence'],
-                                        all_x_aligned[i], all_y_aligned[i],
-                                        gaze_pt['base_data']['norm_pos'][0], gaze_pt['base_data']['norm_pos'][1],
-                                        gaze_pt['base_data']['diameter'],
-                                        gaze_pt['base_data']['ellipse']['axes'],
-                                        gaze_pt['base_data']['ellipse']['angle'],
-                                        gaze_pt['base_data']['ellipse']['center'],
-                            ]
-
-                        final_gaze_list.append(gaze_pt_data)
-
-                    df_gaze = pd.DataFrame(np.array(final_gaze_list, dtype=object), columns=col_names)
-
-                    bids_out_path = f'{out_path}/final_bids_DriftCor/{sub}/{ses}'
-                    Path(bids_out_path).mkdir(parents=True, exist_ok=True)
-                    gfile_path = f'{bids_out_path}/{sub}_{ses}_{task_type}_{run_num}_eyetrack.tsv.gz'
-                    if os.path.exists(gfile_path):
-                        # just in case session's run is done twice... note: not bids...
-                        gfile_path = f'{bids_out_path}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_eyetrack.tsv.gz'
-                    df_gaze.to_csv(gfile_path, sep='\t', header=True, index=False, compression='gzip')
-
-
                 '''
-                fig, axes = plt.subplots(5, 1, figsize=(7, 17.5))
-                run_dur = int(run_event.iloc[-1]['onset'] + 20)
 
-                axes[0].scatter(all_times, all_x, s=10, color='xkcd:light grey', alpha=all_conf)
-                axes[0].scatter(all_times, all_x_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
-                axes[0].set_ylim(-2, 2)
-                axes[0].set_xlim(0, run_dur)
-                axes[0].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_x')
+                # for each trial, derive % of above-threshold gaze and add metric to events file
+                run_event = assign_gazeConf2trial(run_event, all_times, all_conf, task_type, conf_thresh=0.9)
+                if gaze_threshold != 0.9:
+                    run_event = assign_gazeConf2trial(run_event, all_times, all_conf, task_type, conf_thresh=gaze_threshold, add_count=False)
+                # Measure fixation compliance during trial (THINGS) or during preceeding fixation
+                run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 1)
+                run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 2)
+                run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 3)
 
-                axes[1].scatter(all_times, all_y, color='xkcd:light grey', alpha=all_conf)
-                axes[1].scatter(all_times, all_y_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
-                axes[1].set_ylim(-2, 2)
-                axes[1].set_xlim(0, run_dur)
-                axes[1].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_y')
+                # export final events files w metrics on proportion of high confidence pupils per trial
+                run_event.to_csv(out_file, sep='\t', header=True, index=False)
 
-                axes[2].scatter(clean_times, clean_dist_x, color='xkcd:light blue', s=20, alpha=0.2)
-                if row['use_latestFix']==1.0:
-                    axes[2].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=1.0)
-                else:
-                    axes[2].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=0.4)
-                    axes[2].plot(all_times_arr, p_of_all_x, color="xkcd:black", linewidth=2)
-                axes[2].set_ylim(-2, 2)
-                axes[2].set_xlim(0, run_dur)
-                axes[2].set_title(f'{sub} {pseudo_task} {ses} {run_num} fix_distance_x')
+                # Export drift-corrected gaze, realigned timestamps, and all other metrics (pupils, etc) to bids-compliant .tsv file
+                # guidelines: https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-_eyetrackjson
+                col_names = ['eye_timestamp',
+                             'eye1_x_coordinate', 'eye1_y_coordinate',
+                             'eye1_confidence',
+                             'eye1_x_coordinate_driftCorr', 'eye1_y_coordinate_driftCorr',
+                             'eye1_pupil_x_coordinate', 'eye1_pupil_y_coordinate',
+                             'eye1_pupil_diameter',
+                             'eye1_pupil_ellipse_axes',
+                             'eye1_pupil_ellipse_angle',
+                             'eye1_pupil_ellipse_center'
+                             ]
 
-                axes[3].scatter(clean_times, clean_dist_y, color='xkcd:light blue', s=20, alpha=0.2)
-                if row['use_latestFix']==1.0:
-                    axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=1.0)
-                else:
-                    axes[3].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=0.4)
-                    axes[3].plot(all_times_arr, p_of_all_y, color="xkcd:black", linewidth=2)
-                lb = np.min(fix_dist_y)-0.1 if np.min(fix_dist_y) < -2 else -2
-                hb = np.max(fix_dist_y)+0.1 if np.max(fix_dist_y) > 2 else 2
-                axes[3].set_ylim(lb, hb)
-                axes[3].set_xlim(0, run_dur)
-                axes[3].set_title(f'{sub} {pseudo_task} {ses} {run_num} fix_distance_y')
+                final_gaze_list = []
 
-                if 'mario' in pseudo_task:
-                    run_event = run_event[run_event['trial_type'].to_numpy() == 'gym-retro_game']
-                axes[4].scatter(run_event['onset'].to_numpy()+2.0, run_event[f'gaze_confidence_ratio_cThresh{gaze_threshold}'].to_numpy())
-                axes[4].set_ylim(-0.1, 1.1)
-                axes[4].set_xlim(0, run_dur)
-                axes[4].set_title(f'{sub} {pseudo_task} {ses} {run_num} ratio >{str(gaze_threshold)} confidence per trial')
+                assert len(reset_gaze_list) == len(all_x_aligned)
+                for i in range(len(reset_gaze_list)):
+                    gaze_pt = reset_gaze_list[i]
+                    assert gaze_pt['reset_time'] == all_times[i]
+
+                    gaze_pt_data = [
+                                    gaze_pt['reset_time'], # in s
+                                    #round(gaze_pt['reset_time']*1000, 0), # int, in ms
+                                    gaze_pt['norm_pos'][0], gaze_pt['norm_pos'][1],
+                                    gaze_pt['confidence'],
+                                    all_x_aligned[i], all_y_aligned[i],
+                                    gaze_pt['base_data']['norm_pos'][0], gaze_pt['base_data']['norm_pos'][1],
+                                    gaze_pt['base_data']['diameter'],
+                                    gaze_pt['base_data']['ellipse']['axes'],
+                                    gaze_pt['base_data']['ellipse']['angle'],
+                                    gaze_pt['base_data']['ellipse']['center'],
+                        ]
+
+                    final_gaze_list.append(gaze_pt_data)
+
+                df_gaze = pd.DataFrame(np.array(final_gaze_list, dtype=object), columns=col_names)
+
+                bids_out_path = f'{out_path}/final_bids_DriftCor/{sub}/{ses}'
+                Path(bids_out_path).mkdir(parents=True, exist_ok=True)
+                gfile_path = f'{bids_out_path}/{sub}_{ses}_{task_type}_{run_num}_eyetrack.tsv.gz'
+                if os.path.exists(gfile_path):
+                    # just in case session's run is done twice... note: not bids...
+                    gfile_path = f'{bids_out_path}/{sub}_{ses}_{task_type}_{fnum}_{run_num}_eyetrack.tsv.gz'
+                df_gaze.to_csv(gfile_path, sep='\t', header=True, index=False, compression='gzip')
 
 
-                fig.savefig(out_file)
-                plt.close()
-                '''
         #except:
         #    print('could not process')
 
