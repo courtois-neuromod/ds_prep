@@ -114,7 +114,7 @@ def get_onset_time(log_path, run_num, ip_path, gz_ts):
     return o_time
 
 
-def reset_gaze_time(gaze, onset_time, conf_thresh=0.8):
+def reset_gaze_time(gaze, onset_time, conf_thresh=0.9):
     '''
     Realign gaze timestamps based on the task & eyetracker onset (triggered by fMRI run start)
     Export new list of gaze dictionaries (w task-aligned time stamps) and other metrics needed to perform drift correction
@@ -178,10 +178,10 @@ def get_fixation_gaze_things(df_ev, clean_dist_x, clean_dist_y, clean_times, fix
             onset_buffer = 0.6
 
         elif fix_period == 'isi':
-            blink_offset = 0.75
+            blink_offset = 0.0
             fixation_onset = df_ev['onset'][i] + df_ev['duration'][i] + blink_offset
             fixation_offset = fixation_onset + 1.49 - blink_offset
-            onset_buffer = 0.2
+            onset_buffer = 0.6
 
         elif fix_period == 'image+isi':
             fixation_onset = df_ev['onset'][i]
@@ -237,7 +237,7 @@ def add_metrics_2events(df_ev,
                         all_y,
                         all_x_aligned,
                         all_y_aligned,
-                        conf_thresh=0.8,
+                        conf_thresh=0.9,
                         ):
 
     all_distances = get_distances(all_x_aligned, all_y_aligned)
@@ -251,7 +251,7 @@ def add_metrics_2events(df_ev,
         trial_onset = df_ev['onset'][i]
         trial_offset = trial_onset + df_ev['duration'][i]
 
-        isi_onset = trial_offset + 0.75
+        isi_onset = trial_offset + 0.6
         isi_offset = trial_offset + 1.49
 
         if i == 0:
@@ -260,7 +260,7 @@ def add_metrics_2events(df_ev,
             isi_y = []
             isi_distances = []
             while all_idx < len(all_times) and all_times[all_idx] < trial_onset:
-                if all_times[all_idx] > (trial_onset - 0.74):
+                if all_times[all_idx] > (trial_onset - 0.89):
                     isi_confs.append(all_conf[all_idx])
                     isi_x.append(all_x[all_idx])
                     isi_y.append(all_y[all_idx])
@@ -270,7 +270,7 @@ def add_metrics_2events(df_ev,
 
             metrics_per_trials[trial_number-1] = {
                 'isi_gaze_count': len(isi_confs),
-                'isi_gaze_conf_80': np.sum(np.array(isi_confs) > 0.8)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
+                'isi_gaze_conf_90': np.sum(np.array(isi_confs) > 0.9)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
                 'isi_gaze_conf_75': np.sum(np.array(isi_confs) > 0.75)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
             }
 
@@ -318,10 +318,10 @@ def add_metrics_2events(df_ev,
 
         metrics_per_trials[trial_number] = {
             'trial_gaze_count': len(trial_confs),
-            'trial_gaze_conf_80': np.sum(np.array(trial_confs) > 0.8)/len(trial_confs) if len(trial_confs) > 0 else np.nan,
+            'trial_gaze_conf_90': np.sum(np.array(trial_confs) > 0.9)/len(trial_confs) if len(trial_confs) > 0 else np.nan,
             'trial_gaze_conf_75': np.sum(np.array(trial_confs) > 0.75)/len(trial_confs) if len(trial_confs) > 0 else np.nan,
             'isi_gaze_count': len(isi_confs),
-            'isi_gaze_conf_80': np.sum(np.array(isi_confs) > 0.8)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
+            'isi_gaze_conf_90': np.sum(np.array(isi_confs) > 0.9)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
             'isi_gaze_conf_75': np.sum(np.array(isi_confs) > 0.75)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
         }
 
@@ -386,9 +386,9 @@ def add_metrics_2events(df_ev,
     '''
     Insert gaze confidence ratio, out of all collected gaze (0.9 and 0.75 thresholds): pre-isi, image presentation and post-isi
     '''
-    df_ev[f'pre-isi_gaze_confidence_ratio_0.8'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']-1]['isi_gaze_conf_80'], axis=1)
+    df_ev[f'pre-isi_gaze_confidence_ratio_0.9'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']-1]['isi_gaze_conf_90'], axis=1)
     df_ev[f'pre-isi_gaze_confidence_ratio_0.75'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']-1]['isi_gaze_conf_75'], axis=1)
-    df_ev[f'trial_gaze_confidence_ratio_0.8'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_gaze_conf_80'], axis=1)
+    df_ev[f'trial_gaze_confidence_ratio_0.9'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_gaze_conf_90'], axis=1)
     df_ev[f'trial_gaze_confidence_ratio_0.75'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_gaze_conf_75'], axis=1)
     #df_ev[f'post-isi_gaze_confidence_ratio_0.9'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['isi_gaze_conf_90'], axis=1)
     #df_ev[f'post-isi_gaze_confidence_ratio_0.75'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['isi_gaze_conf_75'], axis=1)
@@ -430,7 +430,7 @@ def add_metrics_2events(df_ev,
     return df_ev
 
 
-def assign_gazeConf2trial(df_ev, vals_times, vals_conf, task, conf_thresh=0.8, add_count=True):
+def assign_gazeConf2trial(df_ev, vals_times, vals_conf, task, conf_thresh=0.9, add_count=True):
 
     gazeconf_per_trials = {}
     j = 0
@@ -508,7 +508,7 @@ def assign_Compliance2trial(df_ev, vals_times, vals_x, vals_y, task, deg_va=1):
     return df_ev
 
 
-def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, conf_thresh=0.8, add_count=True):
+def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, conf_thresh=0.9, add_count=True):
 
     bk2_times = {}
     bk2_name = None
@@ -807,7 +807,7 @@ def get_trial_distances_plusMetrics(df_ev, x, y, times, confs, conf_thresh):
             all_confs += trial_confs
 
             isi_gz_count += np.repeat(df_ev['isi_gaze_count_ratio'][i], len(trial_pos)).tolist()
-            isi_conf_ratio += np.repeat(df_ev['isi_gaze_confidence_ratio_0.8'][i], len(trial_pos)).tolist()
+            isi_conf_ratio += np.repeat(df_ev['isi_gaze_confidence_ratio_0.9'][i], len(trial_pos)).tolist()
             isi_stdev_x += np.repeat(df_ev[f'pre-isi_stdev_x_{conf_thresh}'][i], len(trial_pos)).tolist()
             isi_stdev_y += np.repeat(df_ev[f'pre-isi_stdev_y_{conf_thresh}'][i], len(trial_pos)).tolist()
             pre_post_isi_dist += np.repeat(df_ev['pre-post-isi_distance_in_deg'][i], len(trial_pos)).tolist()
@@ -841,7 +841,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
             # identifies logged run start time (mri TTL 0) on clock that matches the gaze using info.player.json
             onset_time = get_onset_time(row['log_path'], row['run'], row['infoplayer_path'], run_gaze[10]['timestamp'])
 
-            gaze_threshold = row['pupilConf_thresh'] if not pd.isna(row['pupilConf_thresh']) else 0.8
+            gaze_threshold = row['pupilConf_thresh'] if not pd.isna(row['pupilConf_thresh']) else 0.9
             reset_gaze_list, all_vals, clean_vals  = reset_gaze_time(run_gaze, onset_time, gaze_threshold)
             # normalized position (x and y), time (s) from onset and confidence for all gaze
             all_x, all_y, all_times, all_conf = all_vals
