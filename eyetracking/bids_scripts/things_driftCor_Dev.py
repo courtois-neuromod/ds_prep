@@ -510,7 +510,7 @@ def get_isi_distance(metrics_dict, trial_num, conf_thresh):
     return distance
 
 
-def get_trial_distances(df_ev, x, y, times, confs):
+def get_trial_distances(df_ev, x, y, times, confs, conf_thresh, filter=False):
     '''
     Reset gaze time in relation to trial onset
     Calculate distance from center (0.5, 0.5) for each trial gaze
@@ -524,6 +524,13 @@ def get_trial_distances(df_ev, x, y, times, confs):
 
     dist_in_pix = 4164 # in pixels
     m_vecpos = np.array([0., 0., dist_in_pix])
+
+    if filter:
+        gz_filter = np.array(confs) > conf_thresh
+        x = np.array(x)[gz_filter].tolist()
+        y = np.array(y)[gz_filter].tolist()
+        times = np.array(times)[gz_filter].tolist()
+        confs = np.array(confs)[gz_filter].tolist()
 
     all_dist = []
     all_x = []
@@ -861,7 +868,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
             elif phase_num  == 2:
                 plot_vals2 = {}
 
-                trial_dist_img, trial_x_img, trial_y_img, trial_time_img, trial_conf_img = get_trial_distances(run_event, all_x_aligned_img, all_y_aligned_img, all_times, all_conf)
+                trial_dist_img, trial_x_img, trial_y_img, trial_time_img, trial_conf_img = get_trial_distances(run_event, all_x_aligned_img, all_y_aligned_img, all_times, all_conf, gaze_threshold, filter=True)
                 plot_vals2['LF_img'] = {
                     'refs': ["A", "B", "C", "D"],
                     'trial_dist': trial_dist_img,
@@ -871,7 +878,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                     'trial_conf': trial_conf_img,
                 }
 
-                trial_dist_isi, trial_x_isi, trial_y_isi, trial_time_isi, trial_conf_isi = get_trial_distances(run_event, all_x_aligned_isi, all_y_aligned_isi, all_times, all_conf)
+                trial_dist_isi, trial_x_isi, trial_y_isi, trial_time_isi, trial_conf_isi = get_trial_distances(run_event, all_x_aligned_isi, all_y_aligned_isi, all_times, all_conf, gaze_threshold, filter=True)
                 plot_vals2['LF_isi'] = {
                     'refs': ["E", "F", "G", "H"],
                     'trial_dist': trial_dist_isi,
@@ -886,6 +893,8 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                                                                                                                                    all_y_aligned_img_isi,
                                                                                                                                    all_times,
                                                                                                                                    all_conf,
+                                                                                                                                   gaze_threshold,
+                                                                                                                                   filter=True,
                                                                                                                                    )
                 plot_vals2['LF_img_isi'] = {
                     'refs': ["I", "J", "K", "L"],
@@ -949,7 +958,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
             elif phase_num  == 3:
                 plot_vals2 = {}
 
-                trial_dist_img, trial_x_img, trial_y_img, trial_time_img, trial_conf_img = get_trial_distances(run_event, all_x_aligned_pimg, all_y_aligned_pimg, all_times, all_conf)
+                trial_dist_img, trial_x_img, trial_y_img, trial_time_img, trial_conf_img = get_trial_distances(run_event, all_x_aligned_pimg, all_y_aligned_pimg, all_times, all_conf, gaze_threshold, filter=True)
                 plot_vals2['Poly_img'] = {
                     'refs': ["A", "B", "C", "D"],
                     'trial_dist': trial_dist_img,
@@ -959,7 +968,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                     'trial_conf': trial_conf_img,
                 }
 
-                trial_dist_isi, trial_x_isi, trial_y_isi, trial_time_isi, trial_conf_isi = get_trial_distances(run_event, all_x_aligned_pisi, all_y_aligned_pisi, all_times, all_conf)
+                trial_dist_isi, trial_x_isi, trial_y_isi, trial_time_isi, trial_conf_isi = get_trial_distances(run_event, all_x_aligned_pisi, all_y_aligned_pisi, all_times, all_conf, gaze_threshold, filter=True)
                 plot_vals2['Poly_isi'] = {
                     'refs': ["E", "F", "G", "H"],
                     'trial_dist': trial_dist_isi,
@@ -974,6 +983,8 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                                                                                                                                    all_y_aligned_pimg_isi,
                                                                                                                                    all_times,
                                                                                                                                    all_conf,
+                                                                                                                                   gaze_threshold,
+                                                                                                                                   filter=True,
                                                                                                                                    )
                 plot_vals2['Poly_img_isi'] = {
                     'refs': ["I", "J", "K", "L"],
