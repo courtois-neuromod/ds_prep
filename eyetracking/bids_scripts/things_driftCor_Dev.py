@@ -925,28 +925,35 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
 
                 for key in plot_vals2:
                     refs = plot_vals2[key]['refs']
-                    trial_dist = plot_vals2[key]['trial_dist']
-                    trial_x = plot_vals2[key]['trial_x']
-                    trial_y = plot_vals2[key]['trial_y']
-                    trial_time = plot_vals2[key]['trial_time']
-                    trial_conf = plot_vals2[key]['trial_conf']
+                    trial_dist = np.array(plot_vals2[key]['trial_dist'])
+                    trial_x = np.array(plot_vals2[key]['trial_x'])
+                    trial_y = np.array(plot_vals2[key]['trial_y'])
+                    trial_time = np.array(plot_vals2[key]['trial_time'])
+                    trial_conf = np.array(plot_vals2[key]['trial_conf'])
 
-                    ax_dict[refs[0]].scatter(trial_time, trial_x, c=trial_conf, s=10, cmap='terrain_r', alpha=0.15)
+                    s = trial_conf.argsort()
+                    time_vals = trial_time[s]
+                    x_vals = trial_x[s]
+                    y_vals = trial_y[s]
+                    dist_vals = trial_dist[s]
+                    conf_vals = trial_conf[s]
+
+                    ax_dict[refs[0]].scatter(time_vals, x_vals, c=conf_vals, s=10, cmap='terrain_r', alpha=0.15)
                     ax_dict[refs[0]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
                     ax_dict[refs[0]].set_ylim(-0.2, 1.2)
                     ax_dict[refs[0]].set_title(f'{sub} {ses} {run_num} {key} gaze_x')
 
-                    ax_dict[refs[1]].scatter(trial_time, trial_y, c=trial_conf, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[1]].scatter(time_vals, y_vals, c=conf_vals, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
                     ax_dict[refs[1]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
                     ax_dict[refs[1]].set_ylim(-0.2, 1.2)
                     ax_dict[refs[1]].set_title(f'{sub} {ses} {run_num} {key} gaze_y')
 
-                    ax_dict[refs[2]].scatter(trial_time, trial_dist, c=trial_conf, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[2]].scatter(time_vals, dist_vals, c=conf_vals, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
                     ax_dict[refs[2]].plot([2.98, 2.98], [-0.1, 7], color="xkcd:red", linewidth=2)
                     ax_dict[refs[2]].set_ylim(-0.1, 7)
                     ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} {key} gaze_dist (deg)')
 
-                    ax_dict[refs[3]].scatter(trial_time, trial_conf, c=trial_conf, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[3]].scatter(time_vals, conf_vals, c=conf_vals, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
                     ax_dict[refs[3]].plot([2.98, 2.98], [-0.1, 1.1], color="xkcd:red", linewidth=2)
                     ax_dict[refs[3]].set_ylim(-0.1, 1.1)
                     ax_dict[refs[3]].set_title(f'{sub} {ses} {run_num} {key} gaze_conf')
@@ -1015,28 +1022,35 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
 
                 for key in plot_vals2:
                     refs = plot_vals2[key]['refs']
-                    trial_dist = plot_vals2[key]['trial_dist']
-                    trial_x = plot_vals2[key]['trial_x']
-                    trial_y = plot_vals2[key]['trial_y']
-                    trial_time = plot_vals2[key]['trial_time']
-                    trial_conf = plot_vals2[key]['trial_conf']
+                    trial_dist = np.array(plot_vals2[key]['trial_dist'])
+                    trial_x = np.array(plot_vals2[key]['trial_x'])
+                    trial_y = np.array(plot_vals2[key]['trial_y'])
+                    trial_time = np.array(plot_vals2[key]['trial_time'])
+                    trial_conf = np.array(plot_vals2[key]['trial_conf'])
 
-                    ax_dict[refs[0]].scatter(trial_time, trial_x, c=trial_conf, s=10, cmap='terrain_r', alpha=0.15)
+                    s = trial_conf.argsort()
+                    time_vals = trial_time[s]
+                    x_vals = trial_x[s]
+                    y_vals = trial_y[s]
+                    dist_vals = trial_dist[s]
+                    conf_vals = trial_conf[s]
+
+                    ax_dict[refs[0]].scatter(time_vals, x_vals, c=conf_vals, s=10, cmap='terrain_r', alpha=0.15)
                     ax_dict[refs[0]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
                     ax_dict[refs[0]].set_ylim(-0.2, 1.2)
                     ax_dict[refs[0]].set_title(f'{sub} {ses} {run_num} {key} gaze_x')
 
-                    ax_dict[refs[1]].scatter(trial_time, trial_y, c=trial_conf, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[1]].scatter(time_vals, y_vals, c=conf_vals, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
                     ax_dict[refs[1]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
                     ax_dict[refs[1]].set_ylim(-0.2, 1.2)
                     ax_dict[refs[1]].set_title(f'{sub} {ses} {run_num} {key} gaze_y')
 
-                    ax_dict[refs[2]].scatter(trial_time, trial_dist, c=trial_conf, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[2]].scatter(time_vals, dist_vals, c=conf_vals, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
                     ax_dict[refs[2]].plot([2.98, 2.98], [-0.1, 7], color="xkcd:red", linewidth=2)
                     ax_dict[refs[2]].set_ylim(-0.1, 7)
                     ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} {key} gaze_dist (deg)')
 
-                    ax_dict[refs[3]].scatter(trial_time, trial_conf, c=trial_conf, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[3]].scatter(time_vals, conf_vals, c=conf_vals, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
                     ax_dict[refs[3]].plot([2.98, 2.98], [-0.1, 1.1], color="xkcd:red", linewidth=2)
                     ax_dict[refs[3]].set_ylim(-0.1, 1.1)
                     ax_dict[refs[3]].set_title(f'{sub} {ses} {run_num} {key} gaze_conf')
