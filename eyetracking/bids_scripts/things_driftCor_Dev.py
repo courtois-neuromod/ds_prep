@@ -375,6 +375,7 @@ def add_metrics_2events(df_ev,
             assuming high drift corr conf index, compute ratio of
             gaze positioned within 1, 2 or 3 deg of vis angle from central fixation during image presentation
     '''
+    print(metrics_per_trials.keys(), metrics_per_trials[0].keys(), metrics_per_trials[1].keys(), metrics_per_trials)
     '''
     Insert gaze count: pre-isi, image presentation and post-isi
     '''
