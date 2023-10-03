@@ -175,18 +175,17 @@ def get_fixation_gaze_things(df_ev, clean_dist_x, clean_dist_y, clean_times, fix
         if fix_period == 'image':
             fixation_onset = df_ev['onset'][i]
             fixation_offset = fixation_onset + df_ev['duration'][i]
-            onset_buffer = 0.6
+            onset_buffer = 0.0
 
         elif fix_period == 'isi':
-            blink_offset = 0.0
-            fixation_onset = df_ev['onset'][i] + df_ev['duration'][i] + blink_offset
-            fixation_offset = fixation_onset + 1.49 - blink_offset
+            fixation_onset = df_ev['onset'][i] + df_ev['duration'][i]
+            fixation_offset = fixation_onset + 1.49
             onset_buffer = 0.6
 
         elif fix_period == 'image+isi':
             fixation_onset = df_ev['onset'][i]
             fixation_offset = fixation_onset + df_ev['duration'][i] + 1.49
-            onset_buffer = 0.6
+            onset_buffer = 0.0
 
 
         # add gaze from trial fixation period
