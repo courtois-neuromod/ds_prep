@@ -699,7 +699,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
             Phase 1: plot drift-corrected gaze based on median from within trial, within ISI, within trial + ISI, and w polynomial
             '''
             plot_vals = {}
-            if phase_num in [1, 2, 3, 4]:
+            if phase_num in [1, 2, 3]:
 
                 fix_dist_x_img, fix_dist_y_img, fix_times_img = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "image", med_fix=True)
                 all_x_aligned_img, all_y_aligned_img = driftcorr_fromlast(fix_dist_x_img, fix_dist_y_img, fix_times_img, all_x, all_y, all_times)
@@ -1070,7 +1070,11 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                                                 )
 
                 # export final events files w metrics on proportion of high confidence pupils per trial
-                run_event.to_csv(out_file, sep='\t', header=True, index=False)
+                outpath_events = f'{out_path}/TEST_gaze/Events_files_enhanced'
+                Path(outpath_events).mkdir(parents=True, exist_ok=True)
+                out_rfile = f'{outpath_events}/{sub}_{ses}_{fnum}_{task_type}_{run_num}_events.tsv'
+
+                run_event.to_csv(out_rfile, sep='\t', header=True, index=False)
 
                 (trial_dist, trial_x, trial_y, trial_time, trial_conf), qc_metrics = get_trial_distances_plusMetrics(
                                                                                                                      run_event,
@@ -1087,33 +1091,39 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                 plot_metrics = {
                     'fix_gz_count': {
                         'refs': ['A', 'B', 'C'],
-                        'metric': fix_gz_count,
+                        'metric': np.array(fix_gz_count),
                         'cmap': 'terrain_r',
+                        'ascending': True,
                     },
                     'fix_conf_ratio': {
                         'refs': ['D', 'E', 'F'],
                         'metric': fix_conf_ratio,
                         'cmap': 'terrain_r',
+                        'ascending': True,
                     },
                     'fix_stdev_x': {
                         'refs': ['G', 'H', 'I'],
                         'metric': fix_stdev_x,
                         'cmap': 'terrain',
+                        'ascending': False,
                     },
                     'fix_stdev_y': {
                         'refs': ['J', 'K', 'L'],
                         'metric': fix_stdev_y,
                         'cmap': 'terrain',
+                        'ascending': False,
                     },
                     'pre_post_isi_dist': {
                         'refs': ['M', 'N', 'O'],
                         'metric': pre_post_isi_dist,
                         'cmap': 'terrain',
+                        'ascending': False,
                     },
                     'trial_fixCom': {
                         'refs': ['P', 'Q', 'R'],
                         'metric': trial_fixCom,
                         'cmap': 'terrain_r',
+                        'ascending': True,
                     },
                 }
 
@@ -1130,20 +1140,29 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
 
                 for key in plot_metrics:
                     refs = plot_metrics[key]['refs']
-                    color_metric = plot_metrics[key]['metric']
+                    color_metric = np.array(plot_metrics[key]['metric'])
                     cmap = plot_metrics[key]['cmap']
 
-                    ax_dict[refs[0]].scatter(trial_time, trial_x, c=color_metric, s=10, cmap=cmap, alpha=0.15)
+                    s = color_metric.argsort()
+                    if not plot_metrics[key]['ascending']:
+                        s = s[::-1]
+                    time_vals = np.array(trial_time)[s]
+                    x_vals = np.array(trial_x)[s]
+                    y_vals = np.array(trial_y)[s]
+                    dist_vals = np.array(trial_dist)[s]
+                    cm = color_metric[s]
+
+                    ax_dict[refs[0]].scatter(time_vals, x_vals, c=cm, s=10, cmap=cmap, alpha=0.15)
                     ax_dict[refs[0]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
                     ax_dict[refs[0]].set_ylim(-0.2, 1.2)
                     ax_dict[refs[0]].set_title(f'{sub} {ses} {run_num} {sub_strategy[sub]} {key} gaze_x')
 
-                    ax_dict[refs[1]].scatter(trial_time, trial_y, c=color_metric, s=10, cmap=cmap, alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[1]].scatter(time_vals, y_vals, c=cm, s=10, cmap=cmap, alpha=0.15)#'xkcd:orange', alpha=all_conf)
                     ax_dict[refs[1]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
                     ax_dict[refs[1]].set_ylim(-0.2, 1.2)
                     ax_dict[refs[1]].set_title(f'{sub} {ses} {run_num} {sub_strategy[sub]} {key} gaze_y')
 
-                    ax_dict[refs[2]].scatter(trial_time, trial_dist, c=color_metric, s=10, cmap=cmap, alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[2]].scatter(time_vals, dist_vals, c=cm, s=10, cmap=cmap, alpha=0.15)#'xkcd:orange', alpha=all_conf)
                     ax_dict[refs[2]].plot([2.98, 2.98], [-0.1, 7], color="xkcd:red", linewidth=2)
                     ax_dict[refs[2]].set_ylim(-0.1, 7)
                     ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} {sub_strategy[sub]} {key} gaze_dist (deg)')
