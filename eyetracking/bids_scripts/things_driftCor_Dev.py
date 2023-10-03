@@ -769,7 +769,7 @@ def get_trial_distances_plusMetrics(df_ev, x, y, times, confs, conf_thresh):
     isi_conf_ratio = []
     isi_stdev_x = []
     isi_stdev_y = []
-    pre-post_isi_dist = []
+    pre_post_isi_dist = []
     trial_fixCom = []
 
     j = 0
@@ -810,10 +810,10 @@ def get_trial_distances_plusMetrics(df_ev, x, y, times, confs, conf_thresh):
             isi_conf_ratio += np.repeat(df_ev['isi_gaze_confidence_ratio_0.8'][i], len(trial_pos)).tolist()
             isi_stdev_x += np.repeat(df_ev[f'pre-isi_stdev_x_{conf_thresh}'][i], len(trial_pos)).tolist()
             isi_stdev_y += np.repeat(df_ev[f'pre-isi_stdev_y_{conf_thresh}'][i], len(trial_pos)).tolist()
-            pre-post_isi_dist += np.repeat(df_ev['pre-post-isi_distance_in_deg'][i], len(trial_pos)).tolist()
+            pre_post_isi_dist += np.repeat(df_ev['pre-post-isi_distance_in_deg'][i], len(trial_pos)).tolist()
             trial_fixCom += np.repeat(df_ev['trial_fixation_compliance_ratio_1.0'][i], len(trial_pos)).tolist()
 
-    return ((all_dist, all_x, all_y, all_times, all_confs), (isi_gz_count, isi_conf_ratio, isi_stdev_x, isi_stdev_y, post_isi_dist, trial_fixCom))
+    return ((all_dist, all_x, all_y, all_times, all_confs), (isi_gz_count, isi_conf_ratio, isi_stdev_x, isi_stdev_y, pre_post_isi_dist, trial_fixCom))
 
 
 def driftCorr_ETtests(row, out_path, phase_num=1):
@@ -1231,7 +1231,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                                                                                                                      gaze_threshold,
                                                                                                                      )
 
-                isi_gz_count, isi_conf_ratio, isi_stdev_x, isi_stdev_y, post_isi_dist, trial_fixCom = qc_metrics
+                isi_gz_count, isi_conf_ratio, isi_stdev_x, isi_stdev_y, pre_post_isi_dist, trial_fixCom = qc_metrics
                 plot_metrics = {
                     'isi_gz_count': {
                         'refs': ['A', 'B', 'C'],
@@ -1249,9 +1249,9 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                         'refs': ['J', 'K', 'L'],
                         'metric': isi_stdev_y,
                     },
-                    'post_isi_dist': {
+                    'pre_post_isi_dist': {
                         'refs': ['M', 'N', 'O'],
-                        'metric': post_isi_dist,
+                        'metric': pre_post_isi_dist,
                     },
                     'trial_fixCom': {
                         'refs': ['P', 'Q', 'R'],
