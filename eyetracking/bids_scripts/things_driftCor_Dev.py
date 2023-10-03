@@ -425,177 +425,6 @@ def add_metrics_2events(df_ev,
     return df_ev
 
 
-def assign_gazeConf2trial(df_ev, vals_times, vals_conf, task, conf_thresh=0.9, add_count=True):
-
-    gazeconf_per_trials = {}
-    j = 0
-
-    for i in range(df_ev.shape[0]):
-        trial_number = df_ev['TrialNumber'][i]
-        if task == 'task-emotionvideos':
-            trial_onset = df_ev['onset_video_flip'][i]
-            trial_offset = trial_onset + df_ev['total_duration'][i]
-
-        elif task in ['task-thingsmemory', 'task-wordsfamiliarity', 'task-triplets']:
-            trial_onset = df_ev['onset'][i]
-            trial_offset = trial_onset + df_ev['duration'][i]
-
-        trial_confs = []
-        while j < len(vals_times) and vals_times[j] < trial_offset:
-            if vals_times[j] > trial_onset:
-                trial_confs.append(vals_conf[j])
-            j += 1
-
-        num_gaze = len(trial_confs)
-        if num_gaze > 0:
-            confRatio = np.sum(np.array(trial_confs) > conf_thresh)/num_gaze
-            gazeconf_per_trials[trial_number] = (confRatio, num_gaze)
-        else:
-            gazeconf_per_trials[trial_number] = (np.nan, 0)
-
-    df_ev[f'gaze_confidence_ratio_cThresh{conf_thresh}'] = df_ev.apply(lambda row: gazeconf_per_trials[row['TrialNumber']][0], axis=1)
-    if add_count:
-        df_ev['gaze_count'] = df_ev.apply(lambda row: gazeconf_per_trials[row['TrialNumber']][1], axis=1)
-
-    return df_ev
-
-
-def assign_Compliance2trial(df_ev, vals_times, vals_x, vals_y, task, deg_va=1):
-
-    fixCompliance_per_trials = {}
-    j = 0
-
-    for i in range(df_ev.shape[0]):
-        trial_number = df_ev['TrialNumber'][i]
-
-        if task == 'task-thingsmemory':
-            fixation_onset = df_ev['onset'][i]
-            fixation_offset = fixation_onset + df_ev['duration'][i]
-            trial_offset = fixation_offset
-            gaze_count = df_ev['gaze_count'][i]
-
-        elif task == 'task-emotionvideos':
-            fixation_onset = df_ev['onset_fixation_flip'][i]
-            fixation_offset = df_ev['onset_video_flip'][i]
-            trial_offset = fixation_offset + df_ev['total_duration'][i]
-
-        elif task in ['task-wordsfamiliarity', 'task-triplets']:
-            fixation_onset = 3.0 if i == 0 else df_ev['onset'][i-1] + df_ev['duration'][i-1]
-            fixation_offset = df_ev['onset'][i]
-            trial_offset = fixation_offset + df_ev['duration'][i]
-
-        trial_comp = []
-        while j < len(vals_times) and vals_times[j] < trial_offset:
-            if vals_times[j] > fixation_onset and vals_times[j] < fixation_offset:
-                # is gaze within 1 degree of visual angle of central fixation in x and y?
-                x_comp = abs(vals_x[j] - 0.5) < (deg_va/17.5)
-                y_comp = abs(vals_y[j] - 0.5) < (deg_va/14.0)
-                trial_comp.append(x_comp and y_comp)
-            j += 1
-
-        num_gaze = len(trial_comp)
-        if task == 'task-thingsmemory':
-            assert gaze_count == num_gaze
-        fixCompliance_per_trials[trial_number] = np.sum(trial_comp)/num_gaze if num_gaze > 0 else np.nan
-
-    df_ev[f'fixation_compliance_ratio_deg{deg_va}'] = df_ev.apply(lambda row: fixCompliance_per_trials[row['TrialNumber']], axis=1)
-
-    return df_ev
-
-
-def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, conf_thresh=0.9, add_count=True):
-
-    bk2_times = {}
-    bk2_name = None
-    bk2_onset, bk2_offset = -1, -1
-
-    for i in range(df_ev.shape[0]):
-        if df_ev['trial_type'][i] == 'fixation_dot' and bk2_onset > 0:
-            bk2_offset = df_ev['onset'][i]
-            bk2_times[bk2_name] = [bk2_onset, bk2_offset]
-        elif df_ev['trial_type'][i] == 'gym-retro_game':
-            bk2_onset = df_ev['onset'][i]
-            bk2_name = df_ev['stim_file'][i]
-
-    gaze_confidence = []
-    fix_compliance = [[], [], [], []]
-    #fix_compliance_2 = []
-    #fix_compliance_3 = []
-    gaze_per_trial = []
-
-    j = 0
-    for i in range(df_ev.shape[0]):
-        trial_onset = df_ev['onset'][i]
-        trial_type = df_ev['trial_type'][i]
-
-        if trial_type == 'fixation_dot':
-            trial_comp = [[], [], [], []]
-            #trial_comp_2 = []
-            #trial_comp_3 = []
-            trial_conf = []
-            trial_offset = trial_onset + df_ev['duration'][i]
-
-            while j < len(vals_times) and vals_times[j] < trial_offset:
-                if vals_times[j] > trial_onset:
-                    # is gaze within 1, 2, 3 degrees of visual angle of central fixation in x and y?
-                    for k, deg_val in enumerate([0.5, 1, 2, 3]):
-                        x_comp = abs(vals_x[j] - 0.5) < (deg_val/17.5)
-                        y_comp = abs(vals_y[j] - 0.5) < (deg_val/14.0)
-                        trial_comp[k].append(x_comp and y_comp)
-                    trial_conf.append(vals_conf[j] > conf_thresh)
-                j += 1
-            num_gaze = len(trial_comp_1)
-            if num_gaze > 0:
-                for k, deg_val in enumerate([0.5, 1, 2, 3]):
-                    fix_compliance[k].append(np.sum(trial_comp[k])/num_gaze)
-                gaze_per_trial.append(num_gaze)
-                gaze_confidence.append(np.sum(trial_conf)/num_gaze)
-            else:
-                for k, deg_val in enumerate([0.5, 1, 2, 3]):
-                    fix_compliance[k].append(np.nan)
-                gaze_per_trial.append(np.nan)
-                gaze_confidence.append(np.nan)
-
-
-        elif trial_type == 'gym-retro_game':
-            trial_conf = []
-            trial_offset = bk2_times[df_ev['stim_file'][i]][1]
-            assert trial_onset == bk2_times[df_ev['stim_file'][i]][0]
-
-            while j < len(vals_times) and vals_times[j] < trial_offset:
-                if vals_times[j] > trial_onset:
-                    trial_conf.append(vals_conf[j] > conf_thresh)
-                j += 1
-
-            num_gaze = len(trial_conf)
-            if num_gaze > 0:
-                gaze_confidence.append(np.sum(trial_conf)/num_gaze)
-                gaze_per_trial.append(num_gaze)
-            else:
-                gaze_confidence.append(np.nan)
-                gaze_per_trial.append(np.nan)
-            for k, deg_val in enumerate([0.5, 1, 2, 3]):
-                fix_compliance[k].append(np.nan)
-
-        else:
-            gaze_confidence.append(np.nan)
-            gaze_per_trial.append(np.nan)
-            for k, deg_val in enumerate([0.5, 1, 2, 3]):
-                fix_compliance[k].append(np.nan)
-
-    # Insert 3 new columns in df_ev
-    df_ev.insert(loc=df_ev.shape[1]-2, column=f'gaze_confidence_ratio_cThresh{conf_thresh}',
-                 value=gaze_confidence, allow_duplicates=True)
-    if add_count:
-        df_ev.insert(loc=df_ev.shape[1]-2, column='gaze_count',
-                     value=gaze_per_trial, allow_duplicates=True)
-        for k, deg_val in enumerate([0.5, 1, 2, 3]):
-            df_ev.insert(loc=df_ev.shape[1]-2, column=f'fixation_compliance_ratio_deg{deg_val}',
-                         value=fix_compliance[k], allow_duplicates=True)
-
-    return df_ev
-
-
 def driftcorr_fromlast(fd_x, fd_y, f_times, all_x, all_y, all_times):
     i = 0
     j = 0
@@ -1231,26 +1060,32 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                     'isi_gz_count': {
                         'refs': ['A', 'B', 'C'],
                         'metric': isi_gz_count,
+                        'cmap': 'terrain_r',
                     },
                     'isi_conf_ratio': {
                         'refs': ['D', 'E', 'F'],
                         'metric': isi_conf_ratio,
+                        'cmap': 'terrain_r',
                     },
                     'isi_stdev_x': {
                         'refs': ['G', 'H', 'I'],
                         'metric': isi_stdev_x,
+                        'cmap': 'terrain',
                     },
                     'isi_stdev_y': {
                         'refs': ['J', 'K', 'L'],
                         'metric': isi_stdev_y,
+                        'cmap': 'terrain',
                     },
                     'pre_post_isi_dist': {
                         'refs': ['M', 'N', 'O'],
                         'metric': pre_post_isi_dist,
+                        'cmap': 'terrain',
                     },
                     'trial_fixCom': {
                         'refs': ['P', 'Q', 'R'],
                         'metric': trial_fixCom,
+                        'cmap': 'terrain_r',
                     },
                 }
 
@@ -1268,18 +1103,19 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                 for key in plot_metrics:
                     refs = plot_metrics[key]['refs']
                     color_metric = plot_metrics[key]['metric']
+                    cmap = plot_metrics[key]['cmap']
 
-                    ax_dict[refs[0]].scatter(trial_time, trial_x, c=color_metric, s=10, cmap='terrain_r', alpha=0.15)
+                    ax_dict[refs[0]].scatter(trial_time, trial_x, c=color_metric, s=10, cmap='cmap', alpha=0.15)
                     ax_dict[refs[0]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
                     ax_dict[refs[0]].set_ylim(-0.2, 1.2)
                     ax_dict[refs[0]].set_title(f'{sub} {ses} {run_num} {key} gaze_x')
 
-                    ax_dict[refs[1]].scatter(trial_time, trial_y, c=color_metric, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[1]].scatter(trial_time, trial_y, c=color_metric, s=10, cmap='cmap', alpha=0.15)#'xkcd:orange', alpha=all_conf)
                     ax_dict[refs[1]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
                     ax_dict[refs[1]].set_ylim(-0.2, 1.2)
                     ax_dict[refs[1]].set_title(f'{sub} {ses} {run_num} {key} gaze_y')
 
-                    ax_dict[refs[2]].scatter(trial_time, trial_dist, c=color_metric, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[2]].scatter(trial_time, trial_dist, c=color_metric, s=10, cmap='cmap', alpha=0.15)#'xkcd:orange', alpha=all_conf)
                     ax_dict[refs[2]].plot([2.98, 2.98], [-0.1, 7], color="xkcd:red", linewidth=2)
                     ax_dict[refs[2]].set_ylim(-0.1, 7)
                     ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} {key} gaze_dist (deg)')
