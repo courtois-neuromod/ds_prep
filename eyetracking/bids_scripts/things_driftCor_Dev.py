@@ -568,7 +568,7 @@ def get_trial_distances(df_ev, x, y, times, confs):
     return all_dist, all_x, all_y, all_times, all_confs
 
 
-def get_trial_distances_plusMetrics(df_ev, strategy, x, y, times, confs, conf_thresh):
+def get_trial_distances_plusMetrics(df_ev, strategy, x, y, times, confs, conf_thresh, filter=False):
     '''
     Reset gaze time in relation to trial onset
     Calculate distance from center (0.5, 0.5) for each trial gaze
@@ -582,6 +582,13 @@ def get_trial_distances_plusMetrics(df_ev, strategy, x, y, times, confs, conf_th
 
     dist_in_pix = 4164 # in pixels
     m_vecpos = np.array([0., 0., dist_in_pix])
+
+    if filter:
+        gz_filter = np.array(confs) > conf_thresh
+        x = np.array(x)[gz_filter].tolist()
+        y = np.array(y)[gz_filter].tolist()
+        times = np.array(times)[gz_filter].tolist()
+        confs = np.array(confs)[gz_filter].tolist()
 
     all_dist = []
     all_x = []
@@ -1062,6 +1069,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                                                                                                                      all_times,
                                                                                                                      all_conf,
                                                                                                                      gaze_threshold,
+                                                                                                                     filter=True,
                                                                                                                      )
 
                 fix_gz_count, fix_conf_ratio, fix_stdev_x, fix_stdev_y, pre_post_isi_dist, trial_fixCom = qc_metrics
