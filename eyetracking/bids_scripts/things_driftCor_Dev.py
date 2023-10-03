@@ -114,7 +114,7 @@ def get_onset_time(log_path, run_num, ip_path, gz_ts):
     return o_time
 
 
-def reset_gaze_time(gaze, onset_time, conf_thresh=0.9):
+def reset_gaze_time(gaze, onset_time, conf_thresh=0.8):
     '''
     Realign gaze timestamps based on the task & eyetracker onset (triggered by fMRI run start)
     Export new list of gaze dictionaries (w task-aligned time stamps) and other metrics needed to perform drift correction
@@ -237,7 +237,7 @@ def add_metrics_2events(df_ev,
                         all_y,
                         all_x_aligned,
                         all_y_aligned,
-                        conf_thresh=0.9,
+                        conf_thresh=0.8,
                         ):
 
     all_distances = get_distances(all_x_aligned, all_y_aligned)
@@ -270,7 +270,7 @@ def add_metrics_2events(df_ev,
 
             metrics_per_trials[trial_number-1] = {
                 'isi_gaze_count': len(isi_confs),
-                'isi_gaze_conf_90': np.sum(np.array(isi_confs) > 0.9)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
+                'isi_gaze_conf_80': np.sum(np.array(isi_confs) > 0.8)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
                 'isi_gaze_conf_75': np.sum(np.array(isi_confs) > 0.75)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
             }
 
@@ -318,10 +318,10 @@ def add_metrics_2events(df_ev,
 
         metrics_per_trials[trial_number] = {
             'trial_gaze_count': len(trial_confs),
-            'trial_gaze_conf_90': np.sum(np.array(trial_confs) > 0.9)/len(trial_confs) if len(trial_confs) > 0 else np.nan,
+            'trial_gaze_conf_80': np.sum(np.array(trial_confs) > 0.8)/len(trial_confs) if len(trial_confs) > 0 else np.nan,
             'trial_gaze_conf_75': np.sum(np.array(trial_confs) > 0.75)/len(trial_confs) if len(trial_confs) > 0 else np.nan,
             'isi_gaze_count': len(isi_confs),
-            'isi_gaze_conf_90': np.sum(np.array(isi_confs) > 0.9)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
+            'isi_gaze_conf_80': np.sum(np.array(isi_confs) > 0.8)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
             'isi_gaze_conf_75': np.sum(np.array(isi_confs) > 0.75)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
         }
 
@@ -386,9 +386,9 @@ def add_metrics_2events(df_ev,
     '''
     Insert gaze confidence ratio, out of all collected gaze (0.9 and 0.75 thresholds): pre-isi, image presentation and post-isi
     '''
-    df_ev[f'pre-isi_gaze_confidence_ratio_0.9'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']-1]['isi_gaze_conf_90'], axis=1)
+    df_ev[f'pre-isi_gaze_confidence_ratio_0.8'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']-1]['isi_gaze_conf_80'], axis=1)
     df_ev[f'pre-isi_gaze_confidence_ratio_0.75'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']-1]['isi_gaze_conf_75'], axis=1)
-    df_ev[f'trial_gaze_confidence_ratio_0.9'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_gaze_conf_90'], axis=1)
+    df_ev[f'trial_gaze_confidence_ratio_0.8'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_gaze_conf_80'], axis=1)
     df_ev[f'trial_gaze_confidence_ratio_0.75'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_gaze_conf_75'], axis=1)
     #df_ev[f'post-isi_gaze_confidence_ratio_0.9'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['isi_gaze_conf_90'], axis=1)
     #df_ev[f'post-isi_gaze_confidence_ratio_0.75'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['isi_gaze_conf_75'], axis=1)
@@ -430,7 +430,7 @@ def add_metrics_2events(df_ev,
     return df_ev
 
 
-def assign_gazeConf2trial(df_ev, vals_times, vals_conf, task, conf_thresh=0.9, add_count=True):
+def assign_gazeConf2trial(df_ev, vals_times, vals_conf, task, conf_thresh=0.8, add_count=True):
 
     gazeconf_per_trials = {}
     j = 0
@@ -508,7 +508,7 @@ def assign_Compliance2trial(df_ev, vals_times, vals_x, vals_y, task, deg_va=1):
     return df_ev
 
 
-def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, conf_thresh=0.9, add_count=True):
+def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, conf_thresh=0.8, add_count=True):
 
     bk2_times = {}
     bk2_name = None
@@ -744,7 +744,7 @@ def get_trial_distances(df_ev, x, y, times, confs):
     return all_dist, all_x, all_y, all_times, all_confs
 
 
-def get_trial_distances_plusMetrics(df_ev, x, y, times, confs):
+def get_trial_distances_plusMetrics(df_ev, x, y, times, confs, conf_thresh):
     '''
     Reset gaze time in relation to trial onset
     Calculate distance from center (0.5, 0.5) for each trial gaze
@@ -764,6 +764,13 @@ def get_trial_distances_plusMetrics(df_ev, x, y, times, confs):
     all_y = []
     all_times = []
     all_confs = []
+
+    isi_gz_count = []
+    isi_conf_ratio = []
+    isi_stdev_x = []
+    isi_stdev_y = []
+    pre-post_isi_dist = []
+    trial_fixCom = []
 
     j = 0
 
@@ -799,7 +806,14 @@ def get_trial_distances_plusMetrics(df_ev, x, y, times, confs):
             all_times += trial_times
             all_confs += trial_confs
 
-    return all_dist, all_x, all_y, all_times, all_confs
+            isi_gz_count += np.repeat(df_ev['isi_gaze_count_ratio'][i], len(trial_pos)).tolist()
+            isi_conf_ratio += np.repeat(df_ev['isi_gaze_confidence_ratio_0.8'][i], len(trial_pos)).tolist()
+            isi_stdev_x += np.repeat(df_ev[f'pre-isi_stdev_x_{conf_thresh}'][i], len(trial_pos)).tolist()
+            isi_stdev_y += np.repeat(df_ev[f'pre-isi_stdev_y_{conf_thresh}'][i], len(trial_pos)).tolist()
+            pre-post_isi_dist += np.repeat(df_ev['pre-post-isi_distance_in_deg'][i], len(trial_pos)).tolist()
+            trial_fixCom += np.repeat(df_ev['trial_fixation_compliance_ratio_1.0'][i], len(trial_pos)).tolist()
+
+    return ((all_dist, all_x, all_y, all_times, all_confs), (isi_gz_count, isi_conf_ratio, isi_stdev_x, isi_stdev_y, post_isi_dist, trial_fixCom))
 
 
 def driftCorr_ETtests(row, out_path, phase_num=1):
@@ -809,7 +823,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
     [sub, ses, fnum, task_type, run_num, appendix] = os.path.basename(row['events_path']).split('_')
     print(sub, ses, fnum, task_type, run_num)
 
-    if phase_num in [1, 2, 3]:
+    if phase_num in [1, 2, 3, 4]:
         outpath_fig = os.path.join(out_path, 'TEST_gaze')
         Path(outpath_fig).mkdir(parents=True, exist_ok=True)
         out_file = f'{outpath_fig}/TESTplot_phase{phase_num}_{sub}_{ses}_{run_num}_{fnum}_{task_type}.png'
@@ -827,7 +841,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
             # identifies logged run start time (mri TTL 0) on clock that matches the gaze using info.player.json
             onset_time = get_onset_time(row['log_path'], row['run'], row['infoplayer_path'], run_gaze[10]['timestamp'])
 
-            gaze_threshold = row['pupilConf_thresh'] if not pd.isna(row['pupilConf_thresh']) else 0.9
+            gaze_threshold = row['pupilConf_thresh'] if not pd.isna(row['pupilConf_thresh']) else 0.8
             reset_gaze_list, all_vals, clean_vals  = reset_gaze_time(run_gaze, onset_time, gaze_threshold)
             # normalized position (x and y), time (s) from onset and confidence for all gaze
             all_x, all_y, all_times, all_conf = all_vals
@@ -839,7 +853,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
             Phase 1: plot drift-corrected gaze based on median from within trial, within ISI, within trial + ISI, and w polynomial
             '''
             plot_vals = {}
-            if phase_num in [1, 2, 3]:
+            if phase_num in [1, 2, 3, 4]:
 
                 fix_dist_x_img, fix_dist_y_img, fix_times_img = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "image", med_fix=True)
                 all_x_aligned_img, all_y_aligned_img = driftcorr_fromlast(fix_dist_x_img, fix_dist_y_img, fix_times_img, all_x, all_y, all_times)
@@ -1208,6 +1222,75 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                 # export final events files w metrics on proportion of high confidence pupils per trial
                 run_event.to_csv(out_file, sep='\t', header=True, index=False)
 
+                (trial_dist, trial_x, trial_y, trial_time, trial_conf), qc_metrics = get_trial_distances_plusMetrics(
+                                                                                                                     run_event,
+                                                                                                                     all_x_aligned,
+                                                                                                                     all_y_aligned,
+                                                                                                                     all_times,
+                                                                                                                     all_conf,
+                                                                                                                     gaze_threshold,
+                                                                                                                     )
+
+                isi_gz_count, isi_conf_ratio, isi_stdev_x, isi_stdev_y, post_isi_dist, trial_fixCom = qc_metrics
+                plot_metrics = {
+                    'isi_gz_count': {
+                        'refs': ['A', 'B', 'C'],
+                        'metric': isi_gz_count,
+                    },
+                    'isi_conf_ratio': {
+                        'refs': ['D', 'E', 'F'],
+                        'metric': isi_conf_ratio,
+                    },
+                    'isi_stdev_x': {
+                        'refs': ['G', 'H', 'I'],
+                        'metric': isi_stdev_x,
+                    },
+                    'isi_stdev_y': {
+                        'refs': ['J', 'K', 'L'],
+                        'metric': isi_stdev_y,
+                    },
+                    'post_isi_dist': {
+                        'refs': ['M', 'N', 'O'],
+                        'metric': post_isi_dist,
+                    },
+                    'trial_fixCom': {
+                        'refs': ['P', 'Q', 'R'],
+                        'metric': trial_fixCom,
+                    },
+                }
+
+                mosaic = """
+                    ADGJMP
+                    BEHKNQ
+                    CFILOR
+                """
+                fs = (35, 14.0)
+
+                fig = plt.figure(constrained_layout=True, figsize=fs)
+                ax_dict = fig.subplot_mosaic(mosaic)
+                run_dur = int(run_event.iloc[-1]['onset'] + 20)
+
+                for key in plot_metrics:
+                    refs = plot_metrics[key]['refs']
+                    color_metric = plot_metrics[key]['metric']
+
+                    ax_dict[refs[0]].scatter(trial_time, trial_x, c=color_metric, s=10, cmap='terrain_r', alpha=0.15)
+                    ax_dict[refs[0]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
+                    ax_dict[refs[0]].set_ylim(-0.2, 1.2)
+                    ax_dict[refs[0]].set_title(f'{sub} {ses} {run_num} {key} gaze_x')
+
+                    ax_dict[refs[1]].scatter(trial_time, trial_y, c=color_metric, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[1]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
+                    ax_dict[refs[1]].set_ylim(-0.2, 1.2)
+                    ax_dict[refs[1]].set_title(f'{sub} {ses} {run_num} {key} gaze_y')
+
+                    ax_dict[refs[2]].scatter(trial_time, trial_dist, c=color_metric, s=10, cmap='terrain_r', alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[2]].plot([2.98, 2.98], [-0.1, 7], color="xkcd:red", linewidth=2)
+                    ax_dict[refs[2]].set_ylim(-0.1, 7)
+                    ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} {key} gaze_dist (deg)')
+
+                fig.savefig(out_file)
+                plt.close()
 
                 '''
                 TODO: make some graphs like in phase 3 to visualize whether QC metrics reflect quality of drift correction...
