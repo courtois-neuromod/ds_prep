@@ -203,7 +203,7 @@ def get_fixation_gaze_things(df_ev, clean_dist_x, clean_dist_y, clean_times, fix
             j += 1
 
         #if len(trial_fd_x) > 0:
-        if len(trial_fd_x) > 100:
+        if len(trial_fd_x) > 20:
             med_x = np.median(trial_fd_x)
             med_y = np.median(trial_fd_y)
             if med_fix:
