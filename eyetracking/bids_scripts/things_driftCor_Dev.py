@@ -1105,17 +1105,17 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                     color_metric = plot_metrics[key]['metric']
                     cmap = plot_metrics[key]['cmap']
 
-                    ax_dict[refs[0]].scatter(trial_time, trial_x, c=color_metric, s=10, cmap='cmap', alpha=0.15)
+                    ax_dict[refs[0]].scatter(trial_time, trial_x, c=color_metric, s=10, cmap=cmap, alpha=0.15)
                     ax_dict[refs[0]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
                     ax_dict[refs[0]].set_ylim(-0.2, 1.2)
                     ax_dict[refs[0]].set_title(f'{sub} {ses} {run_num} {key} gaze_x')
 
-                    ax_dict[refs[1]].scatter(trial_time, trial_y, c=color_metric, s=10, cmap='cmap', alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[1]].scatter(trial_time, trial_y, c=color_metric, s=10, cmap=cmap, alpha=0.15)#'xkcd:orange', alpha=all_conf)
                     ax_dict[refs[1]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
                     ax_dict[refs[1]].set_ylim(-0.2, 1.2)
                     ax_dict[refs[1]].set_title(f'{sub} {ses} {run_num} {key} gaze_y')
 
-                    ax_dict[refs[2]].scatter(trial_time, trial_dist, c=color_metric, s=10, cmap='cmap', alpha=0.15)#'xkcd:orange', alpha=all_conf)
+                    ax_dict[refs[2]].scatter(trial_time, trial_dist, c=color_metric, s=10, cmap=cmap, alpha=0.15)#'xkcd:orange', alpha=all_conf)
                     ax_dict[refs[2]].plot([2.98, 2.98], [-0.1, 7], color="xkcd:red", linewidth=2)
                     ax_dict[refs[2]].set_ylim(-0.1, 7)
                     ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} {key} gaze_dist (deg)')
