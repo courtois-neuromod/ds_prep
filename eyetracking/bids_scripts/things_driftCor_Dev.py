@@ -267,12 +267,6 @@ def add_metrics_2events(df_ev,
 
                 all_idx += 1
 
-            metrics_per_trials[trial_number-1] = {
-                'isi_gaze_count': len(isi_confs),
-                'isi_gaze_conf_90': np.sum(np.array(isi_confs) > 0.9)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
-                'isi_gaze_conf_75': np.sum(np.array(isi_confs) > 0.75)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
-            }
-
             conf_filter = np.array(isi_confs) > conf_thresh
             f_sum = np.sum(conf_filter)
             if f_sum:
@@ -280,6 +274,10 @@ def add_metrics_2events(df_ev,
                 isi_y_arr = np.array(isi_y)[conf_filter]
                 isi_dist_arr = np.array(isi_distances)[conf_filter]
             metrics_per_trials[trial_number-1] = {
+                'isi_gaze_count': len(isi_confs),
+                'isi_gaze_conf_90': np.sum(np.array(isi_confs) > 0.9)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
+                'isi_gaze_conf_75': np.sum(np.array(isi_confs) > 0.75)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
+
                 f'isi_stdev_x_{conf_thresh}': np.std(isi_x_arr) if f_sum else np.nan,
                 f'isi_stdev_y_{conf_thresh}': np.std(isi_y_arr) if f_sum else np.nan,
                 f'isi_median_x_{conf_thresh}': np.median(isi_x_arr) if f_sum else np.nan,
@@ -315,29 +313,12 @@ def add_metrics_2events(df_ev,
 
             all_idx += 1
 
-        metrics_per_trials[trial_number] = {
-            'trial_gaze_count': len(trial_confs),
-            'trial_gaze_conf_90': np.sum(np.array(trial_confs) > 0.9)/len(trial_confs) if len(trial_confs) > 0 else np.nan,
-            'trial_gaze_conf_75': np.sum(np.array(trial_confs) > 0.75)/len(trial_confs) if len(trial_confs) > 0 else np.nan,
-            'isi_gaze_count': len(isi_confs),
-            'isi_gaze_conf_90': np.sum(np.array(isi_confs) > 0.9)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
-            'isi_gaze_conf_75': np.sum(np.array(isi_confs) > 0.75)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
-        }
-
         t_conf_filter = np.array(trial_confs) > conf_thresh
         t_f_sum = np.sum(t_conf_filter)
         if t_f_sum:
             trial_x_arr = np.array(trial_x)[t_conf_filter]
             trial_y_arr = np.array(trial_y)[t_conf_filter]
             trial_dist_arr = np.array(trial_distance)[t_conf_filter]
-        metrics_per_trials[trial_number] = {
-            f'trial_stdev_x_{conf_thresh}': np.std(trial_x_arr) if t_f_sum else np.nan,
-            f'trial_stdev_y_{conf_thresh}': np.std(trial_y_arr) if t_f_sum else np.nan,
-            'trial_fix_compliance_ratio_deg0.5': np.sum(trial_dist_arr < 0.5)/t_f_sum if t_f_sum else np.nan,
-            'trial_fix_compliance_ratio_deg1': np.sum(trial_dist_arr < 1.0)/t_f_sum if t_f_sum else np.nan,
-            'trial_fix_compliance_ratio_deg2': np.sum(trial_dist_arr < 2.0)/t_f_sum if t_f_sum else np.nan,
-            'trial_fix_compliance_ratio_deg3': np.sum(trial_dist_arr < 3.0)/t_f_sum if t_f_sum else np.nan,
-            }
 
         i_conf_filter = np.array(isi_confs) > conf_thresh
         i_f_sum = np.sum(i_conf_filter)
@@ -346,6 +327,20 @@ def add_metrics_2events(df_ev,
             isi_y_arr = np.array(isi_y)[i_conf_filter]
             isi_dist_arr = np.array(isi_distances)[i_conf_filter]
         metrics_per_trials[trial_number] = {
+            'trial_gaze_count': len(trial_confs),
+            'trial_gaze_conf_90': np.sum(np.array(trial_confs) > 0.9)/len(trial_confs) if len(trial_confs) > 0 else np.nan,
+            'trial_gaze_conf_75': np.sum(np.array(trial_confs) > 0.75)/len(trial_confs) if len(trial_confs) > 0 else np.nan,
+            'isi_gaze_count': len(isi_confs),
+            'isi_gaze_conf_90': np.sum(np.array(isi_confs) > 0.9)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
+            'isi_gaze_conf_75': np.sum(np.array(isi_confs) > 0.75)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
+
+            f'trial_stdev_x_{conf_thresh}': np.std(trial_x_arr) if t_f_sum else np.nan,
+            f'trial_stdev_y_{conf_thresh}': np.std(trial_y_arr) if t_f_sum else np.nan,
+            'trial_fix_compliance_ratio_deg0.5': np.sum(trial_dist_arr < 0.5)/t_f_sum if t_f_sum else np.nan,
+            'trial_fix_compliance_ratio_deg1': np.sum(trial_dist_arr < 1.0)/t_f_sum if t_f_sum else np.nan,
+            'trial_fix_compliance_ratio_deg2': np.sum(trial_dist_arr < 2.0)/t_f_sum if t_f_sum else np.nan,
+            'trial_fix_compliance_ratio_deg3': np.sum(trial_dist_arr < 3.0)/t_f_sum if t_f_sum else np.nan,
+
             f'isi_stdev_x_{conf_thresh}': np.std(isi_x_arr) if i_f_sum else np.nan,
             f'isi_stdev_y_{conf_thresh}': np.std(isi_y_arr) if i_f_sum else np.nan,
             f'isi_median_x_{conf_thresh}': np.median(isi_x_arr) if i_f_sum else np.nan,
@@ -375,7 +370,7 @@ def add_metrics_2events(df_ev,
             assuming high drift corr conf index, compute ratio of
             gaze positioned within 1, 2 or 3 deg of vis angle from central fixation during image presentation
     '''
-    print(metrics_per_trials.keys(), metrics_per_trials[0].keys(), metrics_per_trials[1].keys(), metrics_per_trials)
+    #print(metrics_per_trials.keys(), metrics_per_trials[0].keys(), metrics_per_trials[1].keys(), metrics_per_trials)
     '''
     Insert gaze count: pre-isi, image presentation and post-isi
     '''
