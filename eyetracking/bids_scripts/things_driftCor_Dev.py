@@ -329,7 +329,7 @@ def add_metrics_2events(df_ev,
         if t_f_sum:
             trial_x_arr = np.array(trial_x)[t_conf_filter]
             trial_y_arr = np.array(trial_y)[t_conf_filter]
-            trial_dist_arr = np.array(trial_distances)[t_conf_filter]
+            trial_dist_arr = np.array(trial_distance)[t_conf_filter]
         metrics_per_trials[trial_number] = {
             f'trial_stdev_x_{conf_thresh}': np.std(trial_x_arr) if t_f_sum else np.nan,
             f'trial_stdev_y_{conf_thresh}': np.std(trial_y_arr) if t_f_sum else np.nan,
