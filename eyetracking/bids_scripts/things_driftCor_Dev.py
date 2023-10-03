@@ -568,7 +568,7 @@ def get_trial_distances(df_ev, x, y, times, confs):
     return all_dist, all_x, all_y, all_times, all_confs
 
 
-def get_trial_distances_plusMetrics(df_ev, x, y, times, confs, conf_thresh):
+def get_trial_distances_plusMetrics(df_ev, strategy, x, y, times, confs, conf_thresh):
     '''
     Reset gaze time in relation to trial onset
     Calculate distance from center (0.5, 0.5) for each trial gaze
@@ -589,10 +589,10 @@ def get_trial_distances_plusMetrics(df_ev, x, y, times, confs, conf_thresh):
     all_times = []
     all_confs = []
 
-    isi_gz_count = []
-    isi_conf_ratio = []
-    isi_stdev_x = []
-    isi_stdev_y = []
+    fix_gz_count = []
+    fix_conf_ratio = []
+    fix_stdev_x = []
+    fix_stdev_y = []
     pre_post_isi_dist = []
     trial_fixCom = []
 
@@ -630,14 +630,22 @@ def get_trial_distances_plusMetrics(df_ev, x, y, times, confs, conf_thresh):
             all_times += trial_times
             all_confs += trial_confs
 
-            isi_gz_count += np.repeat(df_ev['pre-isi_gaze_count_ratio'][i], len(trial_pos)).tolist()
-            isi_conf_ratio += np.repeat(df_ev['pre-isi_gaze_confidence_ratio_0.9'][i], len(trial_pos)).tolist()
-            isi_stdev_x += np.repeat(df_ev[f'pre-isi_stdev_x_{conf_thresh}'][i], len(trial_pos)).tolist()
-            isi_stdev_y += np.repeat(df_ev[f'pre-isi_stdev_y_{conf_thresh}'][i], len(trial_pos)).tolist()
-            pre_post_isi_dist += np.repeat(df_ev['pre-post-isi_distance_in_deg'][i], len(trial_pos)).tolist()
-            trial_fixCom += np.repeat(df_ev['trial_fixation_compliance_ratio_1.0'][i], len(trial_pos)).tolist()
+            if strategy == 'isi':
+                fix_gz_count += np.repeat(df_ev['pre-isi_gaze_count_ratio'][i], len(trial_pos)).tolist()
+                fix_conf_ratio += np.repeat(df_ev['pre-isi_gaze_confidence_ratio_0.9'][i], len(trial_pos)).tolist()
+                fix_stdev_x += np.repeat(df_ev[f'pre-isi_stdev_x_{conf_thresh}'][i], len(trial_pos)).tolist()
+                fix_stdev_y += np.repeat(df_ev[f'pre-isi_stdev_y_{conf_thresh}'][i], len(trial_pos)).tolist()
+                pre_post_isi_dist += np.repeat(df_ev['pre-post-isi_distance_in_deg'][i], len(trial_pos)).tolist()
+                trial_fixCom += np.repeat(df_ev['trial_fixation_compliance_ratio_1.0'][i], len(trial_pos)).tolist()
+            else:
+                fix_gz_count += np.repeat(df_ev['trial_gaze_count_ratio'][i], len(trial_pos)).tolist()
+                fix_conf_ratio += np.repeat(df_ev['trial_gaze_confidence_ratio_0.9'][i], len(trial_pos)).tolist()
+                fix_stdev_x += np.repeat(df_ev[f'trial_stdev_x_{conf_thresh}'][i], len(trial_pos)).tolist()
+                fix_stdev_y += np.repeat(df_ev[f'trial_stdev_y_{conf_thresh}'][i], len(trial_pos)).tolist()
+                pre_post_isi_dist += np.repeat(df_ev['pre-post-isi_distance_in_deg'][i], len(trial_pos)).tolist()
+                trial_fixCom += np.repeat(df_ev['trial_fixation_compliance_ratio_1.0'][i], len(trial_pos)).tolist()
 
-    return ((all_dist, all_x, all_y, all_times, all_confs), (isi_gz_count, isi_conf_ratio, isi_stdev_x, isi_stdev_y, pre_post_isi_dist, trial_fixCom))
+    return ((all_dist, all_x, all_y, all_times, all_confs), (fix_gz_count, fix_conf_ratio, fix_stdev_x, fix_stdev_y, pre_post_isi_dist, trial_fixCom))
 
 
 def driftCorr_ETtests(row, out_path, phase_num=1):
@@ -1048,6 +1056,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
 
                 (trial_dist, trial_x, trial_y, trial_time, trial_conf), qc_metrics = get_trial_distances_plusMetrics(
                                                                                                                      run_event,
+                                                                                                                     sub_strategy[sub],
                                                                                                                      all_x_aligned,
                                                                                                                      all_y_aligned,
                                                                                                                      all_times,
@@ -1055,26 +1064,26 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                                                                                                                      gaze_threshold,
                                                                                                                      )
 
-                isi_gz_count, isi_conf_ratio, isi_stdev_x, isi_stdev_y, pre_post_isi_dist, trial_fixCom = qc_metrics
+                fix_gz_count, fix_conf_ratio, fix_stdev_x, fix_stdev_y, pre_post_isi_dist, trial_fixCom = qc_metrics
                 plot_metrics = {
-                    'isi_gz_count': {
+                    'fix_gz_count': {
                         'refs': ['A', 'B', 'C'],
-                        'metric': isi_gz_count,
+                        'metric': fix_gz_count,
                         'cmap': 'terrain_r',
                     },
-                    'isi_conf_ratio': {
+                    'fix_conf_ratio': {
                         'refs': ['D', 'E', 'F'],
-                        'metric': isi_conf_ratio,
+                        'metric': fix_conf_ratio,
                         'cmap': 'terrain_r',
                     },
-                    'isi_stdev_x': {
+                    'fix_stdev_x': {
                         'refs': ['G', 'H', 'I'],
-                        'metric': isi_stdev_x,
+                        'metric': fix_stdev_x,
                         'cmap': 'terrain',
                     },
-                    'isi_stdev_y': {
+                    'fix_stdev_y': {
                         'refs': ['J', 'K', 'L'],
-                        'metric': isi_stdev_y,
+                        'metric': fix_stdev_y,
                         'cmap': 'terrain',
                     },
                     'pre_post_isi_dist': {
@@ -1108,17 +1117,17 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                     ax_dict[refs[0]].scatter(trial_time, trial_x, c=color_metric, s=10, cmap=cmap, alpha=0.15)
                     ax_dict[refs[0]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
                     ax_dict[refs[0]].set_ylim(-0.2, 1.2)
-                    ax_dict[refs[0]].set_title(f'{sub} {ses} {run_num} {key} gaze_x')
+                    ax_dict[refs[0]].set_title(f'{sub} {ses} {run_num} {sub_strategy[sub]} {key} gaze_x')
 
                     ax_dict[refs[1]].scatter(trial_time, trial_y, c=color_metric, s=10, cmap=cmap, alpha=0.15)#'xkcd:orange', alpha=all_conf)
                     ax_dict[refs[1]].plot([2.98, 2.98], [-0.2, 1.2], color="xkcd:red", linewidth=2)
                     ax_dict[refs[1]].set_ylim(-0.2, 1.2)
-                    ax_dict[refs[1]].set_title(f'{sub} {ses} {run_num} {key} gaze_y')
+                    ax_dict[refs[1]].set_title(f'{sub} {ses} {run_num} {sub_strategy[sub]} {key} gaze_y')
 
                     ax_dict[refs[2]].scatter(trial_time, trial_dist, c=color_metric, s=10, cmap=cmap, alpha=0.15)#'xkcd:orange', alpha=all_conf)
                     ax_dict[refs[2]].plot([2.98, 2.98], [-0.1, 7], color="xkcd:red", linewidth=2)
                     ax_dict[refs[2]].set_ylim(-0.1, 7)
-                    ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} {key} gaze_dist (deg)')
+                    ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} {sub_strategy[sub]} {key} gaze_dist (deg)')
 
                 fig.savefig(out_file)
                 plt.close()
