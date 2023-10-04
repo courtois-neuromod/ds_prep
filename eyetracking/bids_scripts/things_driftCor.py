@@ -848,13 +848,13 @@ def driftCorr_ET(row, out_path, is_final=False):
                     cmap = vals2plot[key]['cmap']
 
                     ax_dict[refs[0]].scatter(clean_times, clean_dist_x, color='xkcd:light blue', s=20, alpha=0.2)
-                    ax_dict[refs[0]].scatter(fix_times, fix_dist_x, color=color_metric', s=20, alpha=1.0)
+                    ax_dict[refs[0]].scatter(fix_times, fix_dist_x, color=color_metric, s=20, alpha=1.0)
                     ax_dict[refs[0]].set_ylim(-2, 2)
                     ax_dict[refs[0]].set_xlim(0, run_dur)
                     ax_dict[refs[0]].set_title(f'{sub} {ses} {run_num} {key} fix_distance_x')
 
                     ax_dict[refs[1]].scatter(clean_times, clean_dist_y, color='xkcd:light blue', s=20, alpha=0.2)
-                    ax_dict[refs[1]].scatter(fix_times, fix_dist_y, color=color_metric', s=20, alpha=1.0)
+                    ax_dict[refs[1]].scatter(fix_times, fix_dist_y, color=color_metric, s=20, alpha=1.0)
                     lb = np.min(fix_dist_y)-0.1 if np.min(fix_dist_y) < -2 else -2
                     hb = np.max(fix_dist_y)+0.1 if np.max(fix_dist_y) > 2 else 2
                     ax_dict["F"].set_ylim(lb, hb)
@@ -862,7 +862,7 @@ def driftCorr_ET(row, out_path, is_final=False):
                     ax_dict[refs[1]].set_title(f'{sub} {ses} {run_num} {key} fix_distance_y')
 
                     ax_dict[refs[2]].scatter(clean_times, clean_distInDeg, color='xkcd:light blue', s=20, alpha=0.2)
-                    ax_dict[refs[2]].scatter(fix_times, fix_distInDeg, color=color_metric', s=20, alpha=1.0)
+                    ax_dict[refs[2]].scatter(fix_times, fix_distInDeg, color=color_metric, s=20, alpha=1.0)
                     #ax_dict[refs[2]].set_ylim(-0.1, 5)
                     ax_dict[refs[2]].set_xlim(0, run_dur)
                     ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} {key} distance to center (deg visual angle)')
