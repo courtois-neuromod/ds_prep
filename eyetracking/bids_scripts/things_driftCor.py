@@ -368,21 +368,13 @@ def add_metrics_2events(df_ev,
     '''
     Potentially: correction will be anchored on fixation during preceeding ISI (ISI_0)
         TODO: insert trialwise QC metrics in events file to evaluate quality of fixation
-        - gaze confidence ratio (of 0.9, 0.75) during image (signal quality)
-        - gaze confidence ratio during preceding ISI (ISI_0)
-        - gaze confidence ratio during following ISI (ISI_1)
-        - gaze count during image, ISI_0 and ISI_1 (camera freeze?)
-        - stdev in x and y during image : good fixation?
-        - stdev in x and y during ISI_0, ISI_0 : reliable fixations?
+        - gaze count during image and preceding ISI (camera freeze?)
+        - gaze confidence ratio (of 0.9, 0.75) during image and preceding ISI (signal quality)
         - distance in deg of visual angle between medians in ISI_0 and ISI_1: moved?
-        - drift correction confidence index:
-            IF high confidence and gaze count at ISI_0, ISI_1 and image
-            IF low stdev in x and y at ISI_0 and ISI_1
-            IF low distance (in deg v angle) between medians between ISI_0 and ISI_1 (no head mvt)
-            then high confidence in precision of drift correction for that trial
+        - distance in deg of visual angle between current and previous image: moved?
         - fixation compliance ratio:
-            assuming high drift corr conf index, compute ratio of
-            gaze positioned within 1, 2 or 3 deg of vis angle from central fixation during image presentation
+            assuming other metrices look decent, compute ratio of
+            gaze positioned within 1, 2 or 3 deg of vis angle from central fixation (screen center) during image presentation
     '''
     #print(metrics_per_trials.keys(), metrics_per_trials[0].keys(), metrics_per_trials[1].keys(), metrics_per_trials)
     '''
@@ -390,7 +382,6 @@ def add_metrics_2events(df_ev,
     '''
     df_ev['pre-isi_gaze_count_ratio'] = df_ev.apply(lambda row: (metrics_per_trials[row['TrialNumber']-1]['isi_gaze_count'])/(250*0.89), axis=1)
     df_ev['trial_gaze_count_ratio'] = df_ev.apply(lambda row: (metrics_per_trials[row['TrialNumber']]['trial_gaze_count'])/(250*2.98), axis=1)
-    #df_ev[f'post-isi_gaze_count_ratio'] = df_ev.apply(lambda row: (metrics_per_trials[row['TrialNumber']]['isi_gaze_count'])/(250*0.89), axis=1)
 
     '''
     Insert gaze confidence ratio, out of all collected gaze (0.9 and 0.75 thresholds): pre-isi, image presentation and post-isi
@@ -399,8 +390,6 @@ def add_metrics_2events(df_ev,
     df_ev['pre-isi_gaze_confidence_ratio_0.75'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']-1]['isi_gaze_conf_75'], axis=1)
     df_ev['trial_gaze_confidence_ratio_0.9'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_gaze_conf_90'], axis=1)
     df_ev['trial_gaze_confidence_ratio_0.75'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_gaze_conf_75'], axis=1)
-    #df_ev[f'post-isi_gaze_confidence_ratio_0.9'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['isi_gaze_conf_90'], axis=1)
-    #df_ev[f'post-isi_gaze_confidence_ratio_0.75'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['isi_gaze_conf_75'], axis=1)
 
     '''
     Insert distance between median positions, in deg of visual angle, between pre- and pos-isi /current and previous (excessive head motion)
@@ -421,11 +410,6 @@ def add_metrics_2events(df_ev,
     df_ev['trial_fixation_compliance_ratio_2.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_fix_compliance_ratio_deg2'], axis=1)
     df_ev['trial_fixation_compliance_ratio_3.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_fix_compliance_ratio_deg3'], axis=1)
 
-    #df_ev[f'post-isi_fixation_compliance_ratio_0.5'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['isi_fix_compliance_ratio_deg0.5'], axis=1)
-    #df_ev[f'post-isi_fixation_compliance_ratio_1.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['isi_fix_compliance_ratio_deg1'], axis=1)
-    #df_ev[f'post-isi_fixation_compliance_ratio_2.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['isi_fix_compliance_ratio_deg2'], axis=1)
-    #df_ev[f'post-isi_fixation_compliance_ratio_3.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['isi_fix_compliance_ratio_deg3'], axis=1)
-
     return df_ev, all_distances_raw, all_distances
 
 
@@ -442,35 +426,6 @@ def driftcorr_fromlast(fd_x, fd_y, f_times, all_x, all_y, all_times):
         all_y_aligned.append(all_y[i] - fd_y[j])
 
     return all_x_aligned, all_y_aligned
-
-
-def apply_poly(ref_times, distances, degree, all_times, anchors = [150, 150]):
-    '''
-    Fit polynomial to a distribution, then export points along that polynomial curve
-    that correspond to specific gaze time stamps
-
-    The very begining and end of distribution are excluded for stability
-    e.g., participants sometimes look off screen at movie onset & offset,
-    while deepgaze is biased to the center when shown a black screen.
-    This really throws off polynomials
-    '''
-    if degree == 1:
-        p1, p0 = np.polyfit(ref_times[anchors[0]:-anchors[1]], distances[anchors[0]:-anchors[1]], 1)
-        p_of_all = p1*(all_times) + p0
-
-    elif degree == 2:
-        p2, p1, p0 = np.polyfit(ref_times[anchors[0]:-anchors[1]], distances[anchors[0]:-anchors[1]], 2)
-        p_of_all = p2*(all_times**2) + p1*(all_times) + p0
-
-    elif degree == 3:
-        p3, p2, p1, p0 = np.polyfit(ref_times[anchors[0]:-anchors[1]], distances[anchors[0]:-anchors[1]], 3)
-        p_of_all = p3*(all_times**3) + p2*(all_times**2) + p1*(all_times) + p0
-
-    elif degree == 4:
-        p4, p3, p2, p1, p0 = np.polyfit(ref_times[anchors[0]:-anchors[1]], distances[anchors[0]:-anchors[1]], 4)
-        p_of_all = p4*(all_times**4) + p3*(all_times**3) + p2*(all_times**2) + p1*(all_times) + p0
-
-    return p_of_all
 
 
 def get_distances_from_center(x, y, is_distance=False):
@@ -514,158 +469,6 @@ def get_isi_distance(metrics_dict, trial_num, conf_thresh, use_trial=False):
     distance = np.rad2deg(np.arccos(1.0 - pdist(vectors, metric='cosine')))[0]
 
     return distance
-
-
-def get_trial_distances(df_ev, x, y, times, confs, conf_thresh, filter=False):
-    '''
-    Reset gaze time in relation to trial onset
-    Calculate distance from center (0.5, 0.5) for each trial gaze
-
-    Export within-trial position (x and y), distance to center, relative time stamp and confidence
-    '''
-
-    assert len(x) == len(y)
-    assert len(x) == len(times)
-    assert len(x) == len(confs)
-
-    dist_in_pix = 4164 # in pixels
-    m_vecpos = np.array([0., 0., dist_in_pix])
-
-    if filter:
-        gz_filter = np.array(confs) > conf_thresh
-        x = np.array(x)[gz_filter].tolist()
-        y = np.array(y)[gz_filter].tolist()
-        times = np.array(times)[gz_filter].tolist()
-        confs = np.array(confs)[gz_filter].tolist()
-
-    all_dist = []
-    all_x = []
-    all_y = []
-    all_times = []
-    all_confs = []
-
-    j = 0
-
-    for i in range(df_ev.shape[0]):
-        trial_onset = df_ev['onset'][i]
-        trial_offset = trial_onset + df_ev['duration'][i] + 1.49
-
-        # add gaze from trial period
-        trial_pos = []
-        trial_times = []
-        trial_confs = []
-        while j < len(times) and times[j] < trial_offset:
-            if times[j] > trial_onset and times[j] < trial_offset:
-                trial_pos.append((x[j], y[j]))
-                trial_times.append(times[j] - trial_onset)
-                trial_confs.append(confs[j])
-            j += 1
-
-        if len(trial_pos) > 0:
-            t_pos = np.array(trial_pos)
-            gaze = (t_pos - 0.5)*(1280, 1024)
-            gaze_vecpos = np.concatenate((gaze, np.repeat(dist_in_pix, len(gaze)).reshape((-1, 1))), axis=1)
-
-            trial_distances = []
-            for gz_vec in gaze_vecpos:
-                vectors = np.stack((m_vecpos, gz_vec), axis=0)
-                distance = np.rad2deg(np.arccos(1.0 - pdist(vectors, metric='cosine')))[0]
-                trial_distances.append(distance)
-
-            all_dist += trial_distances
-            all_x += t_pos[:, 0].tolist()
-            all_y += t_pos[:, 1].tolist()
-            all_times += trial_times
-            all_confs += trial_confs
-
-    return all_dist, all_x, all_y, all_times, all_confs
-
-
-def get_trial_distances_plusMetrics(df_ev, strategy, x, y, times, confs, conf_thresh, filter=False):
-    '''
-    Reset gaze time in relation to trial onset
-    Calculate distance from center (0.5, 0.5) for each trial gaze
-
-    Export within-trial position (x and y), distance to center, relative time stamp and confidence
-    '''
-
-    assert len(x) == len(y)
-    assert len(x) == len(times)
-    assert len(x) == len(confs)
-
-    dist_in_pix = 4164 # in pixels
-    m_vecpos = np.array([0., 0., dist_in_pix])
-
-    if filter:
-        gz_filter = np.array(confs) > conf_thresh
-        x = np.array(x)[gz_filter].tolist()
-        y = np.array(y)[gz_filter].tolist()
-        times = np.array(times)[gz_filter].tolist()
-        confs = np.array(confs)[gz_filter].tolist()
-
-    all_dist = []
-    all_x = []
-    all_y = []
-    all_times = []
-    all_confs = []
-
-    fix_gz_count = []
-    fix_conf_ratio = []
-    fix_stdev_x = []
-    fix_stdev_y = []
-    pre_post_isi_dist = []
-    trial_fixCom = []
-
-    j = 0
-
-    for i in range(df_ev.shape[0]):
-        trial_onset = df_ev['onset'][i]
-        trial_offset = trial_onset + df_ev['duration'][i] + 1.49
-
-        # add gaze from trial period
-        trial_pos = []
-        trial_times = []
-        trial_confs = []
-        while j < len(times) and times[j] < trial_offset:
-            if times[j] > trial_onset and times[j] < trial_offset:
-                trial_pos.append((x[j], y[j]))
-                trial_times.append(times[j] - trial_onset)
-                trial_confs.append(confs[j])
-            j += 1
-
-        if len(trial_pos) > 0:
-            t_pos = np.array(trial_pos)
-            gaze = (t_pos - 0.5)*(1280, 1024)
-            gaze_vecpos = np.concatenate((gaze, np.repeat(dist_in_pix, len(gaze)).reshape((-1, 1))), axis=1)
-
-            trial_distances = []
-            for gz_vec in gaze_vecpos:
-                vectors = np.stack((m_vecpos, gz_vec), axis=0)
-                distance = np.rad2deg(np.arccos(1.0 - pdist(vectors, metric='cosine')))[0]
-                trial_distances.append(distance)
-
-            all_dist += trial_distances
-            all_x += t_pos[:, 0].tolist()
-            all_y += t_pos[:, 1].tolist()
-            all_times += trial_times
-            all_confs += trial_confs
-
-            if strategy == 'isi':
-                fix_gz_count += np.repeat(df_ev['pre-isi_gaze_count_ratio'][i], len(trial_pos)).tolist()
-                fix_conf_ratio += np.repeat(df_ev['pre-isi_gaze_confidence_ratio_0.9'][i], len(trial_pos)).tolist()
-                fix_stdev_x += np.repeat(df_ev[f'pre-isi_stdev_x_{conf_thresh}'][i], len(trial_pos)).tolist()
-                fix_stdev_y += np.repeat(df_ev[f'pre-isi_stdev_y_{conf_thresh}'][i], len(trial_pos)).tolist()
-                pre_post_isi_dist += np.repeat(df_ev['pre-post-isi_distance_in_deg'][i], len(trial_pos)).tolist()
-                trial_fixCom += np.repeat(df_ev['trial_fixation_compliance_ratio_1.0'][i], len(trial_pos)).tolist()
-            else:
-                fix_gz_count += np.repeat(df_ev['trial_gaze_count_ratio'][i], len(trial_pos)).tolist()
-                fix_conf_ratio += np.repeat(df_ev['trial_gaze_confidence_ratio_0.9'][i], len(trial_pos)).tolist()
-                fix_stdev_x += np.repeat(df_ev[f'trial_stdev_x_{conf_thresh}'][i], len(trial_pos)).tolist()
-                fix_stdev_y += np.repeat(df_ev[f'trial_stdev_y_{conf_thresh}'][i], len(trial_pos)).tolist()
-                pre_post_isi_dist += np.repeat(df_ev['pre-post-isi_distance_in_deg'][i], len(trial_pos)).tolist()
-                trial_fixCom += np.repeat(df_ev['trial_fixation_compliance_ratio_1.0'][i], len(trial_pos)).tolist()
-
-    return ((all_dist, all_x, all_y, all_times, all_confs), (fix_gz_count, fix_conf_ratio, fix_stdev_x, fix_stdev_y, pre_post_isi_dist, trial_fixCom))
 
 
 def driftCorr_ET(row, out_path, is_final=False):
