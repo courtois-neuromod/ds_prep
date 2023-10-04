@@ -298,6 +298,10 @@ def add_metrics_2events(df_ev,
                 'isi_fix_compliance_ratio_deg1': np.sum(isi_dist_arr < 1.0)/f_sum if f_sum else np.nan,
                 'isi_fix_compliance_ratio_deg2': np.sum(isi_dist_arr < 2.0)/f_sum if f_sum else np.nan,
                 'isi_fix_compliance_ratio_deg3': np.sum(isi_dist_arr < 3.0)/f_sum if f_sum else np.nan,
+
+                # mock "previous" trial: take isi medial instead
+                f'trial_median_x_{conf_thresh}': np.median(isi_x_arr) if f_sum else np.nan,
+                f'trial_median_y_{conf_thresh}': np.median(isi_y_arr) if f_sum else np.nan,
                 }
 
         trial_confs = []
@@ -346,6 +350,8 @@ def add_metrics_2events(df_ev,
             'isi_gaze_conf_90': np.sum(np.array(isi_confs) > 0.9)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
             'isi_gaze_conf_75': np.sum(np.array(isi_confs) > 0.75)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
 
+            f'trial_median_x_{conf_thresh}': np.median(trial_x_arr) if t_f_sum else np.nan,
+            f'trial_median_y_{conf_thresh}': np.median(trial_y_arr) if t_f_sum else np.nan,
             'trial_fix_compliance_ratio_deg0.5': np.sum(trial_dist_arr < 0.5)/t_f_sum if t_f_sum else np.nan,
             'trial_fix_compliance_ratio_deg1': np.sum(trial_dist_arr < 1.0)/t_f_sum if t_f_sum else np.nan,
             'trial_fix_compliance_ratio_deg2': np.sum(trial_dist_arr < 2.0)/t_f_sum if t_f_sum else np.nan,
@@ -397,9 +403,10 @@ def add_metrics_2events(df_ev,
     #df_ev[f'post-isi_gaze_confidence_ratio_0.75'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['isi_gaze_conf_75'], axis=1)
 
     '''
-    Insert distance between median positions, in deg of visual angle, between pre- and pos-isi (excessive head motion)
+    Insert distance between median positions, in deg of visual angle, between pre- and pos-isi /current and previous (excessive head motion)
     '''
     df_ev['pre-post-isi_distance_in_deg'] = df_ev.apply(lambda row: get_isi_distance(metrics_per_trials, row['TrialNumber'], conf_thresh), axis=1)
+    df_ev['distance_to_previous_trial_in_deg'] = df_ev.apply(lambda row: get_isi_distance(metrics_per_trials, row['TrialNumber'], conf_thresh, use_trial=True), axis=1)
 
     '''
     Insert fixation compliance ratios
@@ -492,12 +499,14 @@ def get_distances_from_center(x, y, is_distance=False):
     return all_distances
 
 
-def get_isi_distance(metrics_dict, trial_num, conf_thresh):
+def get_isi_distance(metrics_dict, trial_num, conf_thresh, use_trial=False):
 
-    pre_x = (metrics_dict[trial_num-1][f'isi_median_x_{conf_thresh}'] - 0.5)*1280
-    pre_y = (metrics_dict[trial_num-1][f'isi_median_y_{conf_thresh}'] - 0.5)*1024
-    post_x = (metrics_dict[trial_num][f'isi_median_x_{conf_thresh}'] - 0.5)*1280
-    post_y = (metrics_dict[trial_num][f'isi_median_y_{conf_thresh}'] - 0.5)*1024
+    fix_name = 'trial' if use_trial else 'isi'
+
+    pre_x = (metrics_dict[trial_num-1][f'{fix_name}_median_x_{conf_thresh}'] - 0.5)*1280
+    pre_y = (metrics_dict[trial_num-1][f'{fix_name}_median_y_{conf_thresh}'] - 0.5)*1024
+    post_x = (metrics_dict[trial_num][f'{fix_name}_median_x_{conf_thresh}'] - 0.5)*1280
+    post_y = (metrics_dict[trial_num][f'{fix_name}_median_y_{conf_thresh}'] - 0.5)*1024
 
     dist_in_pix = 4164 # in pixels
 
@@ -777,12 +786,13 @@ def driftCorr_ET(row, out_path, is_final=False):
                 cutoff = '0.9' if gaze_threshold == 0.9 else '0.75'
 
                 for i in fix_metrics['gz_idx']:
-                    fix_metrics['gz_pre-post_dist'].append(run_event['pre-post-isi_distance_in_deg'][i])
                     fix_metrics['gz_trial_fixCom'].append(run_event['trial_fixation_compliance_ratio_1.0'][i])
                     if strategy == 'isi':
                         fix_metrics['fix_gz_conf'].append(run_event[f'pre-isi_gaze_confidence_ratio_{cutoff}'][i])
+                        fix_metrics['gz_pre-post_dist'].append(run_event['pre-post-isi_distance_in_deg'][i])
                     else:
                         fix_metrics['fix_gz_conf'].append(run_event[f'trial_gaze_confidence_ratio_{cutoff}'][i])
+                        fix_metrics['gz_pre-post_dist'].append(run_event['distance_to_previous_trial_in_deg'][i])
 
                 vals2plot = {
                     #'col=gz_count': {
