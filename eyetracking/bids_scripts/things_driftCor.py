@@ -699,10 +699,11 @@ def driftCorr_ET(row, out_path, is_final=False):
                 'sub-06': 'isi',
                 }
 
-            fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, sub_strategy[sub], med_fix=True)
+            strategy = sub_strategy[sub]
             '''
+            strategy = 'image+isi'
 
-            fix_dist_x, fix_dist_y, fix_times, fix_metrics = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, 'image+isi')
+            fix_dist_x, fix_dist_y, fix_times, fix_metrics = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, fix_period=strategy)
             all_x_aligned, all_y_aligned = driftcorr_fromlast(fix_dist_x, fix_dist_y, fix_times, all_x, all_y, all_times)
 
             run_event, all_distInDeg, all_distInDeg_aligned = add_metrics_2events(
@@ -769,20 +770,38 @@ def driftCorr_ET(row, out_path, is_final=False):
                 '''
                 plot DriftCorr QC figures
                 '''
-                fix_metrics['gz_isi_fixCom'] = []
                 fix_metrics['gz_trial_fixCom'] = []
+                fix_metrics['gz_pre-post_dist'] = []
+                fix_metrics['fix_gz_conf'] = []
+
+                cutoff = '0.9' if gaze_threshold == 0.9 else '0.75'
+
                 for i in fix_metrics['gz_idx']:
-                    fix_metrics['gz_isi_fixCom'].append(run_event['pre-isi_fixation_compliance_ratio_1.0'][i])
+                    fix_metrics['gz_pre-post_dist'].append(run_event['pre-post-isi_distance_in_deg'][i])
                     fix_metrics['gz_trial_fixCom'].append(run_event['trial_fixation_compliance_ratio_1.0'][i])
+                    if strategy == 'isi':
+                        fix_metrics['fix_gz_conf'].append(run_event[f'pre-isi_gaze_confidence_ratio_{cutoff}'][i])
+                    else:
+                        fix_metrics['fix_gz_conf'].append(run_event[f'trial_gaze_confidence_ratio_{cutoff}'][i])
 
                 vals2plot = {
-                    'col=gz_count': {
-                        'values': fix_metrics['gz_count'],
+                    #'col=gz_count': {
+                    #    'values': fix_metrics['gz_count'],
+                    #    'refs': ['G', 'H', 'I'],
+                    #    'cmap': 'plasma_r',
+                    #},
+                    #'col=dist_from_previous': {
+                    #    'values': fix_metrics['gz_dist_2_prev'],
+                    #    'refs': ['J', 'K', 'L'],
+                    #    'cmap': 'plasma',
+                    #},
+                    'col=fix_confidence': {
+                        'values': fix_metrics['fix_gz_conf'],
                         'refs': ['G', 'H', 'I'],
                         'cmap': 'plasma_r',
                     },
-                    'col=dist_from_previous': {
-                        'values': fix_metrics['gz_dist_2_prev'],
+                    'col=isi_dist': {
+                        'values': fix_metrics['gz_pre-post_dist'],
                         'refs': ['J', 'K', 'L'],
                         'cmap': 'plasma',
                     },
@@ -795,6 +814,17 @@ def driftCorr_ET(row, out_path, is_final=False):
 
                 clean_distInDeg = get_distances_from_center(clean_dist_x, clean_dist_y, is_distance=True)
                 fix_distInDeg = get_distances_from_center(fix_dist_x, fix_dist_y, is_distance=True)
+
+                color_metric = np.array(all_conf)
+                s = color_metric.argsort()
+                time_vals = np.array(all_times)[s]
+                x_vals = np.array(all_x)[s]
+                x_vals_align = np.array(all_x_aligned)[s]
+                y_vals = np.array(all_y)[s]
+                y_vals_align = np.array(all_y_aligned)[s]
+                dist_vals = np.array(all_distInDeg)[s]
+                dist_vals_align = np.array(all_distInDeg_aligned)[s]
+                cm = color_metric[s]
 
                 mosaic = """
                     ABC
@@ -824,20 +854,20 @@ def driftCorr_ET(row, out_path, is_final=False):
                 ax_dict["B"].legend()
                 ax_dict["B"].set_title(f'{sub} {ses} {run_num} trialwise_fixCompliance')
 
-                ax_dict["D"].scatter(all_times, all_x, s=10, color='xkcd:light grey', alpha=all_conf)
-                ax_dict["D"].scatter(all_times, all_x_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
+                ax_dict["D"].scatter(time_vals, x_vals, s=10, color='xkcd:light grey', alpha=cm)
+                ax_dict["D"].scatter(time_vals, x_vals_align, c=cm, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
                 ax_dict["D"].set_ylim(-1.5, 2)
                 ax_dict["D"].set_xlim(0, run_dur)
                 ax_dict["D"].set_title(f'{sub} {ses} {run_num} gaze_x')
 
-                ax_dict["E"].scatter(all_times, all_y, color='xkcd:light grey', alpha=all_conf)
-                ax_dict["E"].scatter(all_times, all_y_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
+                ax_dict["E"].scatter(time_vals, y_vals, color='xkcd:light grey', alpha=cm)
+                ax_dict["E"].scatter(time_vals, y_vals_align, c=cm, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
                 ax_dict["E"].set_ylim(-1.5, 2)
                 ax_dict["E"].set_xlim(0, run_dur)
                 ax_dict["E"].set_title(f'{sub} {ses} {run_num} gaze_y')
 
-                ax_dict["F"].scatter(all_times, all_distInDeg, color='xkcd:light grey', alpha=all_conf)
-                ax_dict["F"].scatter(all_times, all_distInDeg_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
+                ax_dict["F"].scatter(time_vals, dist_vals, color='xkcd:light grey', alpha=cm)
+                ax_dict["F"].scatter(time_vals, dist_vals_align, c=cm, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
                 ax_dict["F"].set_ylim(-0.1, 20)
                 ax_dict["F"].set_xlim(0, run_dur)
                 ax_dict["F"].set_title(f'{sub} {ses} {run_num} dist2center_deg')
