@@ -157,7 +157,7 @@ def reset_gaze_time(gaze, onset_time, conf_thresh=0.9):
     return reset_gaze_list, (all_x, all_y, all_times, all_conf), (clean_dist_x, clean_dist_y, clean_times, clean_conf)
 
 
-def get_single_distance((x1, y1), (x2, y2), is_distance=False):
+def get_single_distance(x1, y1, x2, y2, is_distance=False):
 
     norm_center = (0, 0) if is_distance else (0.5, 0.5)
 
@@ -229,7 +229,7 @@ def get_fixation_gaze_things(df_ev, clean_dist_x, clean_dist_y, clean_times, fix
             med_y = np.median(trial_fd_y)
 
             prev_x, prev_y = (0.0, 0.0) if len(fix_dist_x) < 1 else (fix_dist_x[-1], fix_dist_y[-1])
-            fix_metrics['gz_dist_2_prev'].append(get_single_distance((med_x, med_y), (prev_x, prev_y), is_distance=True))
+            fix_metrics['gz_dist_2_prev'].append(get_single_distance(med_x, med_y, prev_x, prev_y, is_distance=True))
 
             fix_dist_x.append(med_x)
             fix_dist_y.append(med_y)
