@@ -776,17 +776,17 @@ def driftCorr_ET(row, out_path, is_final=False):
                     fix_metrics['gz_trial_fixCom'].append(run_event['trial_fixation_compliance_ratio_1.0'][i])
 
                 vals2plot = {
-                    'gaze_count': {
+                    'col=gz_count': {
                         'values': fix_metrics['gz_count'],
                         'refs': ['G', 'H', 'I'],
                         'cmap': 'plasma_r',
                     },
-                    'dist_from_previous': {
+                    'col=dist_from_previous': {
                         'values': fix_metrics['gz_dist_2_prev'],
                         'refs': ['J', 'K', 'L'],
                         'cmap': 'plasma',
                     },
-                    'trial_fix_compliance': {
+                    'col=trial_fix_compliance': {
                         'values': fix_metrics['gz_trial_fixCom'],
                         'refs': ['M', 'N', 'O'],
                         'cmap': 'plasma_r',
@@ -809,38 +809,38 @@ def driftCorr_ET(row, out_path, is_final=False):
                 ax_dict = fig.subplot_mosaic(mosaic)
                 run_dur = int(run_event.iloc[-1]['onset'] + 20)
 
-                ax_dict["A"].scatter(run_event['onset'].to_numpy(), run_event[f'trial_gaze_confidence_ratio_0.9'].to_numpy(), c='red', label='>0.9')
-                ax_dict["A"].scatter(run_event['onset'].to_numpy(), run_event[f'trial_gaze_confidence_ratio_0.75'].to_numpy(), c='green', label='>0.75')
+                ax_dict["A"].scatter(run_event['onset'].to_numpy(), run_event[f'trial_gaze_confidence_ratio_0.9'].to_numpy(), color='xkcd:dark blue', label='> 0.9')
+                ax_dict["A"].scatter(run_event['onset'].to_numpy(), run_event[f'trial_gaze_confidence_ratio_0.75'].to_numpy(), color='xkcd:light green', label='> 0.75')
                 ax_dict["A"].set_ylim(-0.1, 1.1)
                 ax_dict["A"].set_xlim(0, run_dur)
                 ax_dict["A"].legend()
-                ax_dict["A"].set_title(f'{sub} {ses} {run_num} confidence ratio per trial')
+                ax_dict["A"].set_title(f'{sub} {ses} {run_num} trialwise_confidence')
 
-                ax_dict["B"].scatter(run_event['onset'].to_numpy(), run_event['trial_fixation_compliance_ratio_0.5'].to_numpy(), c='blue', label='< 0.5 deg')
-                ax_dict["B"].scatter(run_event['onset'].to_numpy(), run_event['trial_fixation_compliance_ratio_1.0'].to_numpy(), c='green', label='< 1.0 deg')
-                ax_dict["B"].scatter(run_event['onset'].to_numpy(), run_event['trial_fixation_compliance_ratio_2.0'].to_numpy(), c='orange', label='< 2.0 deg')
+                ax_dict["B"].scatter(run_event['onset'].to_numpy(), run_event['trial_fixation_compliance_ratio_0.5'].to_numpy(), color='xkcd:navy blue', label='< 0.5 deg')
+                ax_dict["B"].scatter(run_event['onset'].to_numpy(), run_event['trial_fixation_compliance_ratio_1.0'].to_numpy(), color='xkcd:bright green', label='< 1.0 deg')
+                ax_dict["B"].scatter(run_event['onset'].to_numpy(), run_event['trial_fixation_compliance_ratio_2.0'].to_numpy(), color='xkcd:orange', label='< 2.0 deg')
                 ax_dict["B"].set_ylim(-0.1, 1.1)
                 ax_dict["B"].set_xlim(-0.1, run_dur)
                 ax_dict["B"].legend()
-                ax_dict["B"].set_title(f'{sub} {ses} {run_num} fixation compliance per trial')
+                ax_dict["B"].set_title(f'{sub} {ses} {run_num} trialwise_fixCompliance')
 
                 ax_dict["D"].scatter(all_times, all_x, s=10, color='xkcd:light grey', alpha=all_conf)
                 ax_dict["D"].scatter(all_times, all_x_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
-                ax_dict["D"].set_ylim(-2, 2)
+                ax_dict["D"].set_ylim(-1.5, 2)
                 ax_dict["D"].set_xlim(0, run_dur)
                 ax_dict["D"].set_title(f'{sub} {ses} {run_num} gaze_x')
 
                 ax_dict["E"].scatter(all_times, all_y, color='xkcd:light grey', alpha=all_conf)
                 ax_dict["E"].scatter(all_times, all_y_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
-                ax_dict["E"].set_ylim(-2, 2)
+                ax_dict["E"].set_ylim(-1.5, 2)
                 ax_dict["E"].set_xlim(0, run_dur)
                 ax_dict["E"].set_title(f'{sub} {ses} {run_num} gaze_y')
 
                 ax_dict["F"].scatter(all_times, all_distInDeg, color='xkcd:light grey', alpha=all_conf)
                 ax_dict["F"].scatter(all_times, all_distInDeg_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
-                ax_dict["F"].set_ylim(-0.1, 8)
+                ax_dict["F"].set_ylim(-0.1, 20)
                 ax_dict["F"].set_xlim(0, run_dur)
-                ax_dict["F"].set_title(f'{sub} {ses} {run_num} distance from center (deg visual angle)')
+                ax_dict["F"].set_title(f'{sub} {ses} {run_num} dist2center_deg')
 
                 for key in vals2plot:
                     refs = vals2plot[key]['refs']
@@ -848,24 +848,24 @@ def driftCorr_ET(row, out_path, is_final=False):
                     cmap = vals2plot[key]['cmap']
 
                     ax_dict[refs[0]].scatter(clean_times, clean_dist_x, color='xkcd:light blue', s=20, alpha=0.2)
-                    ax_dict[refs[0]].scatter(fix_times, fix_dist_x, c=color_metric, s=20, alpha=1.0)
+                    ax_dict[refs[0]].scatter(fix_times, fix_dist_x, c=color_metric, cmap=cmap, s=20, alpha=1.0)
                     ax_dict[refs[0]].set_ylim(-2, 2)
                     ax_dict[refs[0]].set_xlim(0, run_dur)
-                    ax_dict[refs[0]].set_title(f'{sub} {ses} {run_num} {key} fix_distance_x')
+                    ax_dict[refs[0]].set_title(f'{sub} {ses} {run_num} fix_distance_x {key}')
 
                     ax_dict[refs[1]].scatter(clean_times, clean_dist_y, color='xkcd:light blue', s=20, alpha=0.2)
-                    ax_dict[refs[1]].scatter(fix_times, fix_dist_y, c=color_metric, s=20, alpha=1.0)
+                    ax_dict[refs[1]].scatter(fix_times, fix_dist_y, c=color_metric, cmap=cmap, s=20, alpha=1.0)
                     lb = np.min(fix_dist_y)-0.1 if np.min(fix_dist_y) < -2 else -2
                     hb = np.max(fix_dist_y)+0.1 if np.max(fix_dist_y) > 2 else 2
-                    ax_dict["F"].set_ylim(lb, hb)
+                    ax_dict[refs[1]].set_ylim(lb, hb)
                     ax_dict[refs[1]].set_xlim(0, run_dur)
-                    ax_dict[refs[1]].set_title(f'{sub} {ses} {run_num} {key} fix_distance_y')
+                    ax_dict[refs[1]].set_title(f'{sub} {ses} {run_num} fix_distance_y {key}')
 
                     ax_dict[refs[2]].scatter(clean_times, clean_distInDeg, color='xkcd:light blue', s=20, alpha=0.2)
-                    ax_dict[refs[2]].scatter(fix_times, fix_distInDeg, c=color_metric, s=20, alpha=1.0)
-                    #ax_dict[refs[2]].set_ylim(-0.1, 5)
+                    ax_dict[refs[2]].scatter(fix_times, fix_distInDeg, c=color_metric, cmap=cmap, s=20, alpha=1.0)
+                    ax_dict[refs[2]].set_ylim(-0.1, 15)
                     ax_dict[refs[2]].set_xlim(0, run_dur)
-                    ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} {key} distance to center (deg visual angle)')
+                    ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} dist2center_deg {key}')
 
                 fig.savefig(out_file)
                 plt.close()
