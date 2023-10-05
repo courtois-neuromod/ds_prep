@@ -699,7 +699,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
             Phase 1: plot drift-corrected gaze based on median from within trial, within ISI, within trial + ISI, and w polynomial
             '''
             plot_vals = {}
-            if phase_num in [1, 2, 3]:
+            if phase_num in [1, 2]:
 
                 fix_dist_x_img, fix_dist_y_img, fix_times_img = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "image", med_fix=True)
                 all_x_aligned_img, all_y_aligned_img = driftcorr_fromlast(fix_dist_x_img, fix_dist_y_img, fix_times_img, all_x, all_y, all_times)
@@ -737,80 +737,23 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                     'fix_dist_y': fix_dist_y_img_isi,
                 }
 
-                deg_x = int(row['polyDeg_x']) if not pd.isna(row['polyDeg_x']) else 4
-                deg_y = int(row['polyDeg_y']) if not pd.isna(row['polyDeg_y']) else 4
-                anchors = [0, 1]#[0, 50]
-
-                # distance from central fixation for high-confidence gaze captured during periods of fixation (between trials)
-                fix_dist_x_pimg, fix_dist_y_pimg, fix_times_pimg = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "image")
-                # fit polynomial through distance between fixation and target
-                # use poly curve to apply correction to all gaze (no confidence threshold applied)
-                p_of_all_x_pimg = apply_poly(fix_times_pimg, fix_dist_x_pimg, deg_x, all_times_arr, anchors=anchors)
-                all_x_aligned_pimg = np.array(all_x) - (p_of_all_x_pimg)
-                p_of_all_y_pimg = apply_poly(fix_times_pimg, fix_dist_y_pimg, deg_y, all_times_arr, anchors=anchors)
-                all_y_aligned_pimg = np.array(all_y) - (p_of_all_y_pimg)
-                plot_vals['Poly_img'] = {
-                    'refs': ["M", "N", "O", "P"],
-                    'last_fix': False,
-                    'all_x_aligned': all_x_aligned_pimg,
-                    'all_y_aligned': all_y_aligned_pimg,
-                    'fix_times': fix_times_pimg,
-                    'fix_dist_x': fix_dist_x_pimg,
-                    'fix_dist_y': fix_dist_y_pimg,
-                    'p_of_all_x': p_of_all_x_pimg,
-                    'p_of_all_y': p_of_all_y_pimg,
-                }
-
-                # distance from central fixation for high-confidence gaze captured during periods of fixation (between trials)
-                fix_dist_x_pisi, fix_dist_y_pisi, fix_times_pisi = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "isi")
-                # fit polynomial through distance between fixation and target
-                # use poly curve to apply correction to all gaze (no confidence threshold applied)
-                p_of_all_x_pisi = apply_poly(fix_times_pisi, fix_dist_x_pisi, deg_x, all_times_arr, anchors=anchors)
-                all_x_aligned_pisi = np.array(all_x) - (p_of_all_x_pisi)
-                p_of_all_y_pisi = apply_poly(fix_times_pisi, fix_dist_y_pisi, deg_y, all_times_arr, anchors=anchors)
-                all_y_aligned_pisi = np.array(all_y) - (p_of_all_y_pisi)
-                plot_vals['Poly_isi'] = {
-                    'refs': ["Q", "R", "S", "T"],
-                    'last_fix': False,
-                    'all_x_aligned': all_x_aligned_pisi,
-                    'all_y_aligned': all_y_aligned_pisi,
-                    'fix_times': fix_times_pisi,
-                    'fix_dist_x': fix_dist_x_pisi,
-                    'fix_dist_y': fix_dist_y_pisi,
-                    'p_of_all_x': p_of_all_x_pisi,
-                    'p_of_all_y': p_of_all_y_pisi,
-                }
-
-                # distance from central fixation for high-confidence gaze captured during periods of fixation (between trials)
-                fix_dist_x_pimg_isi, fix_dist_y_pimg_isi, fix_times_pimg_isi = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "image+isi")
-                # fit polynomial through distance between fixation and target
-                # use poly curve to apply correction to all gaze (no confidence threshold applied)
-                p_of_all_x_pimg_isi = apply_poly(fix_times_pimg_isi, fix_dist_x_pimg_isi, deg_x, all_times_arr, anchors=anchors)
-                all_x_aligned_pimg_isi = np.array(all_x) - (p_of_all_x_pimg_isi)
-                p_of_all_y_pimg_isi = apply_poly(fix_times_pimg_isi, fix_dist_y_pimg_isi, deg_y, all_times_arr, anchors=anchors)
-                all_y_aligned_pimg_isi = np.array(all_y) - (p_of_all_y_pimg_isi)
-                plot_vals['Poly_img_isi'] = {
-                    'refs': ["U", "V", "W", "X"],
-                    'last_fix': False,
-                    'all_x_aligned': all_x_aligned_pimg_isi,
-                    'all_y_aligned': all_y_aligned_pimg_isi,
-                    'fix_times': fix_times_pimg_isi,
-                    'fix_dist_x': fix_dist_x_pimg_isi,
-                    'fix_dist_y': fix_dist_y_pimg_isi,
-                    'p_of_all_x': p_of_all_x_pimg_isi,
-                    'p_of_all_y': p_of_all_y_pimg_isi,
-                }
-
-
             if phase_num == 1:
                 # export plots to visualize the gaze drift correction for last round of QC
+                #mosaic = """
+                #    AEIMQU
+                #    BFJNRV
+                #    CGKOSW
+                #    DHLPTX
+                #"""
+                #fs = (35, 14.0)
+
                 mosaic = """
-                    AEIMQU
-                    BFJNRV
-                    CGKOSW
-                    DHLPTX
+                    AEI
+                    BFJ
+                    CGK
+                    DHL
                 """
-                fs = (35, 14.0)
+                fs = (20, 14.0)
 
                 fig = plt.figure(constrained_layout=True, figsize=fs)
                 ax_dict = fig.subplot_mosaic(mosaic)
@@ -868,7 +811,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
             elif phase_num  == 2:
                 plot_vals2 = {}
 
-                trial_dist_img, trial_x_img, trial_y_img, trial_time_img, trial_conf_img = get_trial_distances(run_event, all_x_aligned_img, all_y_aligned_img, all_times, all_conf, gaze_threshold, filter=True)
+                trial_dist_img, trial_x_img, trial_y_img, trial_time_img, trial_conf_img = get_trial_distances(run_event, all_x_aligned_img, all_y_aligned_img, all_times, all_conf, gaze_threshold, filter=False)
                 plot_vals2['LF_img'] = {
                     'refs': ["A", "B", "C", "D"],
                     'trial_dist': trial_dist_img,
@@ -878,7 +821,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                     'trial_conf': trial_conf_img,
                 }
 
-                trial_dist_isi, trial_x_isi, trial_y_isi, trial_time_isi, trial_conf_isi = get_trial_distances(run_event, all_x_aligned_isi, all_y_aligned_isi, all_times, all_conf, gaze_threshold, filter=True)
+                trial_dist_isi, trial_x_isi, trial_y_isi, trial_time_isi, trial_conf_isi = get_trial_distances(run_event, all_x_aligned_isi, all_y_aligned_isi, all_times, all_conf, gaze_threshold, filter=False)
                 plot_vals2['LF_isi'] = {
                     'refs': ["E", "F", "G", "H"],
                     'trial_dist': trial_dist_isi,
@@ -894,7 +837,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                                                                                                                                    all_times,
                                                                                                                                    all_conf,
                                                                                                                                    gaze_threshold,
-                                                                                                                                   filter=True,
+                                                                                                                                   filter=False,
                                                                                                                                    )
                 plot_vals2['LF_img_isi'] = {
                     'refs': ["I", "J", "K", "L"],
@@ -963,6 +906,71 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
 
 
             elif phase_num  == 3:
+
+                deg_x = int(row['polyDeg_x']) if not pd.isna(row['polyDeg_x']) else 4
+                deg_y = int(row['polyDeg_y']) if not pd.isna(row['polyDeg_y']) else 4
+                anchors = [0, 1]#[0, 50]
+
+                # distance from central fixation for high-confidence gaze captured during periods of fixation (between trials)
+                fix_dist_x_pimg, fix_dist_y_pimg, fix_times_pimg = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "image")
+                # fit polynomial through distance between fixation and target
+                # use poly curve to apply correction to all gaze (no confidence threshold applied)
+                p_of_all_x_pimg = apply_poly(fix_times_pimg, fix_dist_x_pimg, deg_x, all_times_arr, anchors=anchors)
+                all_x_aligned_pimg = np.array(all_x) - (p_of_all_x_pimg)
+                p_of_all_y_pimg = apply_poly(fix_times_pimg, fix_dist_y_pimg, deg_y, all_times_arr, anchors=anchors)
+                all_y_aligned_pimg = np.array(all_y) - (p_of_all_y_pimg)
+                plot_vals['Poly_img'] = {
+                    'refs': ["M", "N", "O", "P"],
+                    'last_fix': False,
+                    'all_x_aligned': all_x_aligned_pimg,
+                    'all_y_aligned': all_y_aligned_pimg,
+                    'fix_times': fix_times_pimg,
+                    'fix_dist_x': fix_dist_x_pimg,
+                    'fix_dist_y': fix_dist_y_pimg,
+                    'p_of_all_x': p_of_all_x_pimg,
+                    'p_of_all_y': p_of_all_y_pimg,
+                }
+
+                # distance from central fixation for high-confidence gaze captured during periods of fixation (between trials)
+                fix_dist_x_pisi, fix_dist_y_pisi, fix_times_pisi = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "isi")
+                # fit polynomial through distance between fixation and target
+                # use poly curve to apply correction to all gaze (no confidence threshold applied)
+                p_of_all_x_pisi = apply_poly(fix_times_pisi, fix_dist_x_pisi, deg_x, all_times_arr, anchors=anchors)
+                all_x_aligned_pisi = np.array(all_x) - (p_of_all_x_pisi)
+                p_of_all_y_pisi = apply_poly(fix_times_pisi, fix_dist_y_pisi, deg_y, all_times_arr, anchors=anchors)
+                all_y_aligned_pisi = np.array(all_y) - (p_of_all_y_pisi)
+                plot_vals['Poly_isi'] = {
+                    'refs': ["Q", "R", "S", "T"],
+                    'last_fix': False,
+                    'all_x_aligned': all_x_aligned_pisi,
+                    'all_y_aligned': all_y_aligned_pisi,
+                    'fix_times': fix_times_pisi,
+                    'fix_dist_x': fix_dist_x_pisi,
+                    'fix_dist_y': fix_dist_y_pisi,
+                    'p_of_all_x': p_of_all_x_pisi,
+                    'p_of_all_y': p_of_all_y_pisi,
+                }
+
+                # distance from central fixation for high-confidence gaze captured during periods of fixation (between trials)
+                fix_dist_x_pimg_isi, fix_dist_y_pimg_isi, fix_times_pimg_isi = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "image+isi")
+                # fit polynomial through distance between fixation and target
+                # use poly curve to apply correction to all gaze (no confidence threshold applied)
+                p_of_all_x_pimg_isi = apply_poly(fix_times_pimg_isi, fix_dist_x_pimg_isi, deg_x, all_times_arr, anchors=anchors)
+                all_x_aligned_pimg_isi = np.array(all_x) - (p_of_all_x_pimg_isi)
+                p_of_all_y_pimg_isi = apply_poly(fix_times_pimg_isi, fix_dist_y_pimg_isi, deg_y, all_times_arr, anchors=anchors)
+                all_y_aligned_pimg_isi = np.array(all_y) - (p_of_all_y_pimg_isi)
+                plot_vals['Poly_img_isi'] = {
+                    'refs': ["U", "V", "W", "X"],
+                    'last_fix': False,
+                    'all_x_aligned': all_x_aligned_pimg_isi,
+                    'all_y_aligned': all_y_aligned_pimg_isi,
+                    'fix_times': fix_times_pimg_isi,
+                    'fix_dist_x': fix_dist_x_pimg_isi,
+                    'fix_dist_y': fix_dist_y_pimg_isi,
+                    'p_of_all_x': p_of_all_x_pimg_isi,
+                    'p_of_all_y': p_of_all_y_pimg_isi,
+                }
+
                 plot_vals2 = {}
 
                 trial_dist_img, trial_x_img, trial_y_img, trial_time_img, trial_conf_img = get_trial_distances(run_event, all_x_aligned_pimg, all_y_aligned_pimg, all_times, all_conf, gaze_threshold, filter=True)
