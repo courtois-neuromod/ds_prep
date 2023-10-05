@@ -425,14 +425,16 @@ def add_metrics_2events(df_ev,
     return df_ev
 
 
-def driftcorr_fromlast(fd_x, fd_y, f_times, all_x, all_y, all_times):
+def driftcorr_fromlast(fd_x, fd_y, f_times, all_x, all_y, all_times, previous_image=False):
     i = 0
     j = 0
     all_x_aligned = []
     all_y_aligned = []
 
+    gap = 2 if previous_image else 1
+
     for i in range(len(all_times)):
-        while j < len(f_times)-1 and all_times[i] > f_times[j+1]:
+        while j < len(f_times)-gap and all_times[i] > f_times[j+gap]:
             j += 1
         all_x_aligned.append(all_x[i] - fd_x[j])
         all_y_aligned.append(all_y[i] - fd_y[j])
@@ -703,7 +705,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
 
                 fix_dist_x_img, fix_dist_y_img, fix_times_img = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "image", med_fix=True)
                 all_x_aligned_img, all_y_aligned_img = driftcorr_fromlast(fix_dist_x_img, fix_dist_y_img, fix_times_img, all_x, all_y, all_times)
-                plot_vals['LF_img'] = {
+                plot_vals['LF_current_img'] = {
                     'refs': ["A", "B", "C", "D"],
                     'last_fix': True,
                     'all_x_aligned': all_x_aligned_img,
@@ -713,10 +715,21 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                     'fix_dist_y': fix_dist_y_img,
                 }
 
+                all_x_aligned_pre_img, all_y_aligned_pre_img = driftcorr_fromlast(fix_dist_x_img, fix_dist_y_img, fix_times_img, all_x, all_y, all_times, previous_image=True)
+                plot_vals['LF_previous_img'] = {
+                    'refs': ["E", "F", "G", "H"],
+                    'last_fix': True,
+                    'all_x_aligned': all_x_aligned_pre_img,
+                    'all_y_aligned': all_y_aligned_pre_img,
+                    'fix_times': fix_times_img,
+                    'fix_dist_x': fix_dist_x_img,
+                    'fix_dist_y': fix_dist_y_img,
+                }
+
                 fix_dist_x_isi, fix_dist_y_isi, fix_times_isi = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "isi", med_fix=True)
                 all_x_aligned_isi, all_y_aligned_isi = driftcorr_fromlast(fix_dist_x_isi, fix_dist_y_isi, fix_times_isi, all_x, all_y, all_times)
-                plot_vals['LF_isi'] = {
-                    'refs': ["E", "F", "G", "H"],
+                plot_vals['LF_previous_isi'] = {
+                    'refs': ["I", "J", "K", "L"],
                     'last_fix': True,
                     'all_x_aligned': all_x_aligned_isi,
                     'all_y_aligned': all_y_aligned_isi,
@@ -727,11 +740,22 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
 
                 fix_dist_x_img_isi, fix_dist_y_img_isi, fix_times_img_isi = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, "image+isi", med_fix=True)
                 all_x_aligned_img_isi, all_y_aligned_img_isi = driftcorr_fromlast(fix_dist_x_img_isi, fix_dist_y_img_isi, fix_times_img_isi, all_x, all_y, all_times)
-                plot_vals['LF_img_isi'] = {
-                    'refs': ["I", "J", "K", "L"],
+                plot_vals['LF_current_img_isi'] = {
+                    'refs': ["M", "N", "O", "P"],
                     'last_fix': True,
                     'all_x_aligned': all_x_aligned_img_isi,
                     'all_y_aligned': all_y_aligned_img_isi,
+                    'fix_times': fix_times_img_isi,
+                    'fix_dist_x': fix_dist_x_img_isi,
+                    'fix_dist_y': fix_dist_y_img_isi,
+                }
+
+                all_x_aligned_pre_img_isi, all_y_aligned_pre_img_isi = driftcorr_fromlast(fix_dist_x_img_isi, fix_dist_y_img_isi, fix_times_img_isi, all_x, all_y, all_times, previous_image=True)
+                plot_vals['LF_previous_img_isi'] = {
+                    'refs': ["Q", "R", "S", "T"],
+                    'last_fix': True,
+                    'all_x_aligned': all_x_aligned_pre_img_isi,
+                    'all_y_aligned': all_y_aligned_pre_img_isi,
                     'fix_times': fix_times_img_isi,
                     'fix_dist_x': fix_dist_x_img_isi,
                     'fix_dist_y': fix_dist_y_img_isi,
@@ -748,12 +772,12 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                 #fs = (35, 14.0)
 
                 mosaic = """
-                    AEI
-                    BFJ
-                    CGK
-                    DHL
+                    AEIMQ
+                    BFJNR
+                    CGKOS
+                    DHLPT
                 """
-                fs = (20, 14.0)
+                fs = (30, 14.0)
 
                 fig = plt.figure(constrained_layout=True, figsize=fs)
                 ax_dict = fig.subplot_mosaic(mosaic)
@@ -812,7 +836,7 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                 plot_vals2 = {}
 
                 trial_dist_img, trial_x_img, trial_y_img, trial_time_img, trial_conf_img = get_trial_distances(run_event, all_x_aligned_img, all_y_aligned_img, all_times, all_conf, gaze_threshold, filter=False)
-                plot_vals2['LF_img'] = {
+                plot_vals2['LF_current_img'] = {
                     'refs': ["A", "B", "C", "D"],
                     'trial_dist': trial_dist_img,
                     'trial_x': trial_x_img,
@@ -820,10 +844,19 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                     'trial_time': trial_time_img,
                     'trial_conf': trial_conf_img,
                 }
+                trial_dist_pre_img, trial_x_pre_img, trial_y_pre_img, trial_time_pre_img, trial_conf_pre_img = get_trial_distances(run_event, all_x_aligned_pre_img, all_y_aligned_pre_img, all_times, all_conf, gaze_threshold, filter=False)
+                plot_vals2['LF_previous_img'] = {
+                    'refs': ["E", "F", "G", "H"],
+                    'trial_dist': trial_dist_pre_img,
+                    'trial_x': trial_x_pre_img,
+                    'trial_y': trial_y_pre_img,
+                    'trial_time': trial_time_pre_img,
+                    'trial_conf': trial_conf_pre_img,
+                }
 
                 trial_dist_isi, trial_x_isi, trial_y_isi, trial_time_isi, trial_conf_isi = get_trial_distances(run_event, all_x_aligned_isi, all_y_aligned_isi, all_times, all_conf, gaze_threshold, filter=False)
-                plot_vals2['LF_isi'] = {
-                    'refs': ["E", "F", "G", "H"],
+                plot_vals2['LF_previous_isi'] = {
+                    'refs': ["I", "J", "K", "L"],
                     'trial_dist': trial_dist_isi,
                     'trial_x': trial_x_isi,
                     'trial_y': trial_y_isi,
@@ -839,8 +872,8 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                                                                                                                                    gaze_threshold,
                                                                                                                                    filter=False,
                                                                                                                                    )
-                plot_vals2['LF_img_isi'] = {
-                    'refs': ["I", "J", "K", "L"],
+                plot_vals2['LF_current_img_isi'] = {
+                    'refs': ["M", "N", "O", "P"],
                     'trial_dist': trial_dist_img_isi,
                     'trial_x': trial_x_img_isi,
                     'trial_y': trial_y_img_isi,
@@ -848,19 +881,30 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
                     'trial_conf': trial_conf_img_isi,
                 }
 
-                # TODO: generate second series of figures.
-                # Within trial: plot drift_corrected gaze position over trial's timeline, for image and isi
-                # Also plot other metrics: position in x and y, confidence (more blinks during ISI? more mvt in image?),
-                # Plot: distribution of standard deviations during image, and during ISI
-                # Plot: distance between consecutive median points of fixation
-                # export plots to visualize the gaze drift correction for last round of QC
+                trial_dist_pre_img_isi, trial_x_pre_img_isi, trial_y_pre_img_isi, trial_time_pre_img_isi, trial_conf_pre_img_isi = get_trial_distances(run_event,
+                                                                                                                                                       all_x_aligned_pre_img_isi,
+                                                                                                                                                       all_y_aligned_pre_img_isi,
+                                                                                                                                                       all_times,
+                                                                                                                                                       all_conf,
+                                                                                                                                                       gaze_threshold,
+                                                                                                                                                       filter=False,
+                                                                                                                                                       )
+                plot_vals2['LF_previous_img_isi'] = {
+                    'refs': ["Q", "R", "S", "T"],
+                    'trial_dist': trial_dist_pre_img_isi,
+                    'trial_x': trial_x_pre_img_isi,
+                    'trial_y': trial_y_pre_img_isi,
+                    'trial_time': trial_time_pre_img_isi,
+                    'trial_conf': trial_conf_pre_img_isi,
+                }
+
                 mosaic = """
-                    AEI
-                    BFJ
-                    CGK
-                    DHL
+                    AEIMQ
+                    BFJNR
+                    CGKOS
+                    DHLPT
                 """
-                fs = (20, 14.0)
+                fs = (30, 14.0)
 
                 fig = plt.figure(constrained_layout=True, figsize=fs)
                 ax_dict = fig.subplot_mosaic(mosaic)
@@ -1077,8 +1121,9 @@ def driftCorr_ETtests(row, out_path, phase_num=1):
 
                 }
 
-                fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, sub_strategy[sub], med_fix=True)
-                all_x_aligned, all_y_aligned = driftcorr_fromlast(fix_dist_x, fix_dist_y, fix_times, all_x, all_y, all_times)
+                #fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, sub_strategy[sub], med_fix=True)
+                fix_dist_x, fix_dist_y, fix_times = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, 'image+isi', med_fix=True)
+                all_x_aligned, all_y_aligned = driftcorr_fromlast(fix_dist_x, fix_dist_y, fix_times, all_x, all_y, all_times, previous_image=True)
 
                 run_event = add_metrics_2events(
                                                 run_event,
