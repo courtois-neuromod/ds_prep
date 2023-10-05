@@ -550,7 +550,7 @@ def driftCorr_ET(row, out_path, is_final=False):
                                                                                   all_x_aligned,
                                                                                   all_y_aligned,
                                                                                   conf_thresh=gaze_threshold,
-                                                                                  strategy_name,
+                                                                                  strategy_name=strategy_name,
                                                                                   )
 
             if is_final:
