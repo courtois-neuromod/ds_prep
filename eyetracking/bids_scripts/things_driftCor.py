@@ -249,6 +249,7 @@ def add_metrics_2events(df_ev,
                         all_x_aligned,
                         all_y_aligned,
                         conf_thresh=0.9,
+                        strategy_name='previous_image+isi',
                         ):
 
     all_distances = get_distances_from_center(all_x_aligned, all_y_aligned)
@@ -257,6 +258,8 @@ def add_metrics_2events(df_ev,
     metrics_per_trials = {}
     all_idx = 0
 
+    first_fix_trialnum = None
+
     for i in range(df_ev.shape[0]):
         trial_number = df_ev['TrialNumber'][i]
 
@@ -264,45 +267,10 @@ def add_metrics_2events(df_ev,
         trial_offset = trial_onset + df_ev['duration'][i]
 
         # skip first 0.6s of ISI during which subjects tend to blink
-        isi_onset = trial_offset + 0.6
+        isi_buffer = 0.0 if 'image+isi' in strategy_name else 0.6
+        isi_onset = trial_offset + isi_buffer
         isi_offset = trial_offset + 1.49
 
-        if i == 0:
-            isi_confs = []
-            isi_x = []
-            isi_y = []
-            isi_distances = []
-            while all_idx < len(all_times) and all_times[all_idx] < trial_onset:
-                if all_times[all_idx] > (trial_onset - 0.89):
-                    isi_confs.append(all_conf[all_idx])
-                    isi_x.append(all_x[all_idx])
-                    isi_y.append(all_y[all_idx])
-                    isi_distances.append(all_distances[all_idx])
-
-                all_idx += 1
-
-            conf_filter = np.array(isi_confs) > conf_thresh
-            f_sum = np.sum(conf_filter)
-            if f_sum:
-                isi_x_arr = np.array(isi_x)[conf_filter]
-                isi_y_arr = np.array(isi_y)[conf_filter]
-                isi_dist_arr = np.array(isi_distances)[conf_filter]
-            metrics_per_trials[trial_number-1] = {
-                'isi_gaze_count': len(isi_confs),
-                'isi_gaze_conf_90': np.sum(np.array(isi_confs) > 0.9)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
-                'isi_gaze_conf_75': np.sum(np.array(isi_confs) > 0.75)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
-
-                f'isi_median_x_{conf_thresh}': np.median(isi_x_arr) if f_sum else np.nan,
-                f'isi_median_y_{conf_thresh}': np.median(isi_y_arr) if f_sum else np.nan,
-                'isi_fix_compliance_ratio_deg0.5': np.sum(isi_dist_arr < 0.5)/f_sum if f_sum else np.nan,
-                'isi_fix_compliance_ratio_deg1': np.sum(isi_dist_arr < 1.0)/f_sum if f_sum else np.nan,
-                'isi_fix_compliance_ratio_deg2': np.sum(isi_dist_arr < 2.0)/f_sum if f_sum else np.nan,
-                'isi_fix_compliance_ratio_deg3': np.sum(isi_dist_arr < 3.0)/f_sum if f_sum else np.nan,
-
-                # mock "previous" trial: take isi medial instead
-                f'trial_median_x_{conf_thresh}': np.median(isi_x_arr) if f_sum else np.nan,
-                f'trial_median_y_{conf_thresh}': np.median(isi_y_arr) if f_sum else np.nan,
-                }
 
         trial_confs = []
         trial_x = []
@@ -329,98 +297,144 @@ def add_metrics_2events(df_ev,
 
             all_idx += 1
 
+        if 'image+isi' in strategy_name:
+            fix_confs = trial_confs + isi_confs
+            fix_x = trial_x + isi_x
+            fix_y = trial_y + isi_y
+            fix_distances = trial_distance + isi_distances
+        elif 'image' in strategy_name:
+            fix_confs = trial_confs
+            fix_x = trial_x
+            fix_y = trial_y
+            fix_distances = trial_distance
+        else:
+            fix_confs = isi_confs
+            fix_x = isi_x
+            fix_y = isi_y
+            fix_distances = isi_distances
+
+
         t_conf_filter = np.array(trial_confs) > conf_thresh
-        t_f_sum = np.sum(t_conf_filter)
-        if t_f_sum:
+        t_sum = np.sum(t_conf_filter)
+        if t_sum:
             trial_x_arr = np.array(trial_x)[t_conf_filter]
             trial_y_arr = np.array(trial_y)[t_conf_filter]
             trial_dist_arr = np.array(trial_distance)[t_conf_filter]
+            t_med_x = np.median(trial_x_arr)
+            t_med_y = np.median(trial_y_arr)
+            t_dist_to_med = np.array(get_distances_from_center(trial_x_arr-t_med_x, trial_y_arr-t_med_y, is_distance=True))
 
-        i_conf_filter = np.array(isi_confs) > conf_thresh
-        i_f_sum = np.sum(i_conf_filter)
-        if i_f_sum:
-            isi_x_arr = np.array(isi_x)[i_conf_filter]
-            isi_y_arr = np.array(isi_y)[i_conf_filter]
-            isi_dist_arr = np.array(isi_distances)[i_conf_filter]
+        f_conf_filter = np.array(fix_confs) > conf_thresh
+        f_sum = np.sum(f_conf_filter)
+        if f_sum:
+            if first_fix_trialnum is None:
+                first_fix_trialnum = trial_number
+            fix_x_arr = np.array(fix_x)[f_conf_filter]
+            fix_y_arr = np.array(fix_y)[f_conf_filter]
+            fix_dist_arr = np.array(fix_distances)[f_conf_filter]
+            f_med_x = np.median(fix_x_arr)
+            f_med_y = np.median(fix_y_arr)
+            f_dist_to_med = np.array(get_distances_from_center(fix_x_arr-f_med_x, fix_y_arr-f_med_y, is_distance=True))
+
+
         metrics_per_trials[trial_number] = {
             'trial_gaze_count': len(trial_confs),
             'trial_gaze_conf_90': np.sum(np.array(trial_confs) > 0.9)/len(trial_confs) if len(trial_confs) > 0 else np.nan,
             'trial_gaze_conf_75': np.sum(np.array(trial_confs) > 0.75)/len(trial_confs) if len(trial_confs) > 0 else np.nan,
-            'isi_gaze_count': len(isi_confs),
-            'isi_gaze_conf_90': np.sum(np.array(isi_confs) > 0.9)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
-            'isi_gaze_conf_75': np.sum(np.array(isi_confs) > 0.75)/len(isi_confs) if len(isi_confs) > 0 else np.nan,
+            'fix_gaze_count': len(fix_confs),
+            'fix_gaze_conf_90': np.sum(np.array(fix_confs) > 0.9)/len(fix_confs) if len(fix_confs) > 0 else np.nan,
+            'fix_gaze_conf_75': np.sum(np.array(fix_confs) > 0.75)/len(fix_confs) if len(fix_confs) > 0 else np.nan,
 
-            f'trial_median_x_{conf_thresh}': np.median(trial_x_arr) if t_f_sum else np.nan,
-            f'trial_median_y_{conf_thresh}': np.median(trial_y_arr) if t_f_sum else np.nan,
-            'trial_fix_compliance_ratio_deg0.5': np.sum(trial_dist_arr < 0.5)/t_f_sum if t_f_sum else np.nan,
-            'trial_fix_compliance_ratio_deg1': np.sum(trial_dist_arr < 1.0)/t_f_sum if t_f_sum else np.nan,
-            'trial_fix_compliance_ratio_deg2': np.sum(trial_dist_arr < 2.0)/t_f_sum if t_f_sum else np.nan,
-            'trial_fix_compliance_ratio_deg3': np.sum(trial_dist_arr < 3.0)/t_f_sum if t_f_sum else np.nan,
+            f'trial_median_x_{conf_thresh}': t_med_x if t_sum else np.nan,
+            f'trial_median_y_{conf_thresh}': t_med_y if t_sum else np.nan,
+            'trial_fix_compliance_ratio_deg0.5': np.sum(trial_dist_arr < 0.5)/t_sum if t_sum else np.nan,
+            'trial_fix_compliance_ratio_deg1': np.sum(trial_dist_arr < 1.0)/t_sum if t_sum else np.nan,
+            'trial_fix_compliance_ratio_deg2': np.sum(trial_dist_arr < 2.0)/t_sum if t_sum else np.nan,
+            'trial_fix_compliance_ratio_deg3': np.sum(trial_dist_arr < 3.0)/t_sum if t_sum else np.nan,
 
-            f'isi_median_x_{conf_thresh}': np.median(isi_x_arr) if i_f_sum else np.nan,
-            f'isi_median_y_{conf_thresh}': np.median(isi_y_arr) if i_f_sum else np.nan,
-            'isi_fix_compliance_ratio_deg0.5': np.sum(isi_dist_arr < 0.5)/i_f_sum if i_f_sum else np.nan,
-            'isi_fix_compliance_ratio_deg1': np.sum(isi_dist_arr < 1.0)/i_f_sum if i_f_sum else np.nan,
-            'isi_fix_compliance_ratio_deg2': np.sum(isi_dist_arr < 2.0)/i_f_sum if i_f_sum else np.nan,
-            'isi_fix_compliance_ratio_deg3': np.sum(isi_dist_arr < 3.0)/i_f_sum if i_f_sum else np.nan,
+            'trial_dist2med_ratio_deg0.5': np.sum(t_dist_to_med < 0.5)/t_sum if t_sum else np.nan,
+            'trial_dist2med_ratio_deg1': np.sum(t_dist_to_med < 1.0)/t_sum if t_sum else np.nan,
+            'trial_dist2med_ratio_deg2': np.sum(t_dist_to_med < 2.0)/t_sum if t_sum else np.nan,
+            'trial_dist2med_ratio_deg3': np.sum(t_dist_to_med < 3.0)/t_sum if t_sum else np.nan,
+
+            f'fix_median_x_{conf_thresh}': f_med_x if f_sum else np.nan,
+            f'fix_median_y_{conf_thresh}': f_med_y if f_sum else np.nan,
+            'fix_dist2med_ratio_deg0.5': np.sum(f_dist_to_med < 0.5)/f_sum if f_sum else np.nan,
+            'fix_dist2med_ratio_deg1': np.sum(f_dist_to_med < 1.0)/f_sum if f_sum else np.nan,
+            'fix_dist2med_ratio_deg2': np.sum(f_dist_to_med < 2.0)/f_sum if f_sum else np.nan,
+            'fix_dist2med_ratio_deg3': np.sum(f_dist_to_med < 3.0)/f_sum if f_sum else np.nan,
             }
 
+    metrics_per_trials[0] = metrics_per_trials[first_fix_trialnum]
+
     '''
-    Potentially: correction will be anchored on fixation during preceeding ISI (ISI_0)
-        TODO: insert trialwise QC metrics in events file to evaluate quality of fixation
-        - gaze count during image and preceding ISI (camera freeze?)
-        - gaze confidence ratio (of 0.9, 0.75) during image and preceding ISI (signal quality)
-        - distance in deg of visual angle between medians in ISI_0 and ISI_1: moved?
-        - distance in deg of visual angle between current and previous image: moved?
-        - fixation compliance ratio:
-            assuming other metrices look decent, compute ratio of
-            gaze positioned within 1, 2 or 3 deg of vis angle from central fixation (screen center) during image presentation
+    Insert drift correction strategy name
     '''
-    #print(metrics_per_trials.keys(), metrics_per_trials[0].keys(), metrics_per_trials[1].keys(), metrics_per_trials)
+    df_ev['drift_correction_strategy'] = df_ev.apply(lambda row: strategy_name, axis=1)
+
     '''
-    Insert gaze count: pre-isi, image presentation and post-isi
+    Insert gaze count: fixation and image
     '''
-    df_ev['pre-isi_gaze_count_ratio'] = df_ev.apply(lambda row: (metrics_per_trials[row['TrialNumber']-1]['isi_gaze_count'])/(250*0.89), axis=1)
+    if 'image+isi' in strategy_name:
+        fix_dur = 1.49 + 2.98
+    elif 'image' in strategy_name:
+        fix_dur = 2.98
+    else:
+        fix_dur = 1.49 - isi_buffer
+    num_back = 0 if 'current' in strategy_name else 1
+
+    df_ev['fix_gaze_count_ratio'] = df_ev.apply(lambda row: (metrics_per_trials[row['TrialNumber']-num_back]['fix_gaze_count'])/(250*fix_dur), axis=1)
     df_ev['trial_gaze_count_ratio'] = df_ev.apply(lambda row: (metrics_per_trials[row['TrialNumber']]['trial_gaze_count'])/(250*2.98), axis=1)
 
     '''
-    Insert gaze confidence ratio, out of all collected gaze (0.9 and 0.75 thresholds): pre-isi, image presentation and post-isi
+    Insert gaze confidence ratio, out of all collected gaze (0.9 and 0.75 thresholds): fixation and image
     '''
-    df_ev['pre-isi_gaze_confidence_ratio_0.9'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']-1]['isi_gaze_conf_90'], axis=1)
-    df_ev['pre-isi_gaze_confidence_ratio_0.75'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']-1]['isi_gaze_conf_75'], axis=1)
+    df_ev['fix_gaze_confidence_ratio_0.9'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']-num_back]['fix_gaze_conf_90'], axis=1)
+    df_ev['fix_gaze_confidence_ratio_0.75'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']-num_back]['fix_gaze_conf_75'], axis=1)
     df_ev['trial_gaze_confidence_ratio_0.9'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_gaze_conf_90'], axis=1)
     df_ev['trial_gaze_confidence_ratio_0.75'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_gaze_conf_75'], axis=1)
 
     '''
     Insert distance between median positions, in deg of visual angle, between pre- and pos-isi /current and previous (excessive head motion)
     '''
-    df_ev['pre-post-isi_distance_in_deg'] = df_ev.apply(lambda row: get_isi_distance(metrics_per_trials, row['TrialNumber'], conf_thresh), axis=1)
-    df_ev['distance_to_previous_trial_in_deg'] = df_ev.apply(lambda row: get_isi_distance(metrics_per_trials, row['TrialNumber'], conf_thresh, use_trial=True), axis=1)
+    df_ev['median_dist_to_fixation_in_deg'] = df_ev.apply(lambda row: get_isi_distance(metrics_per_trials, row['TrialNumber'], num_back, conf_thresh), axis=1)
+    df_ev['median_dist_to_previous_trial_in_deg'] = df_ev.apply(lambda row: get_isi_distance(metrics_per_trials, row['TrialNumber'], 1, conf_thresh, use_trial=True), axis=1)
 
     '''
     Insert fixation compliance ratios
     '''
-    df_ev['pre-isi_fixation_compliance_ratio_0.5'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']-1]['isi_fix_compliance_ratio_deg0.5'], axis=1)
-    df_ev['pre-isi_fixation_compliance_ratio_1.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']-1]['isi_fix_compliance_ratio_deg1'], axis=1)
-    df_ev['pre-isi_fixation_compliance_ratio_2.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']-1]['isi_fix_compliance_ratio_deg2'], axis=1)
-    df_ev['pre-isi_fixation_compliance_ratio_3.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']-1]['isi_fix_compliance_ratio_deg3'], axis=1)
-
     df_ev['trial_fixation_compliance_ratio_0.5'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_fix_compliance_ratio_deg0.5'], axis=1)
     df_ev['trial_fixation_compliance_ratio_1.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_fix_compliance_ratio_deg1'], axis=1)
     df_ev['trial_fixation_compliance_ratio_2.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_fix_compliance_ratio_deg2'], axis=1)
     df_ev['trial_fixation_compliance_ratio_3.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_fix_compliance_ratio_deg3'], axis=1)
 
+    df_ev['trial_dist2med_ratio_0.5'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_dist2med_ratio_deg0.5'], axis=1)
+    df_ev['trial_dist2med_ratio_1.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_dist2med_ratio_deg1'], axis=1)
+    df_ev['trial_dist2med_ratio_2.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_dist2med_ratio_deg2'], axis=1)
+    df_ev['trial_dist2med_ratio_3.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['trial_dist2med_ratio_deg3'], axis=1)
+
+    df_ev['fix_dist2med_ratio_0.5'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['fix_dist2med_ratio_deg0.5'], axis=1)
+    df_ev['fix_dist2med_ratio_1.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['fix_dist2med_ratio_deg1'], axis=1)
+    df_ev['fix_dist2med_ratio_2.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['fix_dist2med_ratio_deg2'], axis=1)
+    df_ev['fix_dist2med_ratio_3.0'] = df_ev.apply(lambda row: metrics_per_trials[row['TrialNumber']]['fix_dist2med_ratio_deg3'], axis=1)
+
     return df_ev, all_distances_raw, all_distances
 
 
-def driftcorr_fromlast(fd_x, fd_y, f_times, all_x, all_y, all_times):
+def driftcorr_fromlast(fd_x, fd_y, f_times, all_x, all_y, all_times, previous_image=False):
     i = 0
     j = 0
     all_x_aligned = []
     all_y_aligned = []
 
+    '''
+    1: re-align from previous isi, current image or current image + isi median position
+    2: re-align from previous image or previous image + isi median position
+    '''
+    gap = 2 if previous_image else 1
+
     for i in range(len(all_times)):
-        while j < len(f_times)-1 and all_times[i] > f_times[j+1]:
+        while j < len(f_times)-gap and all_times[i] > f_times[j+gap]:
             j += 1
         all_x_aligned.append(all_x[i] - fd_x[j])
         all_y_aligned.append(all_y[i] - fd_y[j])
@@ -454,14 +468,14 @@ def get_distances_from_center(x, y, is_distance=False):
     return all_distances
 
 
-def get_isi_distance(metrics_dict, trial_num, conf_thresh, use_trial=False):
+def get_isi_distance(metrics_dict, trial_num, num_back, conf_thresh, use_trial=False):
 
-    fix_name = 'trial' if use_trial else 'isi'
+    fix_name = 'trial' if use_trial else 'fix'
 
-    pre_x = (metrics_dict[trial_num-1][f'{fix_name}_median_x_{conf_thresh}'] - 0.5)*1280
-    pre_y = (metrics_dict[trial_num-1][f'{fix_name}_median_y_{conf_thresh}'] - 0.5)*1024
-    post_x = (metrics_dict[trial_num][f'{fix_name}_median_x_{conf_thresh}'] - 0.5)*1280
-    post_y = (metrics_dict[trial_num][f'{fix_name}_median_y_{conf_thresh}'] - 0.5)*1024
+    pre_x = (metrics_dict[trial_num-num_back][f'{fix_name}_median_x_{conf_thresh}'] - 0.5)*1280
+    pre_y = (metrics_dict[trial_num-num_back][f'{fix_name}_median_y_{conf_thresh}'] - 0.5)*1024
+    post_x = (metrics_dict[trial_num][f'trial_median_x_{conf_thresh}'] - 0.5)*1280
+    post_y = (metrics_dict[trial_num][f'trial_median_y_{conf_thresh}'] - 0.5)*1024
 
     dist_in_pix = 4164 # in pixels
 
@@ -503,20 +517,29 @@ def driftCorr_ET(row, out_path, is_final=False):
             all_times_arr = np.array(all_times)
             # distance from central fixation point for all gaze above confidence threshold
             clean_dist_x, clean_dist_y, clean_times, clean_conf = clean_vals
+
+            strategies = {
+                'current_image': ('image', False),
+                'previous_image': ('image', True),
+                'previous_isi': ('isi', False),
+                'current_image+isi': ('image+isi', False),
+                'previous_image+isi': ('image+isi', True),
+                }
             '''
             sub_strategy = {
-                'sub-01': 'image+isi',
-                'sub-02': 'isi',
-                'sub-03': 'image',
-                'sub-06': 'isi',
+                'sub-01': strategies['current_image+isi'],
+                'sub-02': strategies['previous_isi'],
+                'sub-03': strategies['current_image'],
+                'sub-06': strategies['previous_isi'],
                 }
 
-            strategy = sub_strategy[sub]
+            strategy_name = sub_strategy[sub]
             '''
-            strategy = 'image+isi'
+            strategy_name = 'current_image+isi'
+            strategy = strategies[strategy_name]
 
-            fix_dist_x, fix_dist_y, fix_times, fix_metrics = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, fix_period=strategy)
-            all_x_aligned, all_y_aligned = driftcorr_fromlast(fix_dist_x, fix_dist_y, fix_times, all_x, all_y, all_times)
+            fix_dist_x, fix_dist_y, fix_times, fix_metrics = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, fix_period=strategy[0])
+            all_x_aligned, all_y_aligned = driftcorr_fromlast(fix_dist_x, fix_dist_y, fix_times, all_x, all_y, all_times, previous_image=strategy[1])
 
             run_event, all_distInDeg, all_distInDeg_aligned = add_metrics_2events(
                                                                                   run_event,
@@ -527,6 +550,7 @@ def driftCorr_ET(row, out_path, is_final=False):
                                                                                   all_x_aligned,
                                                                                   all_y_aligned,
                                                                                   conf_thresh=gaze_threshold,
+                                                                                  strategy_name,
                                                                                   )
 
             if is_final:
@@ -583,19 +607,15 @@ def driftCorr_ET(row, out_path, is_final=False):
                 plot DriftCorr QC figures
                 '''
                 fix_metrics['gz_trial_fixCom'] = []
-                fix_metrics['gz_pre-post_dist'] = []
+                fix_metrics['gz_dist2prev'] = []
                 fix_metrics['fix_gz_conf'] = []
 
                 cutoff = '0.9' if gaze_threshold == 0.9 else '0.75'
 
                 for i in fix_metrics['gz_idx']:
                     fix_metrics['gz_trial_fixCom'].append(run_event['trial_fixation_compliance_ratio_1.0'][i])
-                    if strategy == 'isi':
-                        fix_metrics['fix_gz_conf'].append(run_event[f'pre-isi_gaze_confidence_ratio_{cutoff}'][i])
-                        fix_metrics['gz_pre-post_dist'].append(run_event['pre-post-isi_distance_in_deg'][i])
-                    else:
-                        fix_metrics['fix_gz_conf'].append(run_event[f'trial_gaze_confidence_ratio_{cutoff}'][i])
-                        fix_metrics['gz_pre-post_dist'].append(run_event['distance_to_previous_trial_in_deg'][i])
+                    fix_metrics['fix_gz_conf'].append(run_event[f'fix_gaze_confidence_ratio_{cutoff}'][i])
+                    fix_metrics['gz_dist2prev'].append(run_event['median_dist_to_previous_trial_in_deg'][i])
 
                 vals2plot = {
                     #'col=gz_count': {
@@ -613,8 +633,8 @@ def driftCorr_ET(row, out_path, is_final=False):
                         'refs': ['G', 'H', 'I'],
                         'cmap': 'plasma_r',
                     },
-                    'col=isi_dist': {
-                        'values': fix_metrics['gz_pre-post_dist'],
+                    'col=dist2previous': {
+                        'values': fix_metrics['gz_dist2prev'],
                         'refs': ['J', 'K', 'L'],
                         'cmap': 'plasma',
                     },
