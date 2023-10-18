@@ -344,7 +344,8 @@ def main():
 # of images with larger FoV (eg. cspine acquisitions)
 def generate_deface_ear_mask(mni):
 
-    deface_ear_mask = np.ones(np.asarray(mni.shape) * (1, 1, 2), dtype=np.int8)
+    deface_ear_mask = np.ones(np.asarray(mni.shape) * (1, 1, 2), dtype=np.uint8)
+    deface_ear_mask[:, :, :mni.shape[2]] = 0
     affine_ext = mni.affine.copy()
     affine_ext[2, -1] -= mni.shape[-1]
 
@@ -359,7 +360,7 @@ def generate_deface_ear_mask(mni):
         np.linspace(
             jaw_marker[0], above_eye_marker[0], above_eye_marker[1] - jaw_marker[1]
         )
-    ).astype(np.int)
+    ).astype(np.int32)
     for z, y in zip(range(jaw_marker[1], above_eye_marker[1]), y_coords):
         deface_ear_mask[:, y:, z] = 0
 
@@ -368,7 +369,7 @@ def generate_deface_ear_mask(mni):
     deface_ear_mask[-ear_marker[0] :, :, : ear_marker[1]] = 0
     x_coords = np.round(
         np.linspace(ear_marker[0], ear_marker2[0], ear_marker2[1] - ear_marker[1])
-    ).astype(np.int)
+    ).astype(np.int32)
     for z, x in zip(range(ear_marker[1], ear_marker2[1]), x_coords):
         deface_ear_mask[:x, :, z] = 0
         deface_ear_mask[-x:, :, z] = 0
