@@ -110,10 +110,10 @@ def registration(ref, moving, ref_mask=None, moving_mask=None):
     ref_mask_data, mov_mask_data = None, None
     ref_data = ref.get_fdata()
     if ref_mask:
-        ref_mask_data = (ref_mask.get_fdata() > 0.5).astype(np.int)
+        ref_mask_data = (ref_mask.get_fdata() > 0.5).astype(np.int32)
     mov_data = moving.get_fdata()
     if moving_mask:
-        mov_mask_data = (moving_mask.get_fdata() > 0.5).astype(np.int)
+        mov_mask_data = (moving_mask.get_fdata() > 0.5).astype(np.int32)
 
     metric = MutualInformationMetric(nbins=32, sampling_proportion=None)
     transform = RigidTransform3D()
@@ -260,7 +260,7 @@ def main():
             brain_mask = (brain_xtractor.run(ref_image_nb.get_fdata()) > 0.99).astype(
                 np.uint8
             )
-            brain_mask[:] = scipy.ndimage.morphology.binary_dilation(
+            brain_mask[:] = scipy.ndimage.binary_dilation(
                 brain_mask, iterations=4
             )
             brain_mask_nb = nb.Nifti1Image(brain_mask, ref_image_nb.affine)
