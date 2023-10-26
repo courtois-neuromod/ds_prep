@@ -81,7 +81,7 @@ def logs2event_files(in_files, out_file_tpl):
                         bk2_dur += 1
 
                     duration_log = stop[0] - rep[0]
-                    if np.abs(duration_log-bk2_dur/60.) > 1 or record == last_rep_last_run:
+                    if np.abs(duration_log-bk2_dur/60.) > .05 or record == last_rep_last_run:
                         print(f"error : run-{len(repetition)} {rep[0]} {record} {duration_log} - {bk2_dur/60.}={duration_log-(bk2_dur/60.)}")
                         repetition[-1].append(
                             (
@@ -93,12 +93,12 @@ def logs2event_files(in_files, out_file_tpl):
                                 None,
                             )
                         )
-                        #duration_steps = int(duration_log*60.02)
-                        #keypresses, rewards = extract_keypress_rewards(rep_log)
-                        #print(keypresses, rewards)
-                        #kp_1hot = keypresses_1hot(keypresses, duration_steps)
-                        #bk2 = retro.Movie(record)
-                        #print(find_keyreleases(bk2, kp_1hot, rewards, duration_steps))
+                        duration_steps = int(duration_log*60.02)
+                        keypresses, rewards = extract_keypress_rewards(rep_log)
+                        print(keypresses, rewards)
+                        kp_1hot = keypresses_1hot(keypresses, duration_steps)
+                        bk2 = retro.Movie(record)
+                        print(find_keyreleases(bk2, kp_1hot, rewards, duration_steps))
                     else:
                         repetition[-1].append(
                             (
