@@ -535,7 +535,8 @@ def driftCorr_ET(row, out_path, is_final=False):
 
             strategy_name = sub_strategy[sub]
             '''
-            strategy_name = 'current_image+isi'
+            #strategy_name = 'current_image+isi'
+            strategy_name = 'previous_image+isi'
             strategy = strategies[strategy_name]
 
             fix_dist_x, fix_dist_y, fix_times, fix_metrics = get_fixation_gaze_things(run_event, clean_dist_x, clean_dist_y, clean_times, fix_period=strategy[0])
@@ -763,9 +764,9 @@ def main():
     file_list = pd.read_csv(f'{outpath_report}/QCed_file_list.tsv', sep='\t', header=0)
 
     clean_list = file_list[file_list['DO_NOT_USE']!=1.0]
-    if is_final:
-        final_list = clean_list[clean_list['Fails_DriftCorr']!=1.0]
-        clean_list = final_list
+    #if is_final:
+    #    final_list = clean_list[clean_list['Fails_DriftCorr']!=1.0]
+    #    clean_list = final_list
 
     clean_list['gaze_path'] = clean_list.apply(lambda row: create_gaze_path(row, out_path), axis=1)
     clean_list['events_path'] = clean_list.apply(lambda row: create_event_path(row, in_path), axis=1)
