@@ -740,14 +740,25 @@ def driftCorr_ET(row, out_path, is_final=False):
 
 def main():
     '''
-    This script tests different drift correction metrics for the things dataset
+    This script performs drift-correction on the THINGS eyetracking data.
 
-    In the first phase, 6 different approaches are contrasted
+    If the argument "is_final" is false, it exports quality control figures
+    to assess drift correction success.
 
-    In the second phase (yet to implement), additional metrics are visualized to determine whether fixation is robust during the image presentation vs ISI_0
+    If "is_final" is true, it exports:
+    - drift-corrected gaze data in bids-compliant format
+    - enhanced *events.tsv files that included trial-wise fixation compliance
+    metrics.
 
-    In the third phase (yet to implement), eye-tracking QC metrics are exported to events files,
-    and bids-compliant drift corrected gaze is exported as a derivative
+    Note: the *events.tsv files are based on the raw events files, not the
+    ones with corrected behavioural metrics. To reconcile these files,
+    run the things_add_etQC_2cleanEvents.py script, which imports fixation
+    compliance metrics into the corrected events files (for final dataset).
+
+    IMPORTANT: sub-06's ses-020 was ran under sub-01, is saved under sub-01's
+    ses-020 (sep 15th is sub-06, sep 22nd is sub-01).
+    Those output files (events, gaze and figures) needs to be RELABELLED
+    MANUALLY to match the rest of the dataset (corrected events files, bold files).
     '''
 
     args = get_arguments()
