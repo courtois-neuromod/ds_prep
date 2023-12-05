@@ -77,7 +77,7 @@ def main():
 
         out_name = f'{out_dir}/{sub}_{ses}_task-thingsmemory_{run}_events.tsv'
         if Path(out_name).exists():
-            print("TODO: resolve duplicate source files for : ", sub, ses, task, run")
+            print("TODO: resolve duplicate source files for : ", sub, ses, task, run)
         else:
             df_b.to_csv(out_name, sep='\t', header=True, index=False)
 
