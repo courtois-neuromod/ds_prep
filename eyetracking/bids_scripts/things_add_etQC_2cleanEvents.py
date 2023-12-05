@@ -29,11 +29,29 @@ def main():
     behav_path = args.behav_path
     out_path = args.out_path
 
-    col2add_list = ['gaze_confidence_ratio_cThresh0.9',
-                    'gaze_count',
-                    'fixation_compliance_ratio_deg1',
-                    'fixation_compliance_ratio_deg2',
-                    'fixation_compliance_ratio_deg3']
+    col2add_list = [
+                    'drift_correction_strategy',
+                    'fix_gaze_count_ratio',
+                    'trial_gaze_count_ratio',
+                    'fix_gaze_confidence_ratio_0.9',
+                    'fix_gaze_confidence_ratio_0.75',
+                    'trial_gaze_confidence_ratio_0.9',
+                    'trial_gaze_confidence_ratio_0.75',
+                    'median_dist_to_fixation_in_deg',
+                    'median_dist_to_previous_trial_in_deg',
+                    'trial_fixation_compliance_ratio_0.5',
+                    'trial_fixation_compliance_ratio_1.0',
+                    'trial_fixation_compliance_ratio_2.0',
+                    'trial_fixation_compliance_ratio_3.0',
+                    'trial_dist2med_ratio_0.5',
+                    'trial_dist2med_ratio_1.0',
+                    'trial_dist2med_ratio_2.0',
+                    'trial_dist2med_ratio_3.0',
+                    'fix_dist2med_ratio_0.5',
+                    'fix_dist2med_ratio_1.0',
+                    'fix_dist2med_ratio_2.0',
+                    'fix_dist2med_ratio_3.0',
+                    ]
 
     behav_file_list = glob.glob(f'{behav_path}/sub-0*/ses-0*/sub-*_events.tsv')
 
@@ -48,6 +66,8 @@ def main():
 
             for new_c in col2add_list:
                 df_b.insert(df_b.shape[1], f'{new_c}', df_et[new_c], allow_duplicates=True)
+        elif len(et_file) > 1:
+            print("TODO: resolve duplicate ET files for : ", sub, ses, task, run)
         else:
             for new_c in col2add_list:
                 df_b.insert(df_b.shape[1], f'{new_c}', np.NAN, allow_duplicates=True)
@@ -56,7 +76,10 @@ def main():
         Path(out_dir).mkdir(parents=True, exist_ok=True)
 
         out_name = f'{out_dir}/{sub}_{ses}_task-thingsmemory_{run}_events.tsv'
-        df_b.to_csv(out_name, sep='\t', header=True, index=False)
+        if Path(out_name).exists():
+            print("TODO: resolve duplicate source files for : ", sub, ses, task, run")
+        else:
+            df_b.to_csv(out_name, sep='\t', header=True, index=False)
 
 
 if __name__ == '__main__':
