@@ -120,7 +120,7 @@ def main():
                 offset = df_b.iloc[i]["onset"] + df_b.iloc[i]["duration"]
 
                 # filter time stamps and downsample
-                df_trial = df_et[np.logical_and(df_et["eye_timestamp"].to_numpy() > onset, df_et["eye_timestamp"].to_numpy() < offset)])][::5]
+                df_trial = df_et[np.logical_and(df_et["eye_timestamp"].to_numpy() > onset, df_et["eye_timestamp"].to_numpy() < offset)][::5]
                 # filter above confidence threshold
                 df_trial = df_trial[df_trial["eye1_confidence"].to_numpy() > conf_thresh]
 
