@@ -103,6 +103,7 @@ def main():
     et_file_list = glob.glob(f'{et_path}/{sub_num}/ses-0*/{sub_num}*_eyetrack.tsv.gz')
     for et_file in et_file_list:
         sub, ses, task, run, _ = os.path.basename(et_file).split('_')
+        print(sub, ses, run)
 
         behav_file_path = glob.glob(f'{ev_path}/{sub}/{ses}/*{run}*_events.tsv')
         assert len(behav_file_path) == 1
