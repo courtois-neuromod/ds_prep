@@ -101,7 +101,7 @@ def main():
     df_alltrials = pd.DataFrame(columns=cols2keep) # per trial
     df_allgaze = pd.DataFrame(columns=['subject','session', 'run', 'x', 'y', 'dist']) # per gaze point
 
-    et_file_list = glob.glob(f'{et_path}/{sub_num}/ses-0*/{sub_num}*_eyetrack.tsv.gz')
+    et_file_list = sorted(glob.glob(f'{et_path}/{sub_num}/ses-0*/{sub_num}*_eyetrack.tsv.gz'))
     for et_file in et_file_list:
         sub, ses, task, run, _ = os.path.basename(et_file).split('_')
         print(sub, ses, run)
