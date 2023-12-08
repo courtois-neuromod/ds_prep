@@ -371,6 +371,7 @@ def add_metrics_2events(df_ev,
     Insert drift correction strategy name
     '''
     df_ev['drift_correction_strategy'] = df_ev.apply(lambda row: strategy_name, axis=1)
+    df_ev['confidence_threshold'] = df_ev.apply(lambda row: conf_thresh, axis=1)
 
     '''
     Insert gaze count: fixation and image
@@ -772,12 +773,15 @@ def main():
     outpath_report = os.path.join(out_path, 'QC_gaze')
     Path(outpath_report).mkdir(parents=True, exist_ok=True)
 
-    file_list = pd.read_csv(f'{outpath_report}/QCed_file_list.tsv', sep='\t', header=0)
+    if is_final:
+        file_list = pd.read_csv(f'{outpath_report}/QCed_finalbids_list.tsv', sep='\t', header=0)
+    else:
+        file_list = pd.read_csv(f'{outpath_report}/QCed_file_list.tsv', sep='\t', header=0)
 
     clean_list = file_list[file_list['DO_NOT_USE']!=1.0]
-    #if is_final:
-    #    final_list = clean_list[clean_list['Fails_DriftCorr']!=1.0]
-    #    clean_list = final_list
+    if is_final:
+        final_list = clean_list[clean_list['Fails_DriftCorr']!=1.0]
+        clean_list = final_list
 
     clean_list['gaze_path'] = clean_list.apply(lambda row: create_gaze_path(row, out_path), axis=1)
     clean_list['events_path'] = clean_list.apply(lambda row: create_event_path(row, in_path), axis=1)
