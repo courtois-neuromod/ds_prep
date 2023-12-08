@@ -67,6 +67,7 @@ def main():
     et_path = args.et_path
     ev_path = args.ev_path
     out_path = args.out_path
+    Path(out_path).mkdir(parents=True, exist_ok=True)
 
     conf_thresh = 0.75 if sub_num == "sub-01" else 0.9
 
@@ -142,9 +143,8 @@ def main():
 
                 df_allgaze = pd.concat((df_allgaze, df_deg), ignore_index=True)
 
-        Path(out_path).mkdir(parents=True, exist_ok=True)
-        df_alltrials.to_csv(f"out_path/{sub}_trialwise.tsv", sep='\t', header=True, index=False)
-        df_allgaze.to_csv(f"out_path/{sub}_gaze.tsv", sep='\t', header=True, index=False)
+        df_alltrials.to_csv(f"{out_path}/{sub}_trialwise.tsv", sep='\t', header=True, index=False)
+        df_allgaze.to_csv(f"{out_path}/{sub}_gaze.tsv", sep='\t', header=True, index=False)
 
 
 if __name__ == '__main__':
