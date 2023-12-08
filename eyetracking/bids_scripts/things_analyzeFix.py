@@ -99,7 +99,7 @@ def main():
                     ]
 
     df_alltrials = pd.DataFrame(columns=cols2keep) # per trial
-    df_allgaze = pd.DataFrame(columns=['subject','session', 'run', 'x', 'y', 'dist']) # per gaze point
+    df_allgaze = pd.DataFrame(columns=['subject','session', 'run', 'trial', 'x', 'y', 'dist']) # per gaze point
 
     et_file_list = sorted(glob.glob(f'{et_path}/{sub_num}/ses-0*/{sub_num}*_eyetrack.tsv.gz'))
     for et_file in et_file_list:
@@ -116,6 +116,7 @@ def main():
 
         for i in range(df_b.shape[0]):
             # skip bad trials
+            trial_num = df_b.iloc[i]["TrialNumber"]
             if not np.isnan(df_b.iloc[i]["response"]):
                 onset = df_b.iloc[i]["onset"] + 0.1
                 offset = df_b.iloc[i]["onset"] + df_b.iloc[i]["duration"]
@@ -140,6 +141,7 @@ def main():
                 df_deg.insert(loc=0, column="subject", value=sub, allow_duplicates=True)
                 df_deg.insert(loc=1, column="session", value=ses, allow_duplicates=True)
                 df_deg.insert(loc=2, column="run", value=run, allow_duplicates=True)
+                df_deg.insert(loc=3, column="trial", value=trial_num, allow_duplicates=True)
 
                 df_allgaze = pd.concat((df_allgaze, df_deg), ignore_index=True)
 
