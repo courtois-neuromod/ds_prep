@@ -2,7 +2,7 @@ import csv
 import json
 import os, glob
 import retro
-retro.data.Integrations.add_custom_path('/home/labopb/Documents/Marie/neuromod/MarioStars/mario.stimuli')
+retro.data.Integrations.add_custom_path('/home/labopb/Documents/Marie/neuromod/MarioStars/mariostars.stimuli')
 #from retro.scripts.playback_movie import playback_movie
 
 import signal
