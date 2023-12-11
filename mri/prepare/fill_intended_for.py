@@ -42,6 +42,7 @@ def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_re
         reset_database=force_reindex,
         validate=False,
         ignore=_load_bidsignore_(path),
+        index_metadata=True,
     )
     extra_filters = {}
     if participant_label:
@@ -70,9 +71,9 @@ def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_re
             epi.tags["AcquisitionTime"].value, "%H:%M:%S.%f"
         )
         
-        if epi_b0fieldsource and epi_series_id in epi_b0fieldsource:
+        #if epi_b0fieldsource and epi_series_id in epi_b0fieldsource:
             # that series was already assigned a fieldmap
-            continue
+            #continue
         epi_pedir = epi.entities["PhaseEncodingDirection"]
         opposite_pedir = epi_pedir[-1:] if '-' in epi_pedir else f"{epi_pedir}-"
 
@@ -87,18 +88,18 @@ def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_re
             continue
         sbref = sbref[0]
         
-        if epi_series_id in sbref.entities.get('B0FieldIdentifier',[]):
+        #if epi_series_id in sbref.entities.get('B0FieldIdentifier',[]):
             # that series was already assigned a fieldmap
-            continue
+        #    continue
             
         # fetch candidate fieldmaps from the same session            
         fmap_query_base = dict(
             suffix=["epi", "sbref"],
             extension=".nii.gz",
-            acquisition="sbref",
+            acquisition=["sbref", "sbrefEcho1"], # get first echo
             subject=epi.entities["subject"],
             session=epi.entities.get("session", None),
-            echo=1 if epi.entities.get("echo", None) else None, # get first echo
+#            echo=1 if epi.entities.get("echo", None) else None, # get first echo
             PhaseEncodingDirection=opposite_pedir,
         )
         
@@ -108,6 +109,7 @@ def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_re
             ShimSetting=str(epi.entities['ShimSetting']),
             ImageOrientationPatientDICOM=str(epi.entities['ImageOrientationPatientDICOM']),
         )
+        logging.debug("query fmaps" + str(fmap_query_base))
         if not fmaps:
             epis_with_shim_mismatch.append(epi)
             logging.warning(
@@ -212,11 +214,16 @@ def insert_values_in_json(path, dct):
     for tag, values in dct.items():
         meta[tag] = values #sorted(list(set(meta.get(tag,[])+values)))
     file_mask = os.stat(path)[stat.ST_MODE]
-    os.chmod(path, file_mask | stat.S_IWUSR)
+    try:
+        os.chmod(path, file_mask | stat.S_IWUSR)
+    except PermissionError:
+        pass
     with open(path, "w", encoding="utf-8") as fd:
         fd.write(json_dumps_pretty(meta))
-    os.chmod(path, file_mask)
-
+    try:
+        os.chmod(path, file_mask)
+    except PermissionError:
+        pass
 
 def get_candidate_fmaps(layout, epi, match_shim=True, sloppy=0, non_fmap=True):
     
@@ -452,8 +459,9 @@ def parse_args():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-
+    LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
+    logging.basicConfig(level=LOGLEVEL)
+    
     args = parse_args()
     if args.b0_field_id:
         fill_b0_meta(**vars(args))
