@@ -145,8 +145,8 @@ def main():
 
                 df_allgaze = pd.concat((df_allgaze, df_deg), ignore_index=True)
 
-        df_alltrials.to_csv(f"{out_path}/{sub}_trialwise.tsv", sep='\t', header=True, index=False)
-        df_allgaze.to_csv(f"{out_path}/{sub}_gaze.tsv", sep='\t', header=True, index=False)
+    df_alltrials.to_csv(f"{out_path}/{sub}_trialwise.tsv", sep='\t', header=True, index=False)
+    df_allgaze.to_csv(f"{out_path}/{sub}_gaze.tsv", sep='\t', header=True, index=False)
 
 
 if __name__ == '__main__':
