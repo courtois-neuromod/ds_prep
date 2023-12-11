@@ -16,7 +16,7 @@
   "CalibrationPosition": [[100, 100], [100, 512], [100, 924], [640, 100], [640, 512], [640, 924], [1180, 100], [1180, 512], [1180, 924]],
   "MaximalCalibrationError": "TODO (optional): Maximal calibration error in degree",
   "AverageCalibrationError": "TODO (optional): Average calibration error in visual degree; i don't think we have that",
-  "RecordedEye": "TODO (optional): left or right? I... forgot",
+  "RecordedEye": "right",
   "EyeCameraSettings": "TODO (optional): any settings that influence the resolution and quality of the eye imagery. Autowhitebalance? Changes in sharpness?",
 
   "StartTime": 0.0,
