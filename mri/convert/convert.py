@@ -101,11 +101,13 @@ def single_session_job(input_file, output_datalad, ria_storage_remote, b0_field_
             ds.drop('./.heudiconv/', reckless='kill', recursive=True)
             ds.drop('.', recursive=True)
         print(f"processed {input_file}")
+        return True
     except Exception as e:
         print(f"An error occur processing {input_file}")
         print(e)
         import traceback
         print(traceback.format_exc())
+        return False
 
 def fix_fmap_phase(ds):
     #### fix fmap phase data (sbref series will contain both and heudiconv auto name it)
@@ -185,6 +187,10 @@ def main():
                 ria_storage_remote=args.ria_storage_remote,
                 b0_field_id=args.b0_field_id),
         args.files)
+
+    print("SUMMARY" + "#"*40)
+    for r,f in zip(res, args.files):
+        print(f"{f}: {'SUCCESS' if r else 'FAIL'}")
 
 if __name__ == "__main__":
     main()
