@@ -434,7 +434,7 @@ def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, c
                         trial_comp[k].append(x_comp and y_comp)
                     trial_conf.append(vals_conf[j] > conf_thresh)
                 j += 1
-            num_gaze = len(trial_comp_1)
+            num_gaze = len(trial_comp[0])
             if num_gaze > 0:
                 for k, deg_val in enumerate([0.5, 1, 2, 3]):
                     fix_compliance[k].append(np.sum(trial_comp[k])/num_gaze)
