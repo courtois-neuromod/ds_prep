@@ -68,7 +68,7 @@ def process_dset(
     df_files: DataFrame,
     task_root: str,
     ses_lists: list,
-) -> DataFrame, list:
+) -> tuple:
 
     sub_list = ['sub-01', 'sub-02', 'sub-03', 'sub-04', 'sub-05', 'sub-06']
     pupil_file_paths = []
