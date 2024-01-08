@@ -274,7 +274,7 @@ def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, task, med_
     return fix_dist_x, fix_dist_y, fix_times
 
 
-def get_interfix_dist(df_ev, fix_times, fix_x, fix_y, pseudo_task):
+def get_interfix_dist(df_ev, fix_times, fix_x, fix_y, task):
     inter_dist = []
     j = 0
 
