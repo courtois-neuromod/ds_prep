@@ -399,7 +399,7 @@ def main() -> None:
     '''
     file_report, pupil_paths = compile_file_list(in_path)
 
-    outpath_report = f"{out_path}/QC_gaze")
+    outpath_report = f"{out_path}/QC_gaze"
     Path(outpath_report).mkdir(parents=True, exist_ok=True)
     file_report.to_csv(
         f"{outpath_report}/file_list.tsv",
