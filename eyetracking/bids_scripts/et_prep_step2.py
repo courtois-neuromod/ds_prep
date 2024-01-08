@@ -559,8 +559,8 @@ def driftCorr_EToutput(row, out_path, is_final=False):
         out_file = f'{out_path}/DC_gaze/{sub}_{ses}_{run_num}_{fnum}_{pseudo_task}_DCplot.png'
 
     if not os.path.exists(out_file):
-        if True:
-        #try:
+        #if True:
+        try:
             run_event = pd.read_csv(row['events_path'], sep = '\t', header=0)
             run_gaze = np.load(row['gaze_path'], allow_pickle=True)['gaze2d']
 
@@ -662,7 +662,7 @@ def driftCorr_EToutput(row, out_path, is_final=False):
                 run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 1)
                 run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 2)
                 run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 3)
-            
+
 
             if is_final:
                 if task_root not in ['retino', 'floc']:
@@ -780,8 +780,8 @@ def driftCorr_EToutput(row, out_path, is_final=False):
 
                 fig.savefig(out_file)
                 plt.close()
-        #except:
-        #    print('could not process')
+        except:
+            print('could not process')
 
 
 def main():
