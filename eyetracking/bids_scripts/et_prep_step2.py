@@ -648,7 +648,7 @@ def driftCorr_EToutput(row, out_path, is_final=False):
             if task_root not in ['retino', 'floc']:
                 run_event = get_interfix_dist(run_event, clean_times, clean_dist_x, clean_dist_y, pseudo_task)
 
-            """
+
             if 'mario' in pseudo_task:
                 run_event = assign_gzMetrics2trial_mario(run_event, all_times, all_conf, all_x_aligned, all_y_aligned, conf_thresh=0.9)
                 if gaze_threshold != 0.9:
@@ -662,7 +662,7 @@ def driftCorr_EToutput(row, out_path, is_final=False):
                 run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 1)
                 run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 2)
                 run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 3)
-            """
+            
 
             if is_final:
                 if task_root not in ['retino', 'floc']:
