@@ -67,7 +67,7 @@ run2task_mapping = {
 def process_dset(
     df_files: pd.DataFrame,
     task_root: str,
-    ses_lists: list,
+    ses_list: list,
 ) -> tuple:
 
     sub_list = ['sub-01', 'sub-02', 'sub-03', 'sub-04', 'sub-05', 'sub-06']
@@ -160,7 +160,7 @@ def process_dset(
 
 def process_friends(
     df_files: pd.DataFrame,
-    ses_lists: list,
+    ses_list: list,
 ) -> tuple:
 
     sub_list = ['sub-01', 'sub-02', 'sub-03', 'sub-04', 'sub-05', 'sub-06']
@@ -256,12 +256,12 @@ def compile_file_list(
     ses_list = sorted(glob.glob(f'{in_path}/sub-*/ses-0*'))
 
     if task_root == 'friends':
-        return process_friends(df_files, ses_lists)
+        return process_friends(df_files, ses_list)
     else:
         return process_dset(
             df_files,
             task_root,
-            ses_lists,
+            ses_list,
         )
 
 
