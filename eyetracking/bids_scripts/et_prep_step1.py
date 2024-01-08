@@ -235,7 +235,7 @@ def process_friends(
 
 def compile_file_list(
     in_path: str,
-) -> DataFrame, list:
+) -> tuple:
 
     col_names = [
         'subject',
