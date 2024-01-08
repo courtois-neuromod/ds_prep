@@ -65,10 +65,10 @@ run2task_mapping = {
 
 
 def process_dset(
-    df_files: DataFrame,
+    df_files: pd.DataFrame,
     task_root: str,
     ses_lists: list,
-) -> tuple:
+) -> pd.DataFrame, list:
 
     sub_list = ['sub-01', 'sub-02', 'sub-03', 'sub-04', 'sub-05', 'sub-06']
     pupil_file_paths = []
@@ -159,9 +159,9 @@ def process_dset(
 
 
 def process_friends(
-    df_files: DataFrame,
+    df_files: pd.DataFrame,
     ses_lists: list,
-) -> tuple:
+) -> pd.DataFrame, list:
 
     sub_list = ['sub-01', 'sub-02', 'sub-03', 'sub-04', 'sub-05', 'sub-06']
     pupil_file_paths = []
@@ -235,7 +235,7 @@ def process_friends(
 
 def compile_file_list(
     in_path: str,
-) -> tuple:
+) -> pd.DataFrame, list:
 
     col_names = [
         'subject',
