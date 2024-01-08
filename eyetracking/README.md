@@ -1,84 +1,79 @@
-Eye-tracking QC and offline processing
-==============================
+Eye-tracking QC and pre-processing steps for CNeuromo datasets
+==============================================================
 
-***THINGS dataset***
+**Step 1. List available files and export plots of gaze position over time**
 
-**Step 1. Create one config.json file per session**
+Script: eyetracking/bids_scripts/et_prep_step1.py
 
-Scripts create a config file that sorts through the session's raw output directory, and identifies
-each run's files (pupils, eye movie, gaze) and its corresponding calibration files (pupils, eye movie, gaze)
-and calibration parameters (timing and position of markers in calibration routine) based on pupil timestamps.
-This config file is used to perform quality check and offline processing (pupil detection, calibration and gaze mapping).
+The script
+- compiles an overview of all available files (pupils.pldata, gaze.pldata and eye0.mp4 exported by pupil, psychopy log file) and exports a file list (file_list.tsv).
+- converts gaze.pldata files to .npz format (to process in numpy independently of pupil labs classes)
+- exports plots of gaze and pupil positions over time (per run) to QC each run (flag camera freezes, missing pupils, excessive drift, etc)
 
-For each run,
-- task run output files (pupils, gaze, eye movie) are in sub-0\*_ses-00\*_date-filenum.pupil/task-thingsmemory_run-\*/00\*
-- calibration output files (pupils, gaze, eye movie) are in sub-0\*_ses-00\*_date-filenum.pupil/EyeTracker-Calibration/00\*
-- calibration parameters (marker positions, saved pupils) are saved as sub-0\*_ses-00\*_date-filenum_EyeTracker-Calibration_calib-data\*.npz
-
-To generate a config file for a single session, edit and launch
+To lauch on elm, just specify the name of the dataset directory under /unf/eyetracker dataset\
+e.g.,
 ```bash
-./THINGS_launch_makejson.sh  
+./eyetracking/bids_scripts/launch_etprep_step1.sh triplets
 ```
+-----------
 
-To create several config files for multiple subjects and sessions, edit and launch
-```bash
-./THINGS_batchlaunch_makejson.sh  
-```
+**Step 2. Offline quality check: raw data quality**
+
+Assess the quality of each run based on the graphs generated in step 1.\
+Compile a clean list of runs to drift-correct and bids-format (in step 3).\
+Open the file_list.tsv output file as a spreadsheet, and log in QC info:
+- 1. Add columns "no_pupil_data", "DO_NOT_USE", "pupilConf_thresh" and "notes"
+- 2. Enter "1" in "no_pupil_data" for runs without eye-tracking data
+- 3. Enter "1" in "DO_NOT_USE" for runs to be excluded (corrupt/no data)
+- 4. Detail any issue in "notes" (e.g., gaps, drifts, low confidence data...)
+
+Save this spreadsheet as "QCed_file_list.tsv" in the "out_path/QC_gaze" directory.
+Note that some runs might require the pupil confidence threshold to be lowered from
+the default (0.9). In QCed_file_list.tsv, enter the new confidence threshold parameter
+under "pupilConf_thresh" [0.0-1.0].
 
 -----------
 
-**Step 2. Do quality check on online gaze**
+**Step 3. Correct Drift and export plots of drift-corrected gaze**
 
-From the config file generated in Step 1, run the summary quality check script to
-detect eye camera freezes and assess online gaze data quality
+Scripts: eyetracking/bids_scripts/et_prep_step2.py
 
-For each run,
-- above threshold gaps between eye movie frames are logged and plotted
-- X and Y online gaze coordinates are plotted in time for the calibration routine and main run
-- metrics of deviation from the point of central fixation are logged into a session report
+The script
+- performs drift correction on runs of gaze data according to parameters specified in QCed_file_list.tsv
+- exports plots of raw and corrected gaze positions to QC each run (flag runs that fail drift correction)
 
-To perform QC on a single session, launch (specify session's config file in argument)
+To lauch on elm, just specify the name of the dataset directory under /unf/eyetracker dataset\
+e.g.,
 ```bash
-./THINGS_launch_sumQC.sh config_THINGS_s02_ses004.json
+./eyetracking/bids_scripts/launch_etprep_step2_iterate.sh triplets
 ```
+-----------
 
-To perform QC on all sessions with an existing config file, launch
-```bash
-./THINGS_batchlaunch_sumQC.sh  
-```
+**Step 4. Offline quality check: drift corrected gaze**
+
+Rate the drift correction success for each run based on the graphs generated in step 3.\
+Determine whether drift correction passes or fails.
+
+For failed runs, wadjust drift correction parameters (from the default). In QCed_file_list.tsv, the following parameters can be customized for each run : pupil confidence threshold, polynomial degree in x and y (to fit gaze mapping drift over time), and whether drift should be corrected based on the latest fixation (rather than with a polynomial fitted through the run's fixations).
+
+Iterate on steps 3 and 4 until a run is well-corrected (Pass_DriftCorr), or until it is considered beyond fixing (Fails_DriftCorr).
+
+Compile a final list of runs to drift-correct and bids-format (in step 5).
+Save this list as "QCed_file_list_final.tsv" in the "out_path/QC_gaze" directory.
 
 -----------
 
-**Step 3. Visualize QC metrics for the dataset, per participant**
+**Step 5. Export gaze and pupil metrics in bids-compliant format**
 
-The script compiles all sessions' QC metrics (per run) into a single .tsv file,
-and exports figures that indicate
+Script: eyetracking/bids_scripts/et_prep_step2.py
 
-- the mean gaze deviation from the central fixation point (in X and Y)
-- the slope and intercept of a fitted line passing trough the gaze position over time (in X and Y)
-- the percentage of gazes outside the viewing screen
-- the percentage of gazes below a quality threshold  
+The script
+- performs drift correction on runs of gaze data according to parameters specified in QCed_file_list.tsv
+- exports eyetracking data in bids-compliant format (.tsv.gz), according to the following proposed bids extension guidelines:
+https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-eyetrackjson
 
-To compute these metrics, launch
+To lauch on elm, just specify the name of the dataset directory under /unf/eyetracker dataset\
+e.g.,
 ```bash
-./THINGS_launch_overviewstats.sh
+./eyetracking/bids_scripts/launch_etprep_step2_final.sh triplets
 ```
-
------------
-
-**Step 4. Perform offline processing for runs that need it**
-
-From the config file created in Step 1, a problematic session can be re-processed offline
-(pupil detection, calibration and gaze mapping). As an option (specified in config file with the "apply_qc" argument),
-the script performs a QC on the offline and online gaze data.
-
-To process a session offline, launch (specify session's config file in argument)
-```bash
-./THINGS_launch_offcalib.sh config_THINGS_s02_ses004.json
-```
-
------------
-
-The Pupil software is installed as a sub-module from https://github.com/courtois-neuromod/pupil (gigevision_rebase branch)
-
-------------

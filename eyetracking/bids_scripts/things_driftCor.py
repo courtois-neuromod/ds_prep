@@ -486,7 +486,7 @@ def get_isi_distance(metrics_dict, trial_num, num_back, conf_thresh, use_trial=F
     return distance
 
 
-def driftCorr_ET(row, out_path, is_final=False):
+def driftCorr_ETthings(row, out_path, is_final=False):
 
     task_root = out_path.split('/')[-1]
 
@@ -789,7 +789,7 @@ def main():
     clean_list['infoplayer_path'] = clean_list.apply(lambda row: create_ip_path(row, in_path), axis=1)
 
     # implement drift correction on each run
-    clean_list.apply(lambda row: driftCorr_ET(row, out_path, is_final), axis=1)
+    clean_list.apply(lambda row: driftCorr_ETthings(row, out_path, is_final), axis=1)
 
 
 if __name__ == '__main__':
