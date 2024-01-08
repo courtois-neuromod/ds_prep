@@ -161,7 +161,7 @@ def process_dset(
 def process_friends(
     df_files: DataFrame,
     ses_lists: list,
-) -> DataFrame, list:
+) -> tuple:
 
     sub_list = ['sub-01', 'sub-02', 'sub-03', 'sub-04', 'sub-05', 'sub-06']
     pupil_file_paths = []
