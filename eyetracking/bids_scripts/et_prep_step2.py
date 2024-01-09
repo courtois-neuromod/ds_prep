@@ -275,12 +275,15 @@ def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, task, med_
 
 
 def get_interfix_dist(df_ev, fix_times, fix_x, fix_y, task):
-    inter_dist = []
+    dist_2prev = []
+    dist_2next = []
     j = 0
+    dist_in_pix = 4164 # in pixels
 
     for i in range(df_ev.shape[0]):
         if 'mario' in task and df_ev['trial_type'][i] != 'gym-retro_game':
-            inter_dist.append(np.nan)
+            dist_2prev.append(np.nan)
+            dist_2next.append(np.nan)
 
         else:
             if 'mario' in task:
@@ -295,26 +298,38 @@ def get_interfix_dist(df_ev, fix_times, fix_x, fix_y, task):
             while j+1 < len(fix_times) and trial_onset > fix_times[j+1]:
                 j += 1
 
-            if j+1 < len(fix_times) and trial_onset > fix_times[j] and trial_onset < fix_times[j+1]:
-                pre_x = fix_x[j]*1280
-                post_x = fix_x[j+1]*1280
-                pre_y = fix_y[j]*1024
-                post_y = fix_y[j+1]*1024
+            if trial_onset > fix_times[j]:
+                curr_x = fix_x[j]*1280
+                curr_y = fix_y[j]*1024
+                if j > 0:
+                    prev_x = fix_x[j-1]*1280
+                    prev_y = fix_y[j-1]*1024
+                    pre_vectors = np.array([[prev_x, prev_y, dist_in_pix], [curr_x, curr_y, dist_in_pix]])
+                    pre_distance = np.rad2deg(np.arccos(1.0 - pdist(pre_vectors, metric='cosine')))[0]
+                    dist_2prev.append(pre_distance)
+                else:
+                    dist_2prev.append(np.nan)
 
-                dist_in_pix = 4164 # in pixels
-                vectors = np.array([[pre_x, pre_y, dist_in_pix], [post_x, post_y, dist_in_pix]])
-                distance = np.rad2deg(np.arccos(1.0 - pdist(vectors, metric='cosine')))[0]
-                inter_dist.append(distance)
+                if j+1 < len(fix_times) and trial_onset < fix_times[j+1]:
+                    post_x = fix_x[j+1]*1280
+                    post_y = fix_y[j+1]*1024
+                    post_vectors = np.array([[curr_x, curr_y, dist_in_pix], [post_x, post_y, dist_in_pix]])
+                    post_distance = np.rad2deg(np.arccos(1.0 - pdist(post_vectors, metric='cosine')))[0]
+                    dist_2next.append(post_distance)
+                else:
+                    dist_2next.append(np.nan)
             else:
-                inter_dist.append(np.nan)
+                dist_2prev.append(np.nan)
+                dist_2next.append(np.nan)
 
-    df_ev.insert(loc=df_ev.shape[1]-2, column='interfix_distance_dva',
-                 value=inter_dist, allow_duplicates=True)
+    df_ev.insert(loc=df_ev.shape[1], column='fix_dist2prev',
+                 value=dist_2prev, allow_duplicates=True)
+    df_ev.insert(loc=df_ev.shape[1], column='fix_dist2next',
+                 value=dist_2next, allow_duplicates=True)
 
     return df_ev
 
-
-
+"""
 def assign_gazeConf2trial(df_ev, vals_times, vals_conf, task, conf_thresh=0.9, add_count=True):
 
     gazeconf_per_trials = {}
@@ -348,6 +363,7 @@ def assign_gazeConf2trial(df_ev, vals_times, vals_conf, task, conf_thresh=0.9, a
         df_ev['gaze_count'] = df_ev.apply(lambda row: gazeconf_per_trials[row['TrialNumber']][1], axis=1)
 
     return df_ev
+
 
 
 def assign_Compliance2trial(df_ev, vals_times, vals_x, vals_y, task, deg_va=1):
@@ -484,7 +500,7 @@ def assign_gzMetrics2trial_mario(df_ev, vals_times, vals_conf, vals_x, vals_y, c
                          value=fix_compliance[k], allow_duplicates=True)
 
     return df_ev
-
+"""
 
 def driftcorr_fromlast(fd_x, fd_y, f_times, all_x, all_y, all_times):
     i = 0
@@ -648,7 +664,7 @@ def driftCorr_EToutput(row, out_path, is_final=False):
             if task_root not in ['retino', 'floc']:
                 run_event = get_interfix_dist(run_event, clean_times, clean_dist_x, clean_dist_y, pseudo_task)
 
-
+            """
             if 'mario' in pseudo_task:
                 run_event = assign_gzMetrics2trial_mario(run_event, all_times, all_conf, all_x_aligned, all_y_aligned, conf_thresh=0.9)
                 if gaze_threshold != 0.9:
@@ -659,10 +675,10 @@ def driftCorr_EToutput(row, out_path, is_final=False):
                 if gaze_threshold != 0.9:
                     run_event = assign_gazeConf2trial(run_event, all_times, all_conf, task_type, conf_thresh=gaze_threshold, add_count=False)
                 # Measure fixation compliance during trial (THINGS) or during preceeding fixation
-                run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 1)
-                run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 2)
-                run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 3)
-
+                #run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 1)
+                #run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 2)
+                #run_event = assign_Compliance2trial(run_event, all_times, all_x_aligned, all_y_aligned, task_type, 3)
+            """
 
             if is_final:
                 if task_root not in ['retino', 'floc']:
@@ -716,67 +732,41 @@ def driftCorr_EToutput(row, out_path, is_final=False):
 
             else:
                 # export plots to visulize the gaze drift correction for last round of QC
-                if task_root in ['retino', 'floc']:
-                    mosaic = """
-                        CD
-                        EF
-                    """
-                    fs = (15, 7.0)
-                else:
-                    mosaic = """
-                        AB
-                        CD
-                        EF
-                    """
-                    fs = (15, 10.5)
+                mosaic = """
+                    AB
+                    CD
+                """
+                fs = (15, 7.0)
 
                 fig = plt.figure(constrained_layout=True, figsize=fs)
                 ax_dict = fig.subplot_mosaic(mosaic)
                 run_dur = int(run_event.iloc[-1]['onset'] + 20)
 
-                if task_root not in ['retino', 'floc']:
-                    if 'mario' in pseudo_task:
-                        m_trialtype = run_event['trial_type'].to_numpy()
-                        m_filter = ((m_trialtype == 'gym-retro_game') + (m_trialtype == 'fixation_dot')).astype(bool)
-                        run_event = run_event[m_filter]
-                        #run_event = run_event[run_event['trial_type'].to_numpy() == 'gym-retro_game']
-                    ax_dict["A"].scatter(run_event['onset'].to_numpy(), run_event[f'gaze_confidence_ratio_cThresh{gaze_threshold}'].to_numpy())
-                    ax_dict["A"].set_ylim(-0.1, 1.1)
-                    ax_dict["A"].set_xlim(0, run_dur)
-                    ax_dict["A"].set_title(f'{sub} {pseudo_task} {ses} {run_num} ratio >{str(gaze_threshold)} confidence per trial')
+                ax_dict["A"].scatter(all_times, all_x, s=10, color='xkcd:light grey', alpha=all_conf)
+                ax_dict["A"].scatter(all_times, all_x_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
+                ax_dict["A"].set_ylim(-2, 2)
+                ax_dict["A"].set_xlim(0, run_dur)
+                ax_dict["A"].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_x')
 
-                    if 'mario' in pseudo_task:
-                        run_event = run_event[run_event['trial_type'].to_numpy() == 'fixation_dot']
-                    ax_dict["B"].scatter(run_event['onset'].to_numpy(), run_event['fixation_compliance_ratio_deg1'].to_numpy())
-                    ax_dict["B"].set_ylim(-0.1, 1.1)
-                    ax_dict["B"].set_xlim(-0.1, run_dur)
-                    ax_dict["B"].set_title(f'{sub} {pseudo_task} {ses} {run_num} fixation compliance per trial')
+                ax_dict["B"].scatter(all_times, all_y, color='xkcd:light grey', alpha=all_conf)
+                ax_dict["B"].scatter(all_times, all_y_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
+                ax_dict["B"].set_ylim(-2, 2)
+                ax_dict["B"].set_xlim(0, run_dur)
+                ax_dict["B"].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_y')
 
-                ax_dict["C"].scatter(all_times, all_x, s=10, color='xkcd:light grey', alpha=all_conf)
-                ax_dict["C"].scatter(all_times, all_x_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
+                ax_dict["C"].scatter(clean_times, clean_dist_x, color='xkcd:light blue', s=20, alpha=0.2)
+                ax_dict["C"].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=1.0)
                 ax_dict["C"].set_ylim(-2, 2)
                 ax_dict["C"].set_xlim(0, run_dur)
-                ax_dict["C"].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_x')
+                ax_dict["C"].set_title(f'{sub} {pseudo_task} {ses} {run_num} fix_distance_x')
 
-                ax_dict["D"].scatter(all_times, all_y, color='xkcd:light grey', alpha=all_conf)
-                ax_dict["D"].scatter(all_times, all_y_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
-                ax_dict["D"].set_ylim(-2, 2)
-                ax_dict["D"].set_xlim(0, run_dur)
-                ax_dict["D"].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_y')
-
-                ax_dict["E"].scatter(clean_times, clean_dist_x, color='xkcd:light blue', s=20, alpha=0.2)
-                ax_dict["E"].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=1.0)
-                ax_dict["E"].set_ylim(-2, 2)
-                ax_dict["E"].set_xlim(0, run_dur)
-                ax_dict["E"].set_title(f'{sub} {pseudo_task} {ses} {run_num} fix_distance_x')
-
-                ax_dict["F"].scatter(clean_times, clean_dist_y, color='xkcd:light blue', s=20, alpha=0.2)
-                ax_dict["F"].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=1.0)
+                ax_dict["D"].scatter(clean_times, clean_dist_y, color='xkcd:light blue', s=20, alpha=0.2)
+                ax_dict["D"].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=1.0)
                 lb = np.min(fix_dist_y)-0.1 if np.min(fix_dist_y) < -2 else -2
                 hb = np.max(fix_dist_y)+0.1 if np.max(fix_dist_y) > 2 else 2
-                ax_dict["F"].set_ylim(lb, hb)
-                ax_dict["F"].set_xlim(0, run_dur)
-                ax_dict["F"].set_title(f'{sub} {pseudo_task} {ses} {run_num} fix_distance_y')
+                ax_dict["D"].set_ylim(lb, hb)
+                ax_dict["D"].set_xlim(0, run_dur)
+                ax_dict["D"].set_title(f'{sub} {pseudo_task} {ses} {run_num} fix_distance_y')
 
                 fig.savefig(out_file)
                 plt.close()
