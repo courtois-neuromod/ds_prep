@@ -324,9 +324,6 @@ def get_interfix_dist(df_ev, clean_times, clean_dist_x, clean_dist_y, task):
     k = 0
     for i in range(df_ev.shape[0]):
         if i in fix_dict:
-            while k+1 < len(fix_idx) and i < fix_idx[k]:
-                k += 1
-
             curr_x = fix_dict[i]['med_x']*1280
             curr_y = fix_dict[i]['med_y']*1024
             if k > 0:
@@ -346,6 +343,7 @@ def get_interfix_dist(df_ev, clean_times, clean_dist_x, clean_dist_y, task):
                 dist_2next.append(post_distance)
             else:
                 dist_2next.append(np.nan)
+            k += 1
 
         else:
             dist_2prev.append(np.nan)
