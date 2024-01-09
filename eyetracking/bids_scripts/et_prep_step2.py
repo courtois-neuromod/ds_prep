@@ -275,52 +275,81 @@ def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, task, med_
 
 
 def get_interfix_dist(df_ev, fix_times, fix_x, fix_y, task):
-    dist_2prev = []
-    dist_2next = []
+    fix_dict = {}
     j = 0
-    dist_in_pix = 4164 # in pixels
+    fix_idx = []
 
     for i in range(df_ev.shape[0]):
-        if 'mario' in task and df_ev['trial_type'][i] != 'gym-retro_game':
-            dist_2prev.append(np.nan)
-            dist_2next.append(np.nan)
+        has_fixation = True
+        if 'mario' in task:
+            if df_ev['trial_type'][i] != 'fixation_dot':
+                has_fixation = False
 
-        else:
+        if has_fixation:
             if 'mario' in task:
-                trial_onset = df_ev['onset'][i]
+                fixation_onset = df_ev['onset'][i]
+                fixation_offset = fixation_onset + df_ev['duration'][i]
+                #trial_offset = fixation_offset
 
             elif task == 'task-emotionvideos':
-                trial_onset = df_ev['onset_video_flip'][i]
+                fixation_onset = df_ev['onset_fixation_flip'][i]
+                fixation_offset = df_ev['onset_video_flip'][i]
+                #trial_offset = fixation_offset + df_ev['total_duration'][i]
 
             elif task in ['task-wordsfamiliarity', 'task-triplets']:
-                trial_onset = df_ev['onset'][i]
+                fixation_onset = df_ev['onset'][i] - 3.0 if i == 0 else df_ev['onset'][i-1] + df_ev['duration'][i-1]
+                fixation_offset = df_ev['onset'][i]
+                #trial_offset = fixation_offset + df_ev['duration'][i]
 
-            while j+1 < len(fix_times) and trial_onset > fix_times[j+1]:
+            # add gaze from pre-trial fixation period
+            trial_fd_x = []
+            trial_fd_y = []
+            while j < len(clean_times) and clean_times[j] < fixation_offset:
+                # + 0.8 = 800ms (0.8s) after trial offset to account for saccade
+                if clean_times[j] > (fixation_onset + 0.8) and clean_times[j] < (fixation_offset - 0.1):
+                    trial_fd_x.append(clean_dist_x[j])
+                    trial_fd_y.append(clean_dist_y[j])
                 j += 1
 
-            if trial_onset > fix_times[j]:
-                curr_x = fix_x[j]*1280
-                curr_y = fix_y[j]*1024
-                if j > 0:
-                    prev_x = fix_x[j-1]*1280
-                    prev_y = fix_y[j-1]*1024
-                    pre_vectors = np.array([[prev_x, prev_y, dist_in_pix], [curr_x, curr_y, dist_in_pix]])
-                    pre_distance = np.rad2deg(np.arccos(1.0 - pdist(pre_vectors, metric='cosine')))[0]
-                    dist_2prev.append(pre_distance)
-                else:
-                    dist_2prev.append(np.nan)
+            if len(trial_fd_x) > 0:
+                fix_dict[i] = {
+                    'med_x': np.median(trial_fd_x),
+                    'med_y': np.median(trial_fd_y),
+                }
+                fix_idx.append(i)
 
-                if j+1 < len(fix_times) and trial_onset < fix_times[j+1]:
-                    post_x = fix_x[j+1]*1280
-                    post_y = fix_y[j+1]*1024
-                    post_vectors = np.array([[curr_x, curr_y, dist_in_pix], [post_x, post_y, dist_in_pix]])
-                    post_distance = np.rad2deg(np.arccos(1.0 - pdist(post_vectors, metric='cosine')))[0]
-                    dist_2next.append(post_distance)
-                else:
-                    dist_2next.append(np.nan)
+    dist_2prev = []
+    dist_2next = []
+    dist_in_pix = 4164 # in pixels
+    k = 0
+    for i in range(df_ev.shape[0]):
+        if i in fix_dict:
+            while k+1 < len(fix_idx) and i < fix_idx[k]:
+                k += 1
+
+            curr_x = fix_dict[i]['med_x']*1280
+            curr_y = fix_dict[i]['med_y']*1024
+            if k > 0:
+                prev_x = fix_dict[fix_idx[k-1]]['med_x']*1280
+                prev_y = fix_dict[fix_idx[k-1]]['med_y']*1024
+                pre_vectors = np.array([[prev_x, prev_y, dist_in_pix], [curr_x, curr_y, dist_in_pix]])
+                pre_distance = np.rad2deg(np.arccos(1.0 - pdist(pre_vectors, metric='cosine')))[0]
+                dist_2prev.append(pre_distance)
             else:
                 dist_2prev.append(np.nan)
+
+            if k+1 < len(fix_idx):
+                post_x = fix_dict[fix_idx[k+1]]['med_x']*1280
+                post_y = fix_dict[fix_idx[k+1]]['med_y']*1024
+                post_vectors = np.array([[curr_x, curr_y, dist_in_pix], [post_x, post_y, dist_in_pix]])
+                post_distance = np.rad2deg(np.arccos(1.0 - pdist(post_vectors, metric='cosine')))[0]
+                dist_2next.append(post_distance)
+            else:
                 dist_2next.append(np.nan)
+
+        else:
+            dist_2prev.append(np.nan)
+            dist_2next.append(np.nan)
 
     df_ev.insert(loc=df_ev.shape[1], column='fix_dist2prev',
                  value=dist_2prev, allow_duplicates=True)
