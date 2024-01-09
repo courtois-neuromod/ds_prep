@@ -8,6 +8,6 @@ OUTDIR="/data/neuromod/projects/eyetracking_bids/${TASK}"
 
 python -m et_prep_step2 \
       --in_path="${DATADIR}" \
-      --run_dir="${RUNDIR}" \
+      --task="${TASK}" \
       --is_final \
       --out_path="${OUTDIR}"

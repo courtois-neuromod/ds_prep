@@ -54,12 +54,12 @@ e.g.,
 Rate the drift correction success for each run based on the graphs generated in step 3.\
 Determine whether drift correction passes or fails.
 
-For failed runs, wadjust drift correction parameters (from the default). In QCed_file_list.tsv, the following parameters can be customized for each run : pupil confidence threshold, polynomial degree in x and y (to fit gaze mapping drift over time), and whether drift should be corrected based on the latest fixation (rather than with a polynomial fitted through the run's fixations).
+For failed runs, adjust drift correction parameters (from the default). In QCed_file_list.tsv, the following parameters can be customized for each run : pupil confidence threshold, and the polynomial degree in x and y (to fit gaze mapping drift over time with a polynomial rather than from the last fixation (retino and floc tasks only)).
 
 Iterate on steps 3 and 4 until a run is well-corrected (Pass_DriftCorr), or until it is considered beyond fixing (Fails_DriftCorr).
 
 Compile a final list of runs to drift-correct and bids-format (in step 5).
-Save this list as "QCed_file_list_final.tsv" in the "out_path/QC_gaze" directory.
+Save this list as "QCed_finalbids_list.tsv" in the "out_path/QC_gaze" directory.
 
 -----------
 
