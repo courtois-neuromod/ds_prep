@@ -11,150 +11,35 @@ import matplotlib.pyplot as plt
 
 import argparse
 
+from utils import get_list, add_file_paths, driftcorr_fromlast, get_onset_time
+from utils import reset_gaze_time, format_gaze
+
+
 def get_arguments():
-    parser = argparse.ArgumentParser(description='clean up, label, QC and bids-formats the triplets eye tracking dataset')
-    parser.add_argument('--in_path', type=str, required=True, help='absolute path to directory that contains all data (sourcedata)')
-    parser.add_argument('--is_final', action='store_true', default=False, help='if true, export drift-corrected gaze into bids format')
-    parser.add_argument('--out_path', type=str, required=True, help='absolute path to output directory')
-    args = parser.parse_args()
+    parser = argparse.ArgumentParser(
+        description='clean up, label, QC and bids-formats the THINGS'
+        'eye-tracking dataset'
+    )
+    parser.add_argument(
+        '--in_path',
+        type=str,
+        required=True,
+        help='absolute path to directory that contains all data (sourcedata)',
+    )
+    parser.add_argument(
+        '--is_final',
+        action='store_true',
+        default=False,
+        help='if true, export drift-corrected gaze into bids format',
+    )
+    parser.add_argument(
+        '--out_path',
+        type=str,
+        required=True,
+        help='absolute path to analysis directory',
+    )
 
-    return args
-
-
-def create_gaze_path(row, file_path):
-    '''
-    for each run, create path to deserialized gaze file
-    '''
-    s = row['subject']
-    ses = row['session']
-    task = row["task"]
-
-    task_root = file_path.split('/')[-1]
-    if task_root == 'mario3':
-        task = 'task-mario3'
-
-    return f'{file_path}/{s}/{ses}/{s}_{ses}_{row["run"]}_{row["file_number"]}_{task}_gaze2D.npz'
-
-
-def create_event_path(row, file_path, log=False):
-    '''
-    for each run, create path to events.tsv file
-    '''
-    s = row['subject']
-    ses = row['session']
-    if log:
-        return f'{file_path}/{s}/{ses}/{s}_{ses}_{row["file_number"]}.log'
-    else:
-        if row['task'] in ['task-bar', 'task-rings', 'task-wedges', 'task-flocdef', 'task-flocalt']:
-            return f'{file_path}/{s}/{ses}/{s}_{ses}_{row["file_number"]}_{row["task"]}_events.tsv'
-        else:
-            return f'{file_path}/{s}/{ses}/{s}_{ses}_{row["file_number"]}_{row["task"]}_{row["run"]}_events.tsv'
-
-
-def create_ip_path(row, file_path):
-    '''
-    for each run, create path to info.player.json file
-    '''
-    s = row['subject']
-    ses = row['session']
-    r = row['run']
-    t = row['task']
-    fnum = row['file_number']
-
-    if row['task'] in ['task-bar', 'task-rings', 'task-wedges', 'task-flocdef', 'task-flocalt']:
-        return f'{file_path}/{s}/{ses}/{s}_{ses}_{fnum}.pupil/{t}/000/info.player.json'
-    else:
-        return f'{file_path}/{s}/{ses}/{s}_{ses}_{fnum}.pupil/{t}_{r}/000/info.player.json'
-
-
-def get_onset_time(log_path, run_num, ip_path, gz_ts):
-    onset_time_dict = {}
-    TTL_0 = -1
-    has_lines = True
-
-    with open(log_path) as f:
-        lines = f.readlines()
-        if len(lines) == 0:
-            has_lines = False
-        for line in lines:
-            if "fMRI TTL 0" in line:
-                TTL_0 = line.split('\t')[0]
-            elif "saved wide-format data to /scratch/neuromod/data" in line:
-                rnum = line.split('\t')[-1].split('_')[-2]
-                onset_time_dict[rnum] = float(TTL_0)
-            elif "class 'src.tasks.videogame.VideoGameMultiLevel'" in line:
-                rnum = line.split(': ')[-2].split('_')[-1]
-                onset_time_dict[rnum] = float(TTL_0)
-            elif "class 'src.tasks.localizers.FLoc'" in line:
-                rnum = run2task_mapping['floc'][line.split(': ')[-2]]
-                onset_time_dict[rnum] = float(TTL_0)
-            elif "class 'src.tasks.retinotopy.Retinotopy'" in line:
-                rnum = run2task_mapping['retino'][line.split(': ')[-2]]
-                onset_time_dict[rnum] = float(TTL_0)
-
-    if has_lines:
-        o_time = onset_time_dict[run_num]
-
-        with open(ip_path, 'r') as f:
-            iplayer = json.load(f)
-        sync_ts = iplayer['start_time_synced_s']
-        syst_ts = iplayer['start_time_system_s']
-
-        is_sync_gz = (gz_ts-sync_ts)**2 < (gz_ts-syst_ts)**2
-        is_sync_ot = (o_time-sync_ts)**2 < (o_time-syst_ts)**2
-        if is_sync_gz != is_sync_ot:
-            if is_sync_ot:
-                o_time += (syst_ts - sync_ts)
-            else:
-                o_time += (sync_ts - syst_ts)
-    else:
-        print('empty log file, onset time estimated from gaze timestamp')
-        o_time = gz_ts
-
-    return o_time
-
-
-def reset_gaze_time(gaze, onset_time, conf_thresh=0.9):
-    '''
-    Realign gaze timestamps based on the task & eyetracker onset (triggered by fMRI run start)
-    Export new list of gaze dictionaries (w task-aligned time stamps) and other metrics needed to perform drift correction
-    '''
-    # all gaze values (unfiltered)
-    reset_gaze_list = []
-    all_x = []
-    all_y = []
-    all_times = []
-    all_conf = []
-
-    # normalized distance (proportion of screen) between above-threshold gaze and fixation point
-    # includes fixation and trial gaze
-    clean_dist_x = []
-    clean_dist_y = []
-    clean_times = []
-    clean_conf = [] # probably not needed since filtered...
-
-    for gz_pt in gaze:
-        timestp = gz_pt['timestamp'] - onset_time
-        # exclude gaze & pupil gathered before task onset
-        if timestp > 0.0:
-            x_norm, y_norm = gz_pt['norm_pos']
-            cfd = gz_pt['confidence']
-
-            all_x.append(x_norm)
-            all_y.append(y_norm)
-            all_times.append(timestp)
-            all_conf.append(cfd)
-
-            gz_pt['reset_time'] = timestp
-            reset_gaze_list.append(gz_pt)
-
-            if cfd > conf_thresh:
-                clean_dist_x.append(x_norm - 0.5)
-                clean_dist_y.append(y_norm - 0.5)
-                clean_conf.append(cfd)
-                clean_times.append(timestp)
-
-    return reset_gaze_list, (all_x, all_y, all_times, all_conf), (clean_dist_x, clean_dist_y, clean_times, clean_conf)
+    return parser.parse_args()
 
 
 def get_single_distance(x1, y1, x2, y2, is_distance=False):
@@ -422,27 +307,6 @@ def add_metrics_2events(df_ev,
     return df_ev, all_distances_raw, all_distances
 
 
-def driftcorr_fromlast(fd_x, fd_y, f_times, all_x, all_y, all_times, previous_image=False):
-    i = 0
-    j = 0
-    all_x_aligned = []
-    all_y_aligned = []
-
-    '''
-    1: re-align from previous isi, current image or current image + isi median position
-    2: re-align from previous image or previous image + isi median position
-    '''
-    gap = 2 if previous_image else 1
-
-    for i in range(len(all_times)):
-        while j < len(f_times)-gap and all_times[i] > f_times[j+gap]:
-            j += 1
-        all_x_aligned.append(all_x[i] - fd_x[j])
-        all_y_aligned.append(all_y[i] - fd_y[j])
-
-    return all_x_aligned, all_y_aligned
-
-
 def get_distances_from_center(x, y, is_distance=False):
     '''
     if is_distance == True:
@@ -486,9 +350,156 @@ def get_isi_distance(metrics_dict, trial_num, num_back, conf_thresh, use_trial=F
     return distance
 
 
-def driftCorr_ETthings(row, out_path, is_final=False):
+def make_THINGS_QC_figure(
+    sub: str,
+    ses: str,
+    run_num: str,
+    fix_metrics: dict,
+    gaze_threshold: float,
+    run_event: pd.DataFrame,
+    clean_times: list,
+    clean_dist_x: list,
+    clean_dist_y: list,
+    fix_times: list,
+    fix_dist_x: list,
+    fix_dist_y: list,
+    all_conf: list,
+    all_times: list,
+    all_x: list,
+    all_x_aligned: list,
+    all_y: list,
+    all_y_aligned: list,
+    all_distInDeg: list,
+    all_distInDeg_aligned: list,
+    out_fig_path: str,
+) -> None:
+    """
+    Export figures to assess drift correction per run
+    """
 
-    task_root = out_path.split('/')[-1]
+    fix_metrics['gz_trial_fixCom'] = []
+    fix_metrics['gz_dist2prev'] = []
+    fix_metrics['fix_gz_conf'] = []
+
+    cutoff = '0.9' if gaze_threshold == 0.9 else '0.75'
+
+    for i in fix_metrics['gz_idx']:
+        fix_metrics['gz_trial_fixCom'].append(run_event['trial_fixation_compliance_ratio_1.0'][i])
+        fix_metrics['fix_gz_conf'].append(run_event[f'fix_gaze_confidence_ratio_{cutoff}'][i])
+        fix_metrics['gz_dist2prev'].append(run_event['median_dist_to_previous_trial_in_deg'][i])
+
+    vals2plot = {
+        'col=fix_confidence': {
+            'values': fix_metrics['fix_gz_conf'],
+            'refs': ['G', 'H', 'I'],
+            'cmap': 'plasma_r',
+        },
+        'col=dist2previous': {
+            'values': fix_metrics['gz_dist2prev'],
+            'refs': ['J', 'K', 'L'],
+            'cmap': 'plasma',
+        },
+        'col=trial_fix_compliance': {
+            'values': fix_metrics['gz_trial_fixCom'],
+            'refs': ['M', 'N', 'O'],
+            'cmap': 'plasma_r',
+        },
+    }
+
+    clean_distInDeg = get_distances_from_center(clean_dist_x, clean_dist_y, is_distance=True)
+    fix_distInDeg = get_distances_from_center(fix_dist_x, fix_dist_y, is_distance=True)
+
+    color_metric = np.array(all_conf)
+    s = color_metric.argsort()
+    time_vals = np.array(all_times)[s]
+    x_vals = np.array(all_x)[s]
+    x_vals_align = np.array(all_x_aligned)[s]
+    y_vals = np.array(all_y)[s]
+    y_vals_align = np.array(all_y_aligned)[s]
+    dist_vals = np.array(all_distInDeg)[s]
+    dist_vals_align = np.array(all_distInDeg_aligned)[s]
+    cm = color_metric[s]
+
+    mosaic = """
+        ABC
+        DEF
+        GHI
+        JKL
+        MNO
+    """
+    fs = (20, 24.0)
+
+    fig = plt.figure(constrained_layout=True, figsize=fs)
+    ax_dict = fig.subplot_mosaic(mosaic)
+    run_dur = int(run_event.iloc[-1]['onset'] + 20)
+
+    ax_dict["A"].scatter(run_event['onset'].to_numpy(), run_event[f'trial_gaze_confidence_ratio_0.9'].to_numpy(), color='xkcd:dark blue', label='> 0.9')
+    ax_dict["A"].scatter(run_event['onset'].to_numpy(), run_event[f'trial_gaze_confidence_ratio_0.75'].to_numpy(), color='xkcd:light green', label='> 0.75')
+    ax_dict["A"].set_ylim(-0.1, 1.1)
+    ax_dict["A"].set_xlim(0, run_dur)
+    ax_dict["A"].legend()
+    ax_dict["A"].set_title(f'{sub} {ses} {run_num} trialwise_confidence')
+
+    ax_dict["B"].scatter(run_event['onset'].to_numpy(), run_event['trial_fixation_compliance_ratio_0.5'].to_numpy(), color='xkcd:navy blue', label='< 0.5 deg')
+    ax_dict["B"].scatter(run_event['onset'].to_numpy(), run_event['trial_fixation_compliance_ratio_1.0'].to_numpy(), color='xkcd:bright green', label='< 1.0 deg')
+    ax_dict["B"].scatter(run_event['onset'].to_numpy(), run_event['trial_fixation_compliance_ratio_2.0'].to_numpy(), color='xkcd:orange', label='< 2.0 deg')
+    ax_dict["B"].set_ylim(-0.1, 1.1)
+    ax_dict["B"].set_xlim(-0.1, run_dur)
+    ax_dict["B"].legend()
+    ax_dict["B"].set_title(f'{sub} {ses} {run_num} trialwise_fixCompliance')
+
+    ax_dict["D"].scatter(time_vals, x_vals, s=10, color='xkcd:light grey', alpha=cm)
+    ax_dict["D"].scatter(time_vals, x_vals_align, c=cm, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
+    ax_dict["D"].set_ylim(-1.5, 2)
+    ax_dict["D"].set_xlim(0, run_dur)
+    ax_dict["D"].set_title(f'{sub} {ses} {run_num} gaze_x')
+
+    ax_dict["E"].scatter(time_vals, y_vals, color='xkcd:light grey', alpha=cm)
+    ax_dict["E"].scatter(time_vals, y_vals_align, c=cm, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
+    ax_dict["E"].set_ylim(-1.5, 2)
+    ax_dict["E"].set_xlim(0, run_dur)
+    ax_dict["E"].set_title(f'{sub} {ses} {run_num} gaze_y')
+
+    ax_dict["F"].scatter(time_vals, dist_vals, color='xkcd:light grey', alpha=cm)
+    ax_dict["F"].scatter(time_vals, dist_vals_align, c=cm, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
+    ax_dict["F"].set_ylim(-0.1, 20)
+    ax_dict["F"].set_xlim(0, run_dur)
+    ax_dict["F"].set_title(f'{sub} {ses} {run_num} dist2center_deg')
+
+    for key in vals2plot:
+        refs = vals2plot[key]['refs']
+        color_metric = vals2plot[key]['values']
+        cmap = vals2plot[key]['cmap']
+
+        ax_dict[refs[0]].scatter(clean_times, clean_dist_x, color='xkcd:light blue', s=20, alpha=0.2)
+        ax_dict[refs[0]].scatter(fix_times, fix_dist_x, c=color_metric, cmap=cmap, s=20, alpha=1.0)
+        ax_dict[refs[0]].set_ylim(-2, 2)
+        ax_dict[refs[0]].set_xlim(0, run_dur)
+        ax_dict[refs[0]].set_title(f'{sub} {ses} {run_num} fix_distance_x {key}')
+
+        ax_dict[refs[1]].scatter(clean_times, clean_dist_y, color='xkcd:light blue', s=20, alpha=0.2)
+        ax_dict[refs[1]].scatter(fix_times, fix_dist_y, c=color_metric, cmap=cmap, s=20, alpha=1.0)
+        lb = np.min(fix_dist_y)-0.1 if np.min(fix_dist_y) < -2 else -2
+        hb = np.max(fix_dist_y)+0.1 if np.max(fix_dist_y) > 2 else 2
+        ax_dict[refs[1]].set_ylim(lb, hb)
+        ax_dict[refs[1]].set_xlim(0, run_dur)
+        ax_dict[refs[1]].set_title(f'{sub} {ses} {run_num} fix_distance_y {key}')
+
+        ax_dict[refs[2]].scatter(clean_times, clean_distInDeg, color='xkcd:light blue', s=20, alpha=0.2)
+        ax_dict[refs[2]].scatter(fix_times, fix_distInDeg, c=color_metric, cmap=cmap, s=20, alpha=1.0)
+        ax_dict[refs[2]].set_ylim(-0.1, 15)
+        ax_dict[refs[2]].set_xlim(0, run_dur)
+        ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} dist2center_deg {key}')
+
+    fig.savefig(out_fig_path)
+    plt.close()
+
+
+def driftCorr_ETthings(
+    row,
+    out_path,
+    is_final=False,
+) -> None:
 
     [sub, ses, fnum, task_type, run_num, appendix] = os.path.basename(row['events_path']).split('_')
     print(sub, ses, fnum, task_type, run_num)
@@ -508,17 +519,26 @@ def driftCorr_ETthings(row, out_path, is_final=False):
             run_event = pd.read_csv(row['events_path'], sep = '\t', header=0)
             run_gaze = np.load(row['gaze_path'], allow_pickle=True)['gaze2d']
 
-            # identifies logged run start time (mri TTL 0) on clock that matches the gaze using info.player.json
+            '''
+            identifies logged run start time (mri TTL 0) on clock that matches
+            the gaze using info.player.json
+            '''
             onset_time = get_onset_time(row['log_path'], row['run'], row['infoplayer_path'], run_gaze[10]['timestamp'])
 
+            '''
+            Realign gaze timestamps with run onset, and filter out
+            below-threshold gaze ("clean")
+            '''
             gaze_threshold = row['pupilConf_thresh'] if not pd.isna(row['pupilConf_thresh']) else 0.9
             reset_gaze_list, all_vals, clean_vals  = reset_gaze_time(run_gaze, onset_time, gaze_threshold)
             # normalized position (x and y), time (s) from onset and confidence for all gaze
             all_x, all_y, all_times, all_conf = all_vals
-            all_times_arr = np.array(all_times)
             # distance from central fixation point for all gaze above confidence threshold
             clean_dist_x, clean_dist_y, clean_times, clean_conf = clean_vals
 
+            """
+            Perform drift correction
+            """
             strategies = {
                 'current_image': ('image', False),
                 'previous_image': ('image', True),
@@ -526,16 +546,6 @@ def driftCorr_ETthings(row, out_path, is_final=False):
                 'current_image+isi': ('image+isi', False),
                 'previous_image+isi': ('image+isi', True),
                 }
-            '''
-            sub_strategy = {
-                'sub-01': strategies['current_image+isi'],
-                'sub-02': strategies['previous_isi'],
-                'sub-03': strategies['current_image'],
-                'sub-06': strategies['previous_isi'],
-                }
-
-            strategy_name = sub_strategy[sub]
-            '''
             #strategy_name = 'current_image+isi'
             strategy_name = 'previous_image+isi'
             strategy = strategies[strategy_name]
@@ -556,45 +566,23 @@ def driftCorr_ETthings(row, out_path, is_final=False):
                                                                                   )
 
             if is_final:
-                # export final events files w metrics on eyetracking & fixation quality per trial
+                """
+                export final events files w metrics on eyetracking &
+                fixation quality per trial
+                """
                 run_event.to_csv(out_file, sep='\t', header=True, index=False)
 
-                # Export drift-corrected gaze, realigned timestamps, and all other metrics (pupils, etc) to bids-compliant .tsv file
-                # guidelines: https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-_eyetrackjson
-                col_names = ['eye_timestamp',
-                             'eye1_x_coordinate', 'eye1_y_coordinate',
-                             'eye1_confidence',
-                             'eye1_x_coordinate_driftCorr', 'eye1_y_coordinate_driftCorr',
-                             'eye1_pupil_x_coordinate', 'eye1_pupil_y_coordinate',
-                             'eye1_pupil_diameter',
-                             'eye1_pupil_ellipse_axes',
-                             'eye1_pupil_ellipse_angle',
-                             'eye1_pupil_ellipse_center'
-                             ]
-
-                final_gaze_list = []
-
-                assert len(reset_gaze_list) == len(all_x_aligned)
-                for i in range(len(reset_gaze_list)):
-                    gaze_pt = reset_gaze_list[i]
-                    assert gaze_pt['reset_time'] == all_times[i]
-
-                    gaze_pt_data = [
-                                    gaze_pt['reset_time'], # in s
-                                    #round(gaze_pt['reset_time']*1000, 0), # int, in ms
-                                    gaze_pt['norm_pos'][0], gaze_pt['norm_pos'][1],
-                                    gaze_pt['confidence'],
-                                    all_x_aligned[i], all_y_aligned[i],
-                                    gaze_pt['base_data']['norm_pos'][0], gaze_pt['base_data']['norm_pos'][1],
-                                    gaze_pt['base_data']['diameter'],
-                                    gaze_pt['base_data']['ellipse']['axes'],
-                                    gaze_pt['base_data']['ellipse']['angle'],
-                                    gaze_pt['base_data']['ellipse']['center'],
-                        ]
-
-                    final_gaze_list.append(gaze_pt_data)
-
-                df_gaze = pd.DataFrame(np.array(final_gaze_list, dtype=object), columns=col_names)
+                """
+                Export drift-corrected gaze, realigned timestamps,
+                and all other metrics (pupils, etc) to bids-compliant .tsv file.
+                Guidelines: https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-_eyetrackjson
+                """
+                df_gaze = format_gaze(
+                    all_x_aligned,
+                    all_y_aligned,
+                    all_times,
+                    reset_gaze_list,
+                )
 
                 bids_out_path = f'{out_path}/final_bids_DriftCor/{sub}/{ses}'
                 Path(bids_out_path).mkdir(parents=True, exist_ok=True)
@@ -606,134 +594,31 @@ def driftCorr_ETthings(row, out_path, is_final=False):
 
             else:
                 '''
-                plot DriftCorr QC figures
+                plot QC figures (one per run) to assess drift correction
                 '''
-                fix_metrics['gz_trial_fixCom'] = []
-                fix_metrics['gz_dist2prev'] = []
-                fix_metrics['fix_gz_conf'] = []
-
-                cutoff = '0.9' if gaze_threshold == 0.9 else '0.75'
-
-                for i in fix_metrics['gz_idx']:
-                    fix_metrics['gz_trial_fixCom'].append(run_event['trial_fixation_compliance_ratio_1.0'][i])
-                    fix_metrics['fix_gz_conf'].append(run_event[f'fix_gaze_confidence_ratio_{cutoff}'][i])
-                    fix_metrics['gz_dist2prev'].append(run_event['median_dist_to_previous_trial_in_deg'][i])
-
-                vals2plot = {
-                    #'col=gz_count': {
-                    #    'values': fix_metrics['gz_count'],
-                    #    'refs': ['G', 'H', 'I'],
-                    #    'cmap': 'plasma_r',
-                    #},
-                    #'col=dist_from_previous': {
-                    #    'values': fix_metrics['gz_dist_2_prev'],
-                    #    'refs': ['J', 'K', 'L'],
-                    #    'cmap': 'plasma',
-                    #},
-                    'col=fix_confidence': {
-                        'values': fix_metrics['fix_gz_conf'],
-                        'refs': ['G', 'H', 'I'],
-                        'cmap': 'plasma_r',
-                    },
-                    'col=dist2previous': {
-                        'values': fix_metrics['gz_dist2prev'],
-                        'refs': ['J', 'K', 'L'],
-                        'cmap': 'plasma',
-                    },
-                    'col=trial_fix_compliance': {
-                        'values': fix_metrics['gz_trial_fixCom'],
-                        'refs': ['M', 'N', 'O'],
-                        'cmap': 'plasma_r',
-                    },
-                }
-
-                clean_distInDeg = get_distances_from_center(clean_dist_x, clean_dist_y, is_distance=True)
-                fix_distInDeg = get_distances_from_center(fix_dist_x, fix_dist_y, is_distance=True)
-
-                color_metric = np.array(all_conf)
-                s = color_metric.argsort()
-                time_vals = np.array(all_times)[s]
-                x_vals = np.array(all_x)[s]
-                x_vals_align = np.array(all_x_aligned)[s]
-                y_vals = np.array(all_y)[s]
-                y_vals_align = np.array(all_y_aligned)[s]
-                dist_vals = np.array(all_distInDeg)[s]
-                dist_vals_align = np.array(all_distInDeg_aligned)[s]
-                cm = color_metric[s]
-
-                mosaic = """
-                    ABC
-                    DEF
-                    GHI
-                    JKL
-                    MNO
-                """
-                fs = (20, 24.0)
-
-                fig = plt.figure(constrained_layout=True, figsize=fs)
-                ax_dict = fig.subplot_mosaic(mosaic)
-                run_dur = int(run_event.iloc[-1]['onset'] + 20)
-
-                ax_dict["A"].scatter(run_event['onset'].to_numpy(), run_event[f'trial_gaze_confidence_ratio_0.9'].to_numpy(), color='xkcd:dark blue', label='> 0.9')
-                ax_dict["A"].scatter(run_event['onset'].to_numpy(), run_event[f'trial_gaze_confidence_ratio_0.75'].to_numpy(), color='xkcd:light green', label='> 0.75')
-                ax_dict["A"].set_ylim(-0.1, 1.1)
-                ax_dict["A"].set_xlim(0, run_dur)
-                ax_dict["A"].legend()
-                ax_dict["A"].set_title(f'{sub} {ses} {run_num} trialwise_confidence')
-
-                ax_dict["B"].scatter(run_event['onset'].to_numpy(), run_event['trial_fixation_compliance_ratio_0.5'].to_numpy(), color='xkcd:navy blue', label='< 0.5 deg')
-                ax_dict["B"].scatter(run_event['onset'].to_numpy(), run_event['trial_fixation_compliance_ratio_1.0'].to_numpy(), color='xkcd:bright green', label='< 1.0 deg')
-                ax_dict["B"].scatter(run_event['onset'].to_numpy(), run_event['trial_fixation_compliance_ratio_2.0'].to_numpy(), color='xkcd:orange', label='< 2.0 deg')
-                ax_dict["B"].set_ylim(-0.1, 1.1)
-                ax_dict["B"].set_xlim(-0.1, run_dur)
-                ax_dict["B"].legend()
-                ax_dict["B"].set_title(f'{sub} {ses} {run_num} trialwise_fixCompliance')
-
-                ax_dict["D"].scatter(time_vals, x_vals, s=10, color='xkcd:light grey', alpha=cm)
-                ax_dict["D"].scatter(time_vals, x_vals_align, c=cm, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
-                ax_dict["D"].set_ylim(-1.5, 2)
-                ax_dict["D"].set_xlim(0, run_dur)
-                ax_dict["D"].set_title(f'{sub} {ses} {run_num} gaze_x')
-
-                ax_dict["E"].scatter(time_vals, y_vals, color='xkcd:light grey', alpha=cm)
-                ax_dict["E"].scatter(time_vals, y_vals_align, c=cm, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
-                ax_dict["E"].set_ylim(-1.5, 2)
-                ax_dict["E"].set_xlim(0, run_dur)
-                ax_dict["E"].set_title(f'{sub} {ses} {run_num} gaze_y')
-
-                ax_dict["F"].scatter(time_vals, dist_vals, color='xkcd:light grey', alpha=cm)
-                ax_dict["F"].scatter(time_vals, dist_vals_align, c=cm, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
-                ax_dict["F"].set_ylim(-0.1, 20)
-                ax_dict["F"].set_xlim(0, run_dur)
-                ax_dict["F"].set_title(f'{sub} {ses} {run_num} dist2center_deg')
-
-                for key in vals2plot:
-                    refs = vals2plot[key]['refs']
-                    color_metric = vals2plot[key]['values']
-                    cmap = vals2plot[key]['cmap']
-
-                    ax_dict[refs[0]].scatter(clean_times, clean_dist_x, color='xkcd:light blue', s=20, alpha=0.2)
-                    ax_dict[refs[0]].scatter(fix_times, fix_dist_x, c=color_metric, cmap=cmap, s=20, alpha=1.0)
-                    ax_dict[refs[0]].set_ylim(-2, 2)
-                    ax_dict[refs[0]].set_xlim(0, run_dur)
-                    ax_dict[refs[0]].set_title(f'{sub} {ses} {run_num} fix_distance_x {key}')
-
-                    ax_dict[refs[1]].scatter(clean_times, clean_dist_y, color='xkcd:light blue', s=20, alpha=0.2)
-                    ax_dict[refs[1]].scatter(fix_times, fix_dist_y, c=color_metric, cmap=cmap, s=20, alpha=1.0)
-                    lb = np.min(fix_dist_y)-0.1 if np.min(fix_dist_y) < -2 else -2
-                    hb = np.max(fix_dist_y)+0.1 if np.max(fix_dist_y) > 2 else 2
-                    ax_dict[refs[1]].set_ylim(lb, hb)
-                    ax_dict[refs[1]].set_xlim(0, run_dur)
-                    ax_dict[refs[1]].set_title(f'{sub} {ses} {run_num} fix_distance_y {key}')
-
-                    ax_dict[refs[2]].scatter(clean_times, clean_distInDeg, color='xkcd:light blue', s=20, alpha=0.2)
-                    ax_dict[refs[2]].scatter(fix_times, fix_distInDeg, c=color_metric, cmap=cmap, s=20, alpha=1.0)
-                    ax_dict[refs[2]].set_ylim(-0.1, 15)
-                    ax_dict[refs[2]].set_xlim(0, run_dur)
-                    ax_dict[refs[2]].set_title(f'{sub} {ses} {run_num} dist2center_deg {key}')
-
-                fig.savefig(out_file)
-                plt.close()
+                make_THINGS_QC_figure(
+                    sub,
+                    ses,
+                    run_num,
+                    fix_metrics,
+                    gaze_threshold,
+                    run_event,
+                    clean_times,
+                    clean_dist_x,
+                    clean_dist_y,
+                    fix_times,
+                    fix_dist_x,
+                    fix_dist_y,
+                    all_conf,
+                    all_times,
+                    all_x,
+                    all_x_aligned,
+                    all_y,
+                    all_y_aligned,
+                    all_distInDeg,
+                    all_distInDeg_aligned,
+                    out_file,
+                )
 
         except:
             print('could not process')
@@ -761,32 +646,15 @@ def main():
     Those output files (events, gaze and figures) needs to be RELABELLED
     MANUALLY to match the rest of the dataset (corrected events files, bold files).
     '''
-
     args = get_arguments()
     # e.g., (elm): /unf/eyetracker/neuromod/triplets/sourcedata
     in_path = args.in_path
     out_path = args.out_path
-
     is_final = args.is_final
 
     # load list of valid files (those deserialized and exported as npz in step 2 that passed QC)
-    outpath_report = os.path.join(out_path, 'QC_gaze')
-    Path(outpath_report).mkdir(parents=True, exist_ok=True)
-
-    if is_final:
-        file_list = pd.read_csv(f'{outpath_report}/QCed_finalbids_list.tsv', sep='\t', header=0)
-    else:
-        file_list = pd.read_csv(f'{outpath_report}/QCed_file_list.tsv', sep='\t', header=0)
-
-    clean_list = file_list[file_list['DO_NOT_USE']!=1.0]
-    if is_final:
-        final_list = clean_list[clean_list['Fails_DriftCorr']!=1.0]
-        clean_list = final_list
-
-    clean_list['gaze_path'] = clean_list.apply(lambda row: create_gaze_path(row, out_path), axis=1)
-    clean_list['events_path'] = clean_list.apply(lambda row: create_event_path(row, in_path), axis=1)
-    clean_list['log_path'] = clean_list.apply(lambda row: create_event_path(row, in_path, log=True), axis=1)
-    clean_list['infoplayer_path'] = clean_list.apply(lambda row: create_ip_path(row, in_path), axis=1)
+    clean_list = get_list(out_path, is_final)
+    clean_list = add_file_paths(clean_list, in_path, out_path, None, 'things')
 
     # implement drift correction on each run
     clean_list.apply(lambda row: driftCorr_ETthings(row, out_path, is_final), axis=1)

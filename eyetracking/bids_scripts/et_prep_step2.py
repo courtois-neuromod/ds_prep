@@ -1,4 +1,5 @@
 import os, glob, sys, json
+
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import pdist
@@ -9,6 +10,11 @@ matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 
 import argparse
+
+from friends_driftCor import driftCorr_ETfriends
+from things_driftCor import driftCorr_ETthings
+from utils import get_list, add_file_paths, driftcorr_fromlast, get_onset_time
+from utils import reset_gaze_time, format_gaze, apply_poly
 
 
 def get_arguments():
@@ -26,8 +32,8 @@ def get_arguments():
         type=str,
         required=True,
         choices=['things', 'emotionsvideos', 'mario3', 'mariostars', 'triplets',
-                 'floc', 'retino'],
-        # not included (no fixation): friends, mario
+                 'floc', 'retino', 'friends'],
+        # not included (no fixation): mario
         help='task to analyse.'
     )
     parser.add_argument(
@@ -40,7 +46,13 @@ def get_arguments():
         '--out_path',
         type=str,
         default='./test.tsv',
-        help='absolute path to output file'
+        help='absolute path to analysis directory'
+    )
+    parser.add_argument(
+        '--mkv_path',
+        type=str,
+        default='.',
+        help='absolute path to stimulus directory (friends task only)'
     )
 
     return parser.parse_args()
@@ -63,145 +75,15 @@ run2task_mapping = {
 }
 
 
-def create_gaze_path(row, file_path):
-    '''
-    for each run, create path to deserialized gaze file
-    '''
-    s = row['subject']
-    ses = row['session']
-    task = row["task"]
-
-    task_root = file_path.split('/')[-1]
-    if task_root == 'mario3':
-        task = 'task-mario3'
-
-    return f'{file_path}/{s}/{ses}/{s}_{ses}_{row["run"]}_{row["file_number"]}_{task}_gaze2D.npz'
-
-
-def create_event_path(row, file_path, log=False):
-    '''
-    for each run, create path to events.tsv file
-    '''
-    s = row['subject']
-    ses = row['session']
-    if log:
-        return f'{file_path}/{s}/{ses}/{s}_{ses}_{row["file_number"]}.log'
-    else:
-        if row['task'] in ['task-bar', 'task-rings', 'task-wedges', 'task-flocdef', 'task-flocalt']:
-            return f'{file_path}/{s}/{ses}/{s}_{ses}_{row["file_number"]}_{row["task"]}_events.tsv'
-        else:
-            return f'{file_path}/{s}/{ses}/{s}_{ses}_{row["file_number"]}_{row["task"]}_{row["run"]}_events.tsv'
-
-
-def create_ip_path(row, file_path):
-    '''
-    for each run, create path to info.player.json file
-    '''
-    s = row['subject']
-    ses = row['session']
-    r = row['run']
-    t = row['task']
-    fnum = row['file_number']
-
-    if row['task'] in ['task-bar', 'task-rings', 'task-wedges', 'task-flocdef', 'task-flocalt']:
-        return f'{file_path}/{s}/{ses}/{s}_{ses}_{fnum}.pupil/{t}/000/info.player.json'
-    else:
-        return f'{file_path}/{s}/{ses}/{s}_{ses}_{fnum}.pupil/{t}_{r}/000/info.player.json'
-
-
-def get_onset_time(log_path, run_num, ip_path, gz_ts):
-    onset_time_dict = {}
-    TTL_0 = -1
-    has_lines = True
-
-    with open(log_path) as f:
-        lines = f.readlines()
-        if len(lines) == 0:
-            has_lines = False
-        for line in lines:
-            if "fMRI TTL 0" in line:
-                TTL_0 = line.split('\t')[0]
-            elif "saved wide-format data to /scratch/neuromod/data" in line:
-                rnum = line.split('\t')[-1].split('_')[-2]
-                onset_time_dict[rnum] = float(TTL_0)
-            elif "class 'src.tasks.videogame.VideoGameMultiLevel'" in line:
-                rnum = line.split(': ')[-2].split('_')[-1]
-                onset_time_dict[rnum] = float(TTL_0)
-            elif "class 'src.tasks.localizers.FLoc'" in line:
-                rnum = run2task_mapping['floc'][line.split(': ')[-2]]
-                onset_time_dict[rnum] = float(TTL_0)
-            elif "class 'src.tasks.retinotopy.Retinotopy'" in line:
-                rnum = run2task_mapping['retino'][line.split(': ')[-2]]
-                onset_time_dict[rnum] = float(TTL_0)
-
-    if has_lines:
-        o_time = onset_time_dict[run_num]
-
-        with open(ip_path, 'r') as f:
-            iplayer = json.load(f)
-        sync_ts = iplayer['start_time_synced_s']
-        syst_ts = iplayer['start_time_system_s']
-
-        is_sync_gz = (gz_ts-sync_ts)**2 < (gz_ts-syst_ts)**2
-        is_sync_ot = (o_time-sync_ts)**2 < (o_time-syst_ts)**2
-        if is_sync_gz != is_sync_ot:
-            if is_sync_ot:
-                o_time += (syst_ts - sync_ts)
-            else:
-                o_time += (sync_ts - syst_ts)
-    else:
-        print('empty log file, onset time estimated from gaze timestamp')
-        o_time = gz_ts
-
-    return o_time
-
-
-def reset_gaze_time(gaze, onset_time, conf_thresh=0.9):
-    '''
-    Realign gaze timestamps based on the task & eyetracker onset
-    (triggered by fMRI run start). Export new list of gaze dictionaries
-    (w task-aligned time stamps) and other metrics needed to perform
-    drift correction
-    '''
-    # all gaze values (unfiltered)
-    reset_gaze_list = []
-    all_x = []
-    all_y = []
-    all_times = []
-    all_conf = []
-
-    # normalized distance (proportion of screen) between above-threshold gaze and fixation point
-    # includes fixation and trial gaze
-    clean_dist_x = []
-    clean_dist_y = []
-    clean_times = []
-    clean_conf = [] # probably not needed since filtered...
-
-    for gz_pt in gaze:
-        timestp = gz_pt['timestamp'] - onset_time
-        # exclude gaze & pupil gathered before task onset
-        if timestp > 0.0:
-            x_norm, y_norm = gz_pt['norm_pos']
-            cfd = gz_pt['confidence']
-
-            all_x.append(x_norm)
-            all_y.append(y_norm)
-            all_times.append(timestp)
-            all_conf.append(cfd)
-
-            gz_pt['reset_time'] = timestp
-            reset_gaze_list.append(gz_pt)
-
-            if cfd > conf_thresh:
-                clean_dist_x.append(x_norm - 0.5)
-                clean_dist_y.append(y_norm - 0.5)
-                clean_conf.append(cfd)
-                clean_times.append(timestp)
-
-    return reset_gaze_list, (all_x, all_y, all_times, all_conf), (clean_dist_x, clean_dist_y, clean_times, clean_conf)
-
-
-def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, task, med_fix=False, gap=0.6):
+def get_fixation_gaze(
+    df_ev: pd.DataFrame,
+    clean_dist_x: list,
+    clean_dist_y: list,
+    clean_times: list,
+    task: str,
+    med_fix: bool=False,
+    gap: float=0.6,
+) -> tuple:
     '''
     Identify gaze that correspond to periods of fixation
     if med_fix, export median gaze position for each fixation
@@ -224,17 +106,14 @@ def get_fixation_gaze(df_ev, clean_dist_x, clean_dist_y, clean_times, task, med_
             if 'mario' in task:
                 fixation_onset = df_ev['onset'][i]
                 fixation_offset = fixation_onset + df_ev['duration'][i]
-                #trial_offset = fixation_offset
 
             elif task == 'task-emotionvideos':
                 fixation_onset = df_ev['onset_fixation_flip'][i]
                 fixation_offset = df_ev['onset_video_flip'][i]
-                #trial_offset = fixation_offset + df_ev['total_duration'][i]
 
             elif task in ['task-wordsfamiliarity', 'task-triplets']:
                 fixation_onset = df_ev['onset'][i] - 3.0 if i == 0 else df_ev['onset'][i-1] + df_ev['duration'][i-1]
                 fixation_offset = df_ev['onset'][i]
-                #trial_offset = fixation_offset + df_ev['duration'][i]
 
             # add gaze from pre-trial fixation period
             trial_fd_x = []
@@ -357,51 +236,117 @@ def get_interfix_dist(df_ev, clean_times, clean_dist_x, clean_dist_y, task):
     return df_ev
 
 
-def driftcorr_fromlast(fd_x, fd_y, f_times, all_x, all_y, all_times):
-    i = 0
-    j = 0
-    all_x_aligned = []
-    all_y_aligned = []
+def poly_driftcorr(
+    row,
+    task_root,
+    clean_dist_x,
+    clean_dist_y,
+    clean_times,
+    all_times,
+    all_x,
+    all_y,
+) -> tuple:
 
-    for i in range(len(all_times)):
-        while j < len(f_times)-1 and all_times[i] > f_times[j+1]:
-            j += 1
-        all_x_aligned.append(all_x[i] - fd_x[j])
-        all_y_aligned.append(all_y[i] - fd_y[j])
+    deg_x = int(row['polyDeg_x']) if not pd.isna(row['polyDeg_x']) else 4
+    deg_y = int(row['polyDeg_y']) if not pd.isna(row['polyDeg_y']) else 4
+    anchors = [0, 1]#[0, 50]
 
-    return all_x_aligned, all_y_aligned
+    # remove 3-9s of gaze data at begining and end for stability
+    otime = 6 if task_root == 'floc' else 3
+    fix_dist_x = clean_dist_x[250*otime:-(250*9)]
+    fix_dist_y = clean_dist_y[250*otime:-(250*9)]
+    fix_times = clean_times[250*otime:-(250*9)]
 
+    # remove fixation points > 0.15 (normalized screen) from polynomial to remove outliers
+    p_of_fix_x = apply_poly(fix_times, fix_dist_x, deg_x, np.array(fix_times), anchors=anchors)
+    p_of_fix_y = apply_poly(fix_times, fix_dist_y, deg_y, np.array(fix_times), anchors=anchors)
 
-def apply_poly(ref_times, distances, degree, all_times, anchors = [150, 150]):
-    '''
-    Fit polynomial to a distribution, then export points along that polynomial curve
-    that correspond to specific gaze time stamps
+    x_filter = np.absolute(np.array(fix_dist_x) - p_of_fix_x) < 0.15
+    y_filter = np.absolute(np.array(fix_dist_y) - p_of_fix_y) < 0.15
+    fix_filter = (x_filter * y_filter).astype(bool)
 
-    The very begining and end of distribution are excluded for stability
-    e.g., participants sometimes look off screen at movie onset & offset,
-    while deepgaze is biased to the center when shown a black screen.
-    This really throws off polynomials
-    '''
-    if degree == 1:
-        p1, p0 = np.polyfit(ref_times[anchors[0]:-anchors[1]], distances[anchors[0]:-anchors[1]], 1)
-        p_of_all = p1*(all_times) + p0
+    fix_dist_x = fix_dist_x[fix_filter]
+    fix_dist_y = fix_dist_y[fix_filter]
+    fix_times = fix_times[fix_filter]
 
-    elif degree == 2:
-        p2, p1, p0 = np.polyfit(ref_times[anchors[0]:-anchors[1]], distances[anchors[0]:-anchors[1]], 2)
-        p_of_all = p2*(all_times**2) + p1*(all_times) + p0
+    # fit polynomial through distance between fixation and target
+    # use poly curve to apply correction to all gaze (no confidence threshold applied)
+    p_of_all_x = apply_poly(fix_times, fix_dist_x, deg_x, np.array(all_times), anchors=anchors)
+    all_x_aligned = np.array(all_x) - (p_of_all_x)
 
-    elif degree == 3:
-        p3, p2, p1, p0 = np.polyfit(ref_times[anchors[0]:-anchors[1]], distances[anchors[0]:-anchors[1]], 3)
-        p_of_all = p3*(all_times**3) + p2*(all_times**2) + p1*(all_times) + p0
+    p_of_all_y = apply_poly(fix_times, fix_dist_y, deg_y, np.array(all_times), anchors=anchors)
+    all_y_aligned = np.array(all_y) - (p_of_all_y)
 
-    elif degree == 4:
-        p4, p3, p2, p1, p0 = np.polyfit(ref_times[anchors[0]:-anchors[1]], distances[anchors[0]:-anchors[1]], 4)
-        p_of_all = p4*(all_times**4) + p3*(all_times**3) + p2*(all_times**2) + p1*(all_times) + p0
-
-    return p_of_all
+    return (fix_dist_x, fix_dist_y, fix_times, all_x_aligned, all_y_aligned)
 
 
-def driftCorr_EToutput(row, out_path, is_final=False):
+def make_QC_figure(
+    sub: str,
+    ses: str,
+    task: str,
+    run_num: str,
+    run_event: pd.DataFrame,
+    clean_times: list,
+    clean_dist_x: list,
+    clean_dist_y: list,
+    fix_times: list,
+    fix_dist_x: list,
+    fix_dist_y: list,
+    all_times: list,
+    all_x: list,
+    all_x_aligned: list,
+    all_y: list,
+    all_y_aligned: list,
+    out_fig_path,
+) -> None:
+    """
+    Export figures to assess drift correction per run
+    """
+    mosaic = """
+        AB
+        CD
+    """
+    fs = (15, 7.0)
+
+    fig = plt.figure(constrained_layout=True, figsize=fs)
+    ax_dict = fig.subplot_mosaic(mosaic)
+    run_dur = int(run_event.iloc[-1]['onset'] + 20)
+
+    ax_dict["A"].scatter(all_times, all_x, s=10, color='xkcd:light grey', alpha=all_conf)
+    ax_dict["A"].scatter(all_times, all_x_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)
+    ax_dict["A"].set_ylim(-2, 2)
+    ax_dict["A"].set_xlim(0, run_dur)
+    ax_dict["A"].set_title(f'{sub} {task} {ses} {run_num} gaze_x')
+
+    ax_dict["B"].scatter(all_times, all_y, color='xkcd:light grey', alpha=all_conf)
+    ax_dict["B"].scatter(all_times, all_y_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)
+    ax_dict["B"].set_ylim(-2, 2)
+    ax_dict["B"].set_xlim(0, run_dur)
+    ax_dict["B"].set_title(f'{sub} {task} {ses} {run_num} gaze_y')
+
+    ax_dict["C"].scatter(clean_times, clean_dist_x, color='xkcd:light blue', s=20, alpha=0.2)
+    ax_dict["C"].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=1.0)
+    ax_dict["C"].set_ylim(-2, 2)
+    ax_dict["C"].set_xlim(0, run_dur)
+    ax_dict["C"].set_title(f'{sub} {task} {ses} {run_num} fix_distance_x')
+
+    ax_dict["D"].scatter(clean_times, clean_dist_y, color='xkcd:light blue', s=20, alpha=0.2)
+    ax_dict["D"].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=1.0)
+    lb = np.min(fix_dist_y)-0.1 if np.min(fix_dist_y) < -2 else -2
+    hb = np.max(fix_dist_y)+0.1 if np.max(fix_dist_y) > 2 else 2
+    ax_dict["D"].set_ylim(lb, hb)
+    ax_dict["D"].set_xlim(0, run_dur)
+    ax_dict["D"].set_title(f'{sub} {task} {ses} {run_num} fix_distance_y')
+
+    fig.savefig(out_fig_path)
+    plt.close()
+
+
+def driftCorr_EToutput(
+    row,
+    out_path,
+    is_final=False,
+) -> None:
 
     task_root = out_path.split('/')[-1]
 
@@ -446,14 +391,20 @@ def driftCorr_EToutput(row, out_path, is_final=False):
                 run_gaze[10]['timestamp'],
             )
 
+            '''
+            Realign gaze timestamps with run onset, and filter out
+            below-threshold gaze ("clean")
+            '''
             gaze_threshold = row['pupilConf_thresh'] if not pd.isna(row['pupilConf_thresh']) else 0.9
             reset_gaze_list, all_vals, clean_vals  = reset_gaze_time(run_gaze, onset_time, gaze_threshold)
             # normalized position (x and y), time (s) from onset and confidence for all gaze
             all_x, all_y, all_times, all_conf = all_vals
-            all_times_arr = np.array(all_times)
             # distance from central fixation point for all gaze above confidence threshold
             clean_dist_x, clean_dist_y, clean_times, clean_conf = clean_vals
 
+            """
+            Perform drift correction
+            """
             if task_root in ['retino', 'floc']:
                 """
                 Use polynomial to drift correct, since no discrete periods of
@@ -463,36 +414,22 @@ def driftCorr_EToutput(row, out_path, is_final=False):
                 adjusted for each run (range [1-4]) by specifying them in
                 'polyDeg_x' and 'polyDeg_y' columns.
                 """
-                deg_x = int(row['polyDeg_x']) if not pd.isna(row['polyDeg_x']) else 4
-                deg_y = int(row['polyDeg_y']) if not pd.isna(row['polyDeg_y']) else 4
-                anchors = [0, 1]#[0, 50]
-
-                # remove 3-9s of gaze data at begining and end for stability
-                otime = 6 if task_root == 'floc' else 3
-                fix_dist_x = clean_dist_x[250*otime:-(250*9)]
-                fix_dist_y = clean_dist_y[250*otime:-(250*9)]
-                fix_times = clean_times[250*otime:-(250*9)]
-
-                # remove fixation points > 0.15 (normalized screen) from polynomial to remove outliers
-                p_of_fix_x = apply_poly(fix_times, fix_dist_x, deg_x, np.array(fix_times), anchors=anchors)
-                p_of_fix_y = apply_poly(fix_times, fix_dist_y, deg_y, np.array(fix_times), anchors=anchors)
-
-                x_filter = np.absolute(np.array(fix_dist_x) - p_of_fix_x) < 0.15
-                y_filter = np.absolute(np.array(fix_dist_y) - p_of_fix_y) < 0.15
-                fix_filter = (x_filter * y_filter).astype(bool)
-
-                fix_dist_x = fix_dist_x[fix_filter]
-                fix_dist_y = fix_dist_y[fix_filter]
-                fix_times = fix_times[fix_filter]
-
-                # fit polynomial through distance between fixation and target
-                # use poly curve to apply correction to all gaze (no confidence threshold applied)
-                p_of_all_x = apply_poly(fix_times, fix_dist_x, deg_x, all_times_arr, anchors=anchors)
-                all_x_aligned = np.array(all_x) - (p_of_all_x)
-
-                p_of_all_y = apply_poly(fix_times, fix_dist_y, deg_y, all_times_arr, anchors=anchors)
-                all_y_aligned = np.array(all_y) - (p_of_all_y)
-
+                (
+                    fix_dist_x,
+                    fix_dist_y,
+                    fix_times,
+                    all_x_aligned,
+                    all_y_aligned,
+                ) = poly_driftcorr(
+                    row,
+                    task_root,
+                    clean_dist_x,
+                    clean_dist_y,
+                    clean_times,
+                    all_times,
+                    all_x,
+                    all_y,
+                )
             else:
                 '''
                 Use median gaze from latest point of central fixation to
@@ -516,50 +453,26 @@ def driftCorr_EToutput(row, out_path, is_final=False):
                     all_times,
                 )
 
-            if task_root not in ['retino', 'floc']:
-                run_event = get_interfix_dist(run_event, clean_times, clean_dist_x, clean_dist_y, pseudo_task)
-
             if is_final:
+                """
+                export final events files w added metrics on eyetracking &
+                fixation quality per trial
+                """
                 if task_root not in ['retino', 'floc']:
-                    # export final events files w metrics on proportion of high confidence pupils per trial
+                    run_event = get_interfix_dist(run_event, clean_times, clean_dist_x, clean_dist_y, pseudo_task)
                     run_event.to_csv(out_file, sep='\t', header=True, index=False)
 
-                # Export drift-corrected gaze, realigned timestamps, and all other metrics (pupils, etc) to bids-compliant .tsv file
-                # guidelines: https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-_eyetrackjson
-                col_names = ['eye_timestamp',
-                             'eye1_x_coordinate', 'eye1_y_coordinate',
-                             'eye1_confidence',
-                             'eye1_x_coordinate_driftCorr', 'eye1_y_coordinate_driftCorr',
-                             'eye1_pupil_x_coordinate', 'eye1_pupil_y_coordinate',
-                             'eye1_pupil_diameter',
-                             'eye1_pupil_ellipse_axes',
-                             'eye1_pupil_ellipse_angle',
-                             'eye1_pupil_ellipse_center'
-                             ]
-
-                final_gaze_list = []
-
-                assert len(reset_gaze_list) == len(all_x_aligned)
-                for i in range(len(reset_gaze_list)):
-                    gaze_pt = reset_gaze_list[i]
-                    assert gaze_pt['reset_time'] == all_times[i]
-
-                    gaze_pt_data = [
-                                    gaze_pt['reset_time'], # in s
-                                    #round(gaze_pt['reset_time']*1000, 0), # int, in ms
-                                    gaze_pt['norm_pos'][0], gaze_pt['norm_pos'][1],
-                                    gaze_pt['confidence'],
-                                    all_x_aligned[i], all_y_aligned[i],
-                                    gaze_pt['base_data']['norm_pos'][0], gaze_pt['base_data']['norm_pos'][1],
-                                    gaze_pt['base_data']['diameter'],
-                                    gaze_pt['base_data']['ellipse']['axes'],
-                                    gaze_pt['base_data']['ellipse']['angle'],
-                                    gaze_pt['base_data']['ellipse']['center'],
-                    ]
-
-                    final_gaze_list.append(gaze_pt_data)
-
-                df_gaze = pd.DataFrame(np.array(final_gaze_list, dtype=object), columns=col_names)
+                """
+                Export drift-corrected gaze, realigned timestamps,
+                and all other metrics (pupils, etc) to bids-compliant .tsv file.
+                Guidelines: https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-_eyetrackjson
+                """
+                df_gaze = format_gaze(
+                    all_x_aligned,
+                    all_y_aligned,
+                    all_times,
+                    reset_gaze_list,
+                )
 
                 bids_out_path = f'{out_path}/final_bids_DriftCor/{sub}/{ses}'
                 Path(bids_out_path).mkdir(parents=True, exist_ok=True)
@@ -570,54 +483,39 @@ def driftCorr_EToutput(row, out_path, is_final=False):
                 df_gaze.to_csv(gfile_path, sep='\t', header=True, index=False, compression='gzip')
 
             else:
-                # export plots to visulize the gaze drift correction for last round of QC
-                mosaic = """
-                    AB
-                    CD
-                """
-                fs = (15, 7.0)
+                '''
+                plot QC figures (one per run) to assess drift correction
+                '''
+                make_QC_figure(
+                    sub,
+                    ses,
+                    pseudo_task,
+                    run_num,
+                    run_event,
+                    clean_times,
+                    clean_dist_x,
+                    clean_dist_y,
+                    fix_times,
+                    fix_dist_x,
+                    fix_dist_y,
+                    all_times,
+                    all_x,
+                    all_x_aligned,
+                    all_y,
+                    all_y_aligned,
+                    out_file,
+                )
 
-                fig = plt.figure(constrained_layout=True, figsize=fs)
-                ax_dict = fig.subplot_mosaic(mosaic)
-                run_dur = int(run_event.iloc[-1]['onset'] + 20)
-
-                ax_dict["A"].scatter(all_times, all_x, s=10, color='xkcd:light grey', alpha=all_conf)
-                ax_dict["A"].scatter(all_times, all_x_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
-                ax_dict["A"].set_ylim(-2, 2)
-                ax_dict["A"].set_xlim(0, run_dur)
-                ax_dict["A"].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_x')
-
-                ax_dict["B"].scatter(all_times, all_y, color='xkcd:light grey', alpha=all_conf)
-                ax_dict["B"].scatter(all_times, all_y_aligned, c=all_conf, s=10, cmap='terrain_r', alpha=0.2)#'xkcd:orange', alpha=all_conf)
-                ax_dict["B"].set_ylim(-2, 2)
-                ax_dict["B"].set_xlim(0, run_dur)
-                ax_dict["B"].set_title(f'{sub} {pseudo_task} {ses} {run_num} gaze_y')
-
-                ax_dict["C"].scatter(clean_times, clean_dist_x, color='xkcd:light blue', s=20, alpha=0.2)
-                ax_dict["C"].scatter(fix_times, fix_dist_x, color='xkcd:orange', s=20, alpha=1.0)
-                ax_dict["C"].set_ylim(-2, 2)
-                ax_dict["C"].set_xlim(0, run_dur)
-                ax_dict["C"].set_title(f'{sub} {pseudo_task} {ses} {run_num} fix_distance_x')
-
-                ax_dict["D"].scatter(clean_times, clean_dist_y, color='xkcd:light blue', s=20, alpha=0.2)
-                ax_dict["D"].scatter(fix_times, fix_dist_y, color='xkcd:orange', s=20, alpha=1.0)
-                lb = np.min(fix_dist_y)-0.1 if np.min(fix_dist_y) < -2 else -2
-                hb = np.max(fix_dist_y)+0.1 if np.max(fix_dist_y) > 2 else 2
-                ax_dict["D"].set_ylim(lb, hb)
-                ax_dict["D"].set_xlim(0, run_dur)
-                ax_dict["D"].set_title(f'{sub} {pseudo_task} {ses} {run_num} fix_distance_y')
-
-                fig.savefig(out_file)
-                plt.close()
         except:
             print('could not process')
 
 
 def main():
     '''
-    This script applies drift correction to gaze based on known periods of
-    fixation. The default approach is to realign trialwise gaze with the median
-    gaze position during the central fixation period that precedes each trial.
+    This script applies drift correction to gaze. For most tasks, it corrects
+    drift based on known periods of fixation. The default approach is to realign
+    gaze with the median gaze position during the central fixation period that
+    precedes each trial.
 
     For each run, the pupil confidence threshold for gaze included in the drift
     correction can be adjusted.
@@ -636,30 +534,24 @@ def main():
     # e.g., (elm): /unf/eyetracker/neuromod/triplets/sourcedata
     in_path = args.in_path
     out_path = args.out_path
+    mkv_path = args.mkv_path if args.task == 'friends' else None
     is_final = args.is_final
 
     # load list of valid files (those deserialized and exported as npz in step 2 that passed QC)
-    outpath_report = os.path.join(out_path, 'QC_gaze')
-    Path(outpath_report).mkdir(parents=True, exist_ok=True)
-
-    if is_final:
-        file_list = pd.read_csv(f'{outpath_report}/QCed_finalbids_list.tsv', sep='\t', header=0)
-    else:
-        file_list = pd.read_csv(f'{outpath_report}/QCed_file_list.tsv', sep='\t', header=0)
-
-    clean_list = file_list[file_list['DO_NOT_USE']!=1.0]
-    if is_final:
-        final_list = clean_list[clean_list['Fails_DriftCorr']!=1.0]
-        clean_list = final_list
-    clean_list['gaze_path'] = clean_list.apply(lambda row: create_gaze_path(row, out_path), axis=1)
-    clean_list['events_path'] = clean_list.apply(lambda row: create_event_path(row, in_path), axis=1)
-    clean_list['log_path'] = clean_list.apply(lambda row: create_event_path(row, in_path, log=True), axis=1)
-    clean_list['infoplayer_path'] = clean_list.apply(lambda row: create_ip_path(row, in_path), axis=1)
+    clean_list = get_list(out_path, is_final)
+    clean_list = add_file_paths(
+        clean_list,
+        in_path,
+        out_path,
+        mkv_path,
+        args.task,
+    )
 
     # implement drift correction on each run
     if args.task == 'things':
-        from things_driftCor import driftCorr_ET
         clean_list.apply(lambda row: driftCorr_ETthings(row, out_path, is_final), axis=1)
+    elif args.task == 'friends':
+        clean_list.apply(lambda row: driftCorr_ETfriends(row, out_path, is_final), axis=1)
     else:
         clean_list.apply(lambda row: driftCorr_EToutput(row, out_path, is_final), axis=1)
 
