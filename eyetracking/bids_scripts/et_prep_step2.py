@@ -551,7 +551,7 @@ def main():
     if args.task == 'things':
         clean_list.apply(lambda row: driftCorr_ETthings(row, out_path, is_final), axis=1)
     elif args.task == 'friends':
-        clean_list.apply(lambda row: driftCorr_ETfriends(row, out_path, is_final), axis=1)
+        clean_list.apply(lambda row: driftCorr_ETfriends(row, out_path, False, is_final), axis=1)
     else:
         clean_list.apply(lambda row: driftCorr_EToutput(row, out_path, is_final), axis=1)
 

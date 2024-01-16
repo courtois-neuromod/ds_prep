@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 
 import argparse
 
-from utils import get_list, add_file_paths, apply_poly, reset_gaze_time, format_gaze
+from utils import get_list, add_file_paths, apply_poly, apply_gaussian
+from utils import reset_gaze_time, format_gaze
 
 
 def get_arguments():
@@ -30,6 +31,14 @@ def get_arguments():
         action='store_true',
         default=False,
         help='if true, export drift-corrected gaze into bids format',
+    )
+    parser.add_argument(
+        '--use_poly',
+        action='store_true',
+        default=False,
+        help="if true, use a polynomial to fit the distance between the"
+        "measured gaze and DeepGaze's estimate to model drift, else use a"
+        "gaussian filter within a sliding window (default).",
     )
     parser.add_argument(
         '--out_path',
@@ -235,9 +244,9 @@ def make_Friends_QC_figure(
     dist_y: list,
     all_times: list,
     all_x: list,
-    all_x_aligned: list,
+    all_x_aligned: np.array,
     all_y: list,
-    all_y_aligned: list,
+    all_y_aligned: np.array,
     all_conf: list,
     out_fig_path: str,
 ) -> None:
@@ -250,6 +259,7 @@ def make_Friends_QC_figure(
         EF
         GH
         IJ
+        KL
     """
     fs = (15, 24.0)
 
@@ -276,7 +286,7 @@ def make_Friends_QC_figure(
     for deg, idx in zip([1, 2, 3, 4], ["CD", "EF", "GH", "IJ"]):
         x_col = "xkcd:red" if deg == deg_x else "xkcd:black"
         p_x = apply_poly(frame_times, dist_x, deg, np.array(clean_times), anchors=[150, 150])
-        ax_dict[idx[0]].scatter(frame_times, dist_x, s=10, alpha=0.4, color="xkcd:baby blue")
+        ax_dict[idx[0]].scatter(frame_times, dist_x, s=10, alpha=0.4, color="xkcd:light blue")
         ax_dict[idx[0]].plot(np.array(clean_times), p_x, color=x_col, linewidth=3)
         ax_dict[idx[0]].set_ylim(-2, 2)
         ax_dict[idx[0]].set_xlim(0, run_dur)
@@ -284,11 +294,25 @@ def make_Friends_QC_figure(
 
         y_col = "xkcd:red" if deg == deg_y else "xkcd:black"
         p_y = apply_poly(frame_times, dist_y, deg, np.array(clean_times), anchors=[150, 150])
-        ax_dict[idx[1]].scatter(frame_times, dist_y, s=10, alpha=0.4, color="xkcd:baby blue")
+        ax_dict[idx[1]].scatter(frame_times, dist_y, s=10, alpha=0.4, color="xkcd:light blue")
         ax_dict[idx[1]].plot(np.array(clean_times), p_y, color=y_col, linewidth=3)
         ax_dict[idx[1]].set_ylim(-2, 2)
         ax_dict[idx[1]].set_xlim(0, run_dur)
         ax_dict[idx[1]].set_title(f'{sub} {ses} {run_num} dist_y {deg}-deg')
+
+    f_x = apply_gaussian(frame_times, dist_x, np.array(clean_times), rollwin_dur=15.0, fps=20.0, anchors=[20, 20])
+    ax_dict["K"].scatter(frame_times, dist_x, s=10, alpha=0.4, color="xkcd:light blue")
+    ax_dict["K"].plot(np.array(clean_times), f_x, color="xkcd:green", linewidth=3)
+    ax_dict["K"].set_ylim(-2, 2)
+    ax_dict["K"].set_xlim(0, run_dur)
+    ax_dict["K"].set_title(f'{sub} {ses} {run_num} dist_x gaussian')
+
+    f_y = apply_gaussian(frame_times, dist_y, np.array(clean_times), rollwin_dur=15.0, fps=20.0, anchors=[20, 20])
+    ax_dict["L"].scatter(frame_times, dist_y, s=10, alpha=0.4, color="xkcd:light blue")
+    ax_dict["L"].plot(np.array(clean_times), f_y, color="xkcd:green", linewidth=3)
+    ax_dict["L"].set_ylim(-2, 2)
+    ax_dict["L"].set_xlim(0, run_dur)
+    ax_dict["L"].set_title(f'{sub} {ses} {run_num} dist_y gaussian')
 
     fig.savefig(out_fig_path)
     plt.close()
@@ -297,6 +321,7 @@ def make_Friends_QC_figure(
 def driftCorr_ETfriends(
     row,
     out_path,
+    use_poly=False,
     is_final=False,
 ) -> None:
     sub = row["subject"]
@@ -389,35 +414,67 @@ def driftCorr_ETfriends(
             )
 
             """
-            Apply drift correction by drawing a polynomial through the distance
-            between the measured gaze and the gaze estimated by DeepGaze
-
-            Default degree is 4 in x and in y. Each can be adjusted for
-            each run (range [1-4]) by specifying them in the 'polyDeg_x'
-            and 'polyDeg_y' columns.
+            Apply drift correction.
             """
             deg_x = int(row['polyDeg_x']) if not pd.isna(row['polyDeg_x']) else 4
             deg_y = int(row['polyDeg_y']) if not pd.isna(row['polyDeg_y']) else 4
-            anchors = [150, 150]
 
-            # correct all x gaze
-            p_of_all_x = apply_poly(
-                frame_times,
-                dist_x,
-                deg_x,
-                np.array(all_times),
-                anchors=anchors,
-            )
-            all_x_aligned = np.array(all_x) - (p_of_all_x)
+            if use_poly:
+                """
+                Implement polynomial correction by drawing a polynomial through
+                the distance between the measured gaze and the gaze estimated
+                by DeepGaze.
 
-            # correct all y gaze
-            p_of_all_y = apply_poly(
-                frame_times,
-                dist_y, deg_y,
-                np.array(all_times),
-                anchors=anchors,
-            )
-            all_y_aligned = np.array(all_y) - (p_of_all_y)
+                Default degree is 4 in x and in y. Each can be adjusted for
+                each run (range [1-4]) by specifying them in the 'polyDeg_x'
+                and 'polyDeg_y' columns.
+                """
+                anchors = [150, 150]
+                # correct all x gaze
+                p_of_all_x = apply_poly(
+                    frame_times,
+                    dist_x,
+                    deg_x,
+                    np.array(all_times),
+                    anchors=anchors,
+                )
+                all_x_aligned = np.array(all_x) - (p_of_all_x)
+
+                # correct all y gaze
+                p_of_all_y = apply_poly(
+                    frame_times,
+                    dist_y, deg_y,
+                    np.array(all_times),
+                    anchors=anchors,
+                )
+                all_y_aligned = np.array(all_y) - (p_of_all_y)
+
+            else:
+                """
+                Apply gaussian filter correction to distances between the measured
+                gaze and the gaze estimated by DeepGaze: better fit than polynomial.
+                """
+                # correct all x gaze
+                f_of_all_x = apply_gaussian(
+                    frame_times,
+                    dist_x,
+                    np.array(all_times),
+                    rollwin_dur=15.0, # 15 seconds windows
+                    fps=20.0,
+                    anchors=[20, 20],
+                )
+                all_x_aligned = np.array(all_x) - (f_of_all_x)
+
+                # correct all y gaze
+                f_of_all_y = apply_gaussian(
+                    frame_times,
+                    dist_y,
+                    np.array(all_times),
+                    rollwin_dur=15.0, # 15 seconds windows
+                    fps=20.0,
+                    anchors=[20, 20],
+                )
+                all_y_aligned = np.array(all_y) - (f_of_all_y)
 
             if is_final:
                 df_gaze = format_gaze(
@@ -437,8 +494,8 @@ def driftCorr_ETfriends(
 
             else:
                 '''
-                plot QC figures (one per run) to determine choice of polynomial
-                degrees in x and y and assess drift correction
+                plot QC figures (one per run) to assess drift correction and
+                select correction strategy
                 '''
                 make_Friends_QC_figure(
                     sub,
@@ -474,6 +531,7 @@ def main():
     out_path = args.out_path
     mkv_path = args.mkv_path
     #mkv_path = "/data/neuromod/DATA/cneuromod/friends/stimuli/s1/friends_s01e13a.mkv"
+    use_poly = args.use_poly
     is_final = args.is_final
 
     # load list of valid files (those deserialized and exported as npz in step 2 that passed QC)
@@ -481,7 +539,12 @@ def main():
     clean_list = add_file_paths(clean_list, in_path, out_path, mkv_path, 'friends')
 
     # implement drift correction on each run
-    clean_list.apply(lambda row: driftCorr_ETfriends(row, out_path, is_final), axis=1)
+    clean_list.apply(lambda row: driftCorr_ETfriends(
+        row,
+        out_path,
+        use_poly,
+        is_final,
+    ), axis=1)
 
 
 if __name__ == '__main__':

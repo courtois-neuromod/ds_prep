@@ -1,7 +1,9 @@
 import json
+import copy
 import numpy as np
 import pandas as pd
-
+import scipy
+from scipy import interpolate
 
 def get_list(
     out_path: str,
@@ -254,6 +256,40 @@ def apply_poly(
         p_of_all = p4*(all_times**4) + p3*(all_times**3) + p2*(all_times**2) + p1*(all_times) + p0
 
     return p_of_all
+
+
+def apply_gaussian(
+    ref_times: list,
+    distances: list,
+    all_times: np.array,
+    rollwin_dur: float = 15.0,
+    fps: float = 250.0,
+    anchors: list = [150, 150],
+) -> np.array:
+
+    roll_win = int(fps*rollwin_dur)
+
+    dist = distances[anchors[0]:-anchors[1]]
+    median_line = pd.Series(dist).rolling(roll_win).median()
+    under_line = pd.Series(dist).rolling(roll_win).quantile(0.25)
+    over_line = pd.Series(dist).rolling(roll_win).quantile(0.75)
+
+    median_line[:roll_win-1] = np.median(dist[:roll_win])
+    under_line[:roll_win-1] = np.quantile(dist[:roll_win], 0.25)
+    over_line[:roll_win-1] = np.quantile(dist[:roll_win], 0.75)
+
+    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.gaussian_filter.html
+    sig_val = int(fps*20)
+    median_gauss = scipy.ndimage.gaussian_filter(copy.deepcopy(median_line), sigma=sig_val, mode='nearest', truncate=1.0)
+    under_gauss = scipy.ndimage.gaussian_filter(copy.deepcopy(under_line), sigma=sig_val, mode='nearest', truncate=1.0)
+    over_gauss = scipy.ndimage.gaussian_filter(copy.deepcopy(over_line), sigma=sig_val, mode='nearest', truncate=1.0)
+    avg_smooth = (median_gauss + under_gauss + over_gauss)/3
+
+    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.interp1d.html
+    f = interpolate.interp1d(ref_times[anchors[0]:-anchors[1]], avg_smooth, bounds_error=False, fill_value="extrapolate", assume_sorted=True)
+    f_of_all = f(all_times)
+
+    return f_of_all
 
 
 def driftcorr_fromlast(
