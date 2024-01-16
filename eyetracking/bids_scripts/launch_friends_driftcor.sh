@@ -1,6 +1,6 @@
 
 #source /data/neuromod/virtualenvs/eyetracking/bin/activate
-source /home/mariestl/my_envs/things_venv/bin/activate
+source /data/neuromod/virtualenvs/eyetracking/bin/activate
 # run on elm...
 DATADIR="/unf/eyetracker/neuromod/friends/sourcedata"
 OUTDIR="/data/neuromod/projects/eyetracking_bids/friends"
