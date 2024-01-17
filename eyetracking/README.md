@@ -68,9 +68,10 @@ Save this list as "QCed_finalbids_list.tsv" in the "out_path/QC_gaze" directory.
 Script: eyetracking/bids_scripts/et_prep_step2.py
 
 The script
-- performs drift correction on runs of gaze data according to parameters specified in QCed_file_list.tsv
+- performs drift correction on runs of gaze data according to parameters specified in QCed_finalbids_list.tsv
 - exports eyetracking data in bids-compliant format (.tsv.gz), according to the following proposed bids extension guidelines:
 https://bids-specification--1128.org.readthedocs.build/en/1128/modality-specific-files/eye-tracking.html#sidecar-json-document-eyetrackjson
+- exports *events.tsv files with added trialwise metrics of fixation compliance for datasets with known periods of fixation
 
 To lauch on elm, just specify the name of the dataset directory under /unf/eyetracker dataset\
 e.g.,
