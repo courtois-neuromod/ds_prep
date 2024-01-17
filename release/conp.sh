@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # open tunnel to conp sftp server
-ssh -fN -L  4722:sftp-conp.acelab.ca:4722 bpinsard@login.acelab.ca
+ssh -fN -L  4722:sftp.conp.ca:6806 bpinsard@login.acelab.ca
 
 # create ssh remotes recursively
 datalad create-sibling-ria --existing skip  -r -R 2 -s conp-ria ria+ssh://cneuromod@localhost:4722/data/proftpd/users/cneuromod/ria-conp --shared 0644
