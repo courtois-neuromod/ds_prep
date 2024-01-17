@@ -101,28 +101,38 @@ def single_session_job(input_file, output_datalad, ria_storage_remote, b0_field_
             ds.drop('./.heudiconv/', reckless='kill', recursive=True)
             ds.drop('.', recursive=True)
         print(f"processed {input_file}")
-        return True
     except Exception as e:
         print(f"An error occur processing {input_file}")
         print(e)
         import traceback
         print(traceback.format_exc())
-        return False
+        return traceback.format_exc()
 
-def fix_fmap_phase(ds):
+def fix_fmap_phase(ds, commit=None):
     #### fix fmap phase data (sbref series will contain both and heudiconv auto name it)
-    new_files = [(ds.pathobj / nf) for nf in ds.repo.call_git(['show','--name-only','HEAD','--format=oneline']).split('\n')[1:]]
 
     phase_glob = 'sub-*/ses-*/fmap/*_part-phase*'
-    phase_files = [f for f in ds.pathobj.glob(phase_glob) if f in new_files]
-    if not list(phase_files):
+    mag_glob = 'sub-*/ses-*/fmap/*_part-mag*'
+    phase_fmaps = ds.pathobj.glob(phase_glob)
+    mag_fmaps = ds.pathobj.glob(mag_glob)
+
+    if commit:
+        new_files = [(ds.pathobj / nf) for nf in ds.repo.call_git(['show','--name-only', commit,'--format=oneline']).split('\n')[1:]]
+        phase_fmap = [f for f in phase_fmaps if f in new_files]
+        mag_fmaps = [f for f in mag_fmaps if f in new_files]
+        scans_tsvs = [nf for nf in new_files if '_scans.tsv' in str(nf)]
+    else:
+        phase_fmaps = list(phase_fmaps)
+        mag_fmaps = list(mag_fmaps)
+        scans_tsvs = list(ds.pathobj.glob('sub-*/ses-*/*_scans.tsv'))
+        
+    if not phase_fmaps and not mag_fmaps:
         return
-    ds.repo.remove(phase_files)
-    mag_fmaps = [f for f in ds.pathobj.glob('sub-*/ses-*/fmap/*_part-mag*') if f in new_files]
+    ds.repo.remove(phase_fmaps)
+
     for f in mag_fmaps:
         ds.repo.call_git(['mv', str(f), str(f).replace('_part-mag','')])
 
-    scans_tsvs = [nf for nf in new_files if '_scans.tsv' in str(nf)]
     ds.unlock(scans_tsvs, on_failure='ignore')
     with fileinput.input(files=scans_tsvs, inplace=True) as f:
         for line in f:
@@ -188,9 +198,10 @@ def main():
                 b0_field_id=args.b0_field_id),
         args.files)
 
-    print("SUMMARY" + "#"*40)
+    print("SUMMARY " + "#"*40)
     for r,f in zip(res, args.files):
-        print(f"{f}: {'SUCCESS' if r else 'FAIL'}")
+        print(f"{f}: {'SUCCESS' if r is None else 'FAIL -> ' + r}")
+    print("#"*50)
 
 if __name__ == "__main__":
     main()
