@@ -260,8 +260,10 @@ def get_seq_bids_info(s):
     elif "*me2d1r3" in s.sequence_name:
         seq["label"] = "T2starw"
 
-    if seq["label"] == "sbref" and "part" in seq:
-        del seq["part"]
+    # fix bug with tarred dicoms being indexed in the wrong order, resulting in phase tag
+    if seq["label"] == "sbref" and "part" in seq_extra:
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        del seq_extra["part"]
 
     return seq, seq_extra
 
