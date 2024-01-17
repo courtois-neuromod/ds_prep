@@ -1,6 +1,7 @@
 import sys, os
 import shutil, stat
 from bids import BIDSLayout
+from bids.layout import Query
 import json
 import logging
 import argparse
@@ -11,23 +12,205 @@ from heudiconv.utils import json_dumps_pretty
 
 PYBIDS_CACHE_PATH = ".pybids_cache"
 
-
-def fill_intended_for(args):
-    path = os.path.abspath(args.bids_path)
+def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before', sloppy=False, **kwargs):
+    path = os.path.abspath(bids_path)
     pybids_cache_path = os.path.join(path, PYBIDS_CACHE_PATH)
 
     layout = BIDSLayout(
         path,
         database_path=pybids_cache_path,
-        reset_database=args.force_reindex,
+        reset_database=force_reindex,
         validate=False,
     )
     extra_filters = {}
-    if args.participant_label:
-        extra_filters["subject"] = args.participant_label
-    if args.session_label:
-        extra_filters["session"] = args.session_label
-    bolds = layout.get(suffix="bold", extension=".nii.gz", **extra_filters)
+    if participant_label:
+        extra_filters["subject"] = participant_label
+    if session_label:
+        extra_filters["session"] = session_label
+    
+    bolds = layout.get(suffix="bold", extension=".nii.gz", part='mag', **extra_filters) + \
+            layout.get(suffix="bold", extension=".nii.gz", part=Query.NONE, **extra_filters)
+
+    fmaps_to_modify = {}
+
+    bolds_with_no_fmap = []
+    bolds_with_shim_mismatch = []
+    
+    for bold in bolds:
+        logging.info(f"matching fmap for {bold.path}")
+        bold_series_id = os.path.basename(bold.path).split('.')[0].split('_echo')[0].split('_part')[0].replace('-', '_')
+        bold_b0fieldsource = bold.entities.get('B0FieldSource', None)
+        bold_scan_time = datetime.datetime.strptime(
+            bold.tags["AcquisitionTime"].value, "%H:%M:%S.%f"
+        )
+        
+        if bold_b0fieldsource and bold_series_id in bold_b0fieldsource:
+            # that series was already assigned a fieldmap
+            continue
+        bold_pedir = bold.entities["PhaseEncodingDirection"]
+        opposite_pedir = bold_pedir[-1:] if '-' in bold_pedir else f"{bold_pedir}-"
+
+        sbref = layout.get(**{
+            **bold.get_entities(),
+            'suffix':'sbref',
+            'echo': 1 if bold.entities.get('echo', None) else None # 
+        })
+        assert len(sbref)==1, "There should be a single SBRef for each bold"
+        if not sbref:
+            logging.error(f"SBref not found for {bold.path}, something went wrong, check BIDS conversion.")
+            continue
+        sbref = sbref[0]
+        
+        if bold_series_id in sbref.entities.get('B0FieldIdentifier',[]):
+            # that series was already assigned a fieldmap
+            continue
+            
+        # fetch candidate fieldmaps from the same session            
+        fmap_query_base = dict(
+            suffix="epi",
+            extension=".nii.gz",
+            acquisition="sbref",
+            subject=bold.entities["subject"],
+            session=bold.entities.get("session", None),
+            echo=1 if bold.entities.get("echo", None) else None, # get first echo
+            PhaseEncodingDirection=opposite_pedir,
+        )
+        
+        # strict match
+        fmaps = layout.get(
+            **fmap_query_base,
+            ShimSetting=str(bold.entities['ShimSetting']),
+            ImageOrientationPatientDICOM=str(bold.entities['ImageOrientationPatientDICOM']),
+        )
+        if not fmaps:
+            bolds_with_shim_mismatch.append(bold)
+            logging.warning(
+                f"We couldn't find an fieldmap with matching ShimSettings and opposite pedir for: {bold.path}. "
+                "Including other based on ImageOrientationPatient."
+            )
+            # looser match
+            fmaps = layout.get(
+                **fmap_query_base,
+                ImageOrientationPatientDICOM=str(bold.entities['ImageOrientationPatientDICOM']),
+            )
+        if not fmaps:
+            logging.error(
+                f"We couldn't find an epi fieldmaps with matching ImageOrientationPatient and opposite pedir for {bold.path}. "
+                "Please review manually.")
+            if sloppy > 0:
+                all_fmaps = layout.get(
+                    **fmap_query_base,
+                )
+                fmaps = [fmap for fmap in all_fmaps
+                         if np.allclose(bold.entities['ImageOrientationPatientDICOM'],
+                                        fmap.entities['ImageOrientationPatientDICOM'],
+                                        atol=sloppy)]
+                if not len(fmaps):
+                    logging.error(f"Sloppy match gives no {bold.path}.")
+                    continue
+            else:
+                bolds_with_no_fmap.append(bold)
+                continue
+
+            
+        fmaps_time_diffs = sorted(
+            [(
+                fm,
+                datetime.datetime.strptime(
+                    fm.entities["AcquisitionTime"], "%H:%M:%S.%f"
+                ) - bold_scan_time
+            )
+             for fm in fmaps ],
+            key=itemgetter(1),
+        )
+        
+        if match_strategy == "before":
+            delta_for_sbref = datetime.timedelta(seconds=0)
+            match_fmap = [
+                fm for fm, ftd in fmaps_time_diffs if ftd <= delta_for_sbref
+                ]
+            if len(match_fmap):
+                match_fmap = match_fmap[-1]
+            else:
+                logging.warning(
+                    f"No fmap matched the {match_strategy} strategy for {bold.path}, taking the first match after scan."
+                )
+                match_fmap = fmaps_time_diffs[0][0]
+        elif match_strategy == "after":
+            # to match the sbref with the corresponding bold, there is a diff of ~11sec, depending on multiband/multi-echo params
+            delta_for_sbref = datetime.timedelta(seconds=-30)
+            match_fmap = [
+                    fm for fm, ftd in fmaps_time_diffs if ftd >= delta_for_sbref
+            ]
+            if len(match_fmap):
+                match_fmap = match_fmap[0]
+            else:
+                logging.warning(
+                    f"No fmap matched the {match_strategy} strategy for {bold.path}, taking the first match before scan."
+                )
+                match_fmap = fmaps_time_diffs[-1][0]
+
+
+        if ("B0FieldIdentifier" not in match_fmap.entities) or (
+                bold_series_id not in match_fmap.tags.get("B0FieldIdentifier").value
+        ):
+            fmap_json_path = match_fmap.get_associations(kind='Metadata')[0].path
+            logging.info(f"_______________{fmap_json_path}")
+
+            if fmap_json_path not in fmaps_to_modify:
+                fmaps_to_modify[fmap_json_path] = []
+            if bold_series_id not in fmaps_to_modify[fmap_json_path]:
+                fmaps_to_modify[fmap_json_path].append(bold_series_id)
+
+        insert_values_in_json(
+            sbref.get_associations(kind='Metadata')[0].path,
+            {'B0FieldIdentifier': bold_series_id,
+             'B0FieldSource': bold_series_id}
+        )
+        insert_values_in_json(
+            bold.get_associations(kind='Metadata')[0].path,
+            {'B0FieldSource': bold_series_id}
+        )
+    for fmap_path, b0fieldids in fmaps_to_modify.items():
+        #avoid lists due to SDCFlows/pybids current limitations: see https://github.com/nipreps/sdcflows/issues/266#issuecomment-1303696056
+        b0fieldids = b0fieldids if len(b0fieldids)>1 else b0fieldids[0]
+        insert_values_in_json(
+            fmap_path,
+            {'B0FieldIdentifier': b0fieldids}
+        )
+            
+def insert_values_in_json(path, dct):
+    logging.info(f"modifying {path} add {dct}")
+    with open(path, "r", encoding="utf-8") as fd:
+        meta = json.load(fd)
+    for tag, values in dct.items():
+        meta[tag] = values #sorted(list(set(meta.get(tag,[])+values)))
+    file_mask = os.stat(path)[stat.ST_MODE]
+    os.chmod(path, file_mask | stat.S_IWUSR)
+    with open(path, "w", encoding="utf-8") as fd:
+        fd.write(json_dumps_pretty(meta))
+    os.chmod(path, file_mask)
+        
+    
+
+def fill_intended_for(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before', sloppy=False, **kwargs):
+    path = os.path.abspath(bids_path)
+    pybids_cache_path = os.path.join(path, PYBIDS_CACHE_PATH)
+
+    layout = BIDSLayout(
+        path,
+        database_path=pybids_cache_path,
+        reset_database=force_reindex,
+        validate=False,
+    )
+    extra_filters = {}
+    if participant_label:
+        extra_filters["subject"] = participant_label
+    if session_label:
+        extra_filters["session"] = session_label
+    bolds = layout.get(suffix="bold", extension=".nii.gz", part='mag', **extra_filters) + \
+            layout.get(suffix="bold", extension=".nii.gz", part=Query.NONE, **extra_filters)
+    logging.info(f"found {len(bolds)} runs")
     json_to_modify = dict()
 
     bolds_with_no_fmap = []
@@ -43,9 +226,10 @@ def fill_intended_for(args):
             extension=".nii.gz",
             acquisition="sbref",
             subject=bold.entities["subject"],
-            session=bold.entities["session"],
+            session=bold.entities.get("session", None),
+            echo=bold.entities.get("echo",None)
         )
-
+        
         shim_settings = bold.tags["ShimSetting"].value
         # First: get epi fieldmaps with similar ShimSetting
         fmaps_match = [
@@ -67,16 +251,14 @@ def fill_intended_for(args):
                     fm
                     for fm in fmaps
                     if np.allclose(
-                        fm.tags["ImageOrientationPatientDICOM"].value,
-                        bold.tags["ImageOrientationPatientDICOM"].value,
+                            fm.tags["ImageOrientationPatientDICOM"].value,
+                            bold.tags["ImageOrientationPatientDICOM"].value,
                     )
                     and fm not in fmaps_match
                 ]
             )
 
-            pedirs = set(
-                [fm.tags["PhaseEncodingDirection"].value for fm in fmaps_match]
-            )
+            pedirs = set([fm.tags["PhaseEncodingDirection"].value for fm in fmaps_match])
 
         # get all fmap possible
         if len(fmaps_match) < 2 or len(pedirs) < 2:
@@ -88,7 +270,23 @@ def fill_intended_for(args):
             continue
             # TODO: maybe match on time distance
             # fmaps_match = fmaps
+        elif sloppy > 0:
+            fmaps_match.extend(
+                [
+                    fm
+                    for fm in fmaps
+                    if np.allclose(
+                        fm.tags["ImageOrientationPatientDICOM"].value,
+                        bold.tags["ImageOrientationPatientDICOM"].value,
+                    )
+                    and fm not in fmaps_match
+                ]
+            )
+            pedirs = set([fm.tags["PhaseEncodingDirection"].value for fm in fmaps_match])
+            if len(fmaps_match) < 2 or len(pedirs) < 2:
+                logging.error(f"No sloppy match for {bold.path}. Please review manually.")
 
+            
         # only get 2 images with opposed pedir
         fmaps_match_pe_pos = [
             fm
@@ -99,6 +297,8 @@ def fill_intended_for(args):
             fm for fm in fmaps_match if "-" in fm.tags["PhaseEncodingDirection"].value
         ]
 
+
+        
         if not fmaps_match_pe_pos or not fmaps_match_pe_neg:
             logging.error("no matching fieldmaps")
             continue
@@ -118,7 +318,7 @@ def fill_intended_for(args):
                 key=itemgetter(1),
             )
 
-            if args.match_strategy == "before":
+            if match_strategy == "before":
                 delta_for_sbref = datetime.timedelta(seconds=0)
                 match_fmap = [
                     fm for fm, ftd in fmaps_time_diffs if ftd <= delta_for_sbref
@@ -127,10 +327,10 @@ def fill_intended_for(args):
                     match_fmap = match_fmap[-1]
                 else:
                     logging.warning(
-                        f"No fmap matched the {args.match_strategy} strategy for {bold.path}, taking the first match after scan."
+                        f"No fmap matched the {match_strategy} strategy for {bold.path}, taking the first match after scan."
                     )
                     match_fmap = fmaps_time_diffs[0][0]
-            elif args.match_strategy == "after":
+            elif match_strategy == "after":
                 # to match the sbref with the corresponding bold, there is a diff of ~11sec
                 delta_for_sbref = datetime.timedelta(seconds=-15)
                 match_fmap = [
@@ -140,7 +340,7 @@ def fill_intended_for(args):
                     match_fmap = match_fmap[0]
                 else:
                     logging.warning(
-                        f"No fmap matched the {args.match_strategy} strategy for {bold.path}, taking the first match before scan."
+                        f"No fmap matched the {match_strategy} strategy for {bold.path}, taking the first match before scan."
                     )
                     match_fmap = fmaps_time_diffs[-1][0]
             if ("IntendedFor" not in match_fmap.tags) or (
@@ -231,6 +431,19 @@ def parse_args():
         default="before",
         help='Strategy to resolve multiple matches: "before"/"after" closest matching in time  ',
     )
+    parser.add_argument(
+        "--b0-field-id",
+        action="store_true",
+        help="fill new BIDS B0FieldIdentifier instead of IntendedFor",
+    )
+
+
+    parser.add_argument(
+        "--sloppy",
+        type=float,
+        default=0,
+        help="tolerance to allow finding fieldmaps with approximate matching position",
+    )
 
     return parser.parse_args()
 
@@ -239,4 +452,8 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     args = parse_args()
-    fill_intended_for(args)
+    if args.b0_field_id:
+        fill_b0_meta(**vars(args))
+    else:
+        fill_intended_for(**vars(args))
+    

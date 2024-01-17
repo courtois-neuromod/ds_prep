@@ -1,24 +1,23 @@
 import os
 import sys
+import glob
 import argparse
 import bids
 import subprocess
 import json
 import re
 import pathlib
-#from .fmriprep.fmriprep import load_bidsignore
+import datalad.api
 
 script_dir = os.path.dirname(__file__)
 
 PYBIDS_CACHE_PATH = ".pybids_cache"
-SLURM_JOB_DIR = ".slurm"
+SLURM_JOB_DIR = "code"
 
 MRIQC_REQ = {"cpus": 8, "mem_per_cpu": 4, "time": "8:00:00", "omp_nthreads": 8}
 
-MRIQC_DEFAULT_VERSION = "mriqc-0.16"
-MRIQC_DEFAULT_SINGULARITY_PATH = os.path.abspath(
-    os.path.join(script_dir, f"../containers/{MRIQC_DEFAULT_VERSION}.sif")
-)
+MRIQC_DEFAULT_VERSION = "mriqc-22.0.1"
+
 SINGULARITY_CMD_BASE = " ".join(
     [
         "singularity run",
@@ -28,11 +27,23 @@ SINGULARITY_CMD_BASE = " ".join(
     ]
 )
 
+SINGULARITY_CMD_BASE = " ".join(
+    [
+        "datalad containers-run "
+        "-m 'mriqc_{subject_session}'",
+        "-n containers/bids-mriqc",
+        "--input sourcedata/{study}/{subject_session}/fmap/",
+        "--input sourcedata/{study}/{subject_session}/func/",
+        "--output .",
+        "--",
+    ]
+)
+
 slurm_preamble = """#!/bin/bash
 #SBATCH --account={slurm_account}
 #SBATCH --job-name={jobname}.job
-#SBATCH --output={bids_root}/.slurm/{jobname}.out
-#SBATCH --error={bids_root}/.slurm/{jobname}.err
+#SBATCH --output={derivatives_path}/code/{jobname}.out
+#SBATCH --error={derivatives_path}/code/{jobname}.err
 #SBATCH --time={time}
 #SBATCH --cpus-per-task={cpus}
 #SBATCH --mem-per-cpu={mem_per_cpu}G
@@ -42,7 +53,29 @@ slurm_preamble = """#!/bin/bash
 #SBATCH --mail-user={email}
 
 
-export SINGULARITYENV_TEMPLATEFLOW_HOME=/home/bidsapp/.cache/templateflow/
+"""
+
+
+datalad_pre = """
+export LOCAL_DATASET=$SLURM_TMPDIR/${{SLURM_JOB_NAME//-/}}/
+flock --verbose {ds_lockfile} datalad clone {output_repo} $LOCAL_DATASET
+cd $LOCAL_DATASET
+git-annex enableremote ria-beluga-storage
+datalad get -s ria-beluga-storage -J 4 -n -r -R1 . # get sourcedata/* containers
+if [ -d sourcedata/smriprep ] ; then
+    datalad get -n sourcedata/smriprep sourcedata/smriprep/sourcedata/freesurfer
+fi
+git submodule foreach --recursive git annex dead here
+git submodule foreach git annex enableremote ria-beluga-storage
+git checkout -b $SLURM_JOB_NAME
+
+"""
+
+datalad_post = """
+flock --verbose {ds_lockfile} datalad push -d ./ --to origin
+if [ -d sourcedata/freesurfer ] ; then
+    flock --verbose {ds_lockfile} datalad push -J 4 -d sourcedata/freesurfer $LOCAL_DATASET --to origin
+fi 
 """
 
 
@@ -64,21 +97,25 @@ def load_bidsignore(bids_root):
     return tuple()
 
 def write_mriqc_job(layout, subject, session, args, type='func'):
+    print(subject, session)
     study = os.path.basename(layout.root)
     job_specs = dict(
         slurm_account=args.slurm_account,
         jobname=f"mriqc_study-{study}_sub-{subject}_ses-{session}",
         email=args.email,
         bids_root=layout.root,
+        study=study,
+        subject=subject,
+        subject_session=f"sub-{subject}" + (f"/ses-{session}" if session else ""),
+        output_repo=args.output_repo,
+        derivatives_path=args.output_path,
+        ds_lockfile=os.path.join(args.output_repo.replace('ria+file://','').split('@')[0].replace('#~','/alias/'), '.datalad_lock'),
     )
     job_specs.update(MRIQC_REQ)
-    job_path = os.path.join(layout.root, SLURM_JOB_DIR, f"{job_specs['jobname']}.sh")
+    job_path = os.path.join(args.output_path, SLURM_JOB_DIR, f"{job_specs['jobname']}.sh")
 
-    derivatives_path = os.path.join(layout.root, "derivatives", args.derivatives_name)
 
     pybids_cache_path = os.path.join(layout.root, PYBIDS_CACHE_PATH)
-
-    mriqc_singularity_path = args.container or MRIQC_DEFAULT_SINGULARITY_PATH
 
     if type == 'anat':
         acqs = ['T1w']
@@ -87,14 +124,13 @@ def write_mriqc_job(layout, subject, session, args, type='func'):
 
     with open(job_path, "w") as f:
         f.write(slurm_preamble.format(**job_specs))
+        f.write(datalad_pre.format(**job_specs))
 
         f.write(
             " ".join(
                 [
-                    SINGULARITY_CMD_BASE,
-                    f"-B {layout.root}:{layout.root}",
-                    mriqc_singularity_path,
-                    "-w /work",
+                    SINGULARITY_CMD_BASE.format(**job_specs),
+                    "-w workdir/",
                     f"--participant-label {subject}",
                     f"--session-id {session}",
                     f"--omp-nthreads {job_specs['omp_nthreads']}",
@@ -102,13 +138,17 @@ def write_mriqc_job(layout, subject, session, args, type='func'):
                     f"-m {' '.join(acqs)}",
                     f"--mem_gb {job_specs['mem_per_cpu']*job_specs['cpus']}",
                     "--no-sub", # no internet on compute nodes
-                    layout.root,
-                    derivatives_path,
+                    str(args.bids_path.relative_to(args.output_path)),
+                    './',
                     "participant",
                     "\n",
                 ]
             )
         )
+        f.write("mriqc_exitcode=$?\n")
+        f.write(datalad_post.format(**job_specs))
+        f.write("exit $mriqc_exitcode \n")
+
     return job_path
 
 
@@ -126,10 +166,15 @@ def parse_args():
         "bids_path", type=pathlib.Path, help="BIDS folder to run mriqc on."
     )
     parser.add_argument(
-        "derivatives_name",
+        "output_path",
         type=pathlib.Path,
-        help="name of the output folder in derivatives.",
+        help="path of the output folder",
     )
+    parser.add_argument(
+        "--output-repo",
+        help="path to the ria-store dataset.",
+    )
+    
     parser.add_argument("preproc", help="anat or func")
     parser.add_argument(
         "--slurm-account",
@@ -138,9 +183,6 @@ def parse_args():
         help="SLURM account for job submission",
     )
     parser.add_argument("--email", action="store", help="email for SLURM notifications")
-    parser.add_argument(
-        "--container", action="store", help="mriqc singularity container"
-    )
     parser.add_argument(
         "--participant-label",
         action="store",
@@ -180,8 +222,6 @@ def run_mriqc(layout, args, pipe="anat"):
         else:
             sessions = layout.get_sessions(subject=subject)
 
-
-
         for session in sessions:
             yield write_mriqc_job(layout, subject, session, args, type=pipe)
 
@@ -205,7 +245,7 @@ def main():
         + load_bidsignore(args.bids_path),
     )
 
-    job_path = os.path.join(layout.root, SLURM_JOB_DIR)
+    job_path = os.path.join(args.output_path, SLURM_JOB_DIR)
     if not os.path.exists(job_path):
         os.mkdir(job_path)
         # add .slurm to .gitignore
@@ -218,6 +258,8 @@ def main():
         if not args.no_submit:
             submit_slurm_job(job_file)
 
+    datalad.api.save(glob.glob('code/*mriqc*.sh'))
+    datalad.api.push(to='ria-beluga')
 
 if __name__ == "__main__":
     main()

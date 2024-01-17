@@ -23,7 +23,7 @@ from dipy.align.transforms import (
     AffineTransform3D,
     RigidTransform3D,
     RigidScalingTransform3D,
-    RigidIsoscalingTransform3D,
+    RigidIsoScalingTransform3D,
 )
 
 PYBIDS_CACHE_PATH = ".pybids_cache"
@@ -110,10 +110,10 @@ def registration(ref, moving, ref_mask=None, moving_mask=None):
     ref_mask_data, mov_mask_data = None, None
     ref_data = ref.get_fdata()
     if ref_mask:
-        ref_mask_data = ref_mask.get_fdata() > 0.5
+        ref_mask_data = (ref_mask.get_fdata() > 0.5).astype(np.int)
     mov_data = moving.get_fdata()
     if moving_mask:
-        mov_mask_data = moving_mask.get_fdata() > 0.5
+        mov_mask_data = (moving_mask.get_fdata() > 0.5).astype(np.int)
 
     metric = MutualInformationMetric(nbins=32, sampling_proportion=None)
     transform = RigidTransform3D()
@@ -248,7 +248,7 @@ def main():
         ref_image_nb = ref_image.get_image()
 
         matrix_path = ref_image.path.replace(
-            "_%s.%s" % (ref_image.entities["suffix"], ref_image.entities["extension"]),
+            "_%s%s" % (ref_image.entities["suffix"], ref_image.entities["extension"]),
             "_mod-%s_defacemaskreg.mat" % ref_image.entities["suffix"],
         )
 
@@ -284,9 +284,6 @@ def main():
                 )
             )
 
-        # unlock before making any change to avoid unwanted save
-        if args.datalad:
-            annex_repo.unlock([serie.path for serie in series_to_deface])
 
         for serie in series_to_deface:
             if args.datalad:
@@ -303,6 +300,10 @@ def main():
             logging.info(f"defacing {serie.path}")
 
             datalad.api.get(serie.path)
+            # unlock before making any change to avoid unwanted save
+            if args.datalad:
+                annex_repo.unlock([serie.path for serie in series_to_deface])
+
             serie_nb = serie.get_image()
             warped_mask = warp_mask(tmpl_defacemask, serie_nb, ref2tpl_affine)
             if args.save_all_masks or serie == ref_image:
@@ -343,7 +344,8 @@ def main():
 # of images with larger FoV (eg. cspine acquisitions)
 def generate_deface_ear_mask(mni):
 
-    deface_ear_mask = np.ones(np.asarray(mni.shape) * (1, 1, 2), dtype=np.int8)
+    deface_ear_mask = np.ones(np.asarray(mni.shape) * (1, 1, 2), dtype=np.uint8)
+    deface_ear_mask[:, :, :mni.shape[2]] = 0
     affine_ext = mni.affine.copy()
     affine_ext[2, -1] -= mni.shape[-1]
 
@@ -358,7 +360,7 @@ def generate_deface_ear_mask(mni):
         np.linspace(
             jaw_marker[0], above_eye_marker[0], above_eye_marker[1] - jaw_marker[1]
         )
-    ).astype(np.int)
+    ).astype(np.int32)
     for z, y in zip(range(jaw_marker[1], above_eye_marker[1]), y_coords):
         deface_ear_mask[:, y:, z] = 0
 
@@ -367,7 +369,7 @@ def generate_deface_ear_mask(mni):
     deface_ear_mask[-ear_marker[0] :, :, : ear_marker[1]] = 0
     x_coords = np.round(
         np.linspace(ear_marker[0], ear_marker2[0], ear_marker2[1] - ear_marker[1])
-    ).astype(np.int)
+    ).astype(np.int32)
     for z, x in zip(range(ear_marker[1], ear_marker2[1]), x_coords):
         deface_ear_mask[:x, :, z] = 0
         deface_ear_mask[-x:, :, z] = 0

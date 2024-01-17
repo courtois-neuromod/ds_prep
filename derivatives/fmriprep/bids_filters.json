@@ -1,14 +1,17 @@
 {
   "t1w": {
     "reconstruction": null,
-    "acquisition": null,
-    "session":["001", "002"]
+    "acquisition": null
   },
   "t2w": {
     "reconstruction": null,
-    "acquisition": null,
-    "session":["001", "002"]
+    "acquisition": null
   },
   "bold" : {
-  }
+
+  },
+  "sbref" : {
+
+  },
+  "fmap" : {}
 }
