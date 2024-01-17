@@ -228,7 +228,7 @@ def insert_values_in_json(path, dct):
 def get_candidate_fmaps(layout, epi, match_shim=True, sloppy=0, non_fmap=True):
     
     epi_pedir = epi.entities["PhaseEncodingDirection"]
-    opposite_pedir = epi_pedir[-1:] if '-' in epi_pedir else f"{epi_pedir}-"
+    opposite_pedir = epi_pedir[0] if '-' in epi_pedir else f"{epi_pedir}-"
         
     fmap_query_base = dict(
         extension=".nii.gz",
@@ -259,7 +259,7 @@ def get_candidate_fmaps(layout, epi, match_shim=True, sloppy=0, non_fmap=True):
     
     if sloppy > 0:
         # find fmaps with close enough patient position
-        fmaps = [fmap for fmap in all_fmaps
+        fmaps = [fmap for fmap in fmaps
                  if np.allclose(epi.entities['ImageOrientationPatientDICOM'],
                                 fmap.entities['ImageOrientationPatientDICOM'],
                                 atol=sloppy)]
@@ -316,7 +316,9 @@ def fill_intended_for(bids_path, participant_label=None, session_label=None, for
             epi.tags["AcquisitionTime"].value, "%H:%M:%S.%f"
         )
 
-        fmaps_match_pe_pos, fmaps_match_pe_neg = get_candidate_fmaps(layout, epi, sloppy, non_fmap=False)
+        fmaps_match_pe_pos, fmaps_match_pe_neg = get_candidate_fmaps(layout, epi, sloppy=sloppy, non_fmap=False)
+        if not fmaps_match_pe_pos or not fmaps_match_pe_neg:
+            fmaps_match_pe_pos, fmaps_match_pe_neg = get_candidate_fmaps(layout, epi, sloppy=sloppy, non_fmap=False, match_shim=False)
         if not fmaps_match_pe_pos or not fmaps_match_pe_neg:
             logging.error(f"no matching fieldmaps for: {epi.relpath}")
             continue
