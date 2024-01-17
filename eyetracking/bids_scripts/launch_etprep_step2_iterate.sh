@@ -10,4 +10,5 @@ MKVDIR="/data/neuromod/DATA/cneuromod/friends/stimuli"
 python -m et_prep_step2 \
       --in_path="${DATADIR}" \
       --task="${TASK}" \
+      --mkv_path="${MKVDIR}" \
       --out_path="${OUTDIR}"
