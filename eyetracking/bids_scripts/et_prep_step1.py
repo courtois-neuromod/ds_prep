@@ -163,7 +163,7 @@ def process_friends(
     ses_list: list,
 ) -> tuple:
 
-    #sub_list = ['sub-01', 'sub-02', 'sub-03', 'sub-04', 'sub-05', 'sub-06']
+    sub_list = ['sub-01', 'sub-02', 'sub-03', 'sub-04', 'sub-05', 'sub-06']
     pupil_file_paths = []
 
     for ses_path in ses_list:
@@ -182,57 +182,58 @@ def process_friends(
 
             fnum = f1.split('.')[0].split('_')[-1]
 
-            if True:
+            if sub not in sub_list:
+                print(f"Subject {sub} data not in subject list")
+            if sub != sub_num:
+                print(f"Subject {sub} data under {sub_num} directory")
+            if ses_num != ses:
+                print(f"{ses} data under {ses_num} directory")
 
-            #if sub in sub_list:
-            #    assert sub == sub_num
-            #    assert ses_num == ses
+            log_list = glob.glob(
+                f'{ses_path}/{sub_num}_{ses_num}_{fnum}.log'
+            )
+            has_log = len(log_list) == 1
+            if has_log:
+                with open(log_list[0]) as f:
+                    lines = f.readlines()
+                    empty_log = len(lines) == 0
+            else:
+                empty_log = True
 
-                log_list = glob.glob(
-                    f'{ses_path}/{sub_num}_{ses_num}_{fnum}.log'
+            list_pupil = glob.glob(f'{epfile}/pupil.pldata')
+            has_pupil = len(list_pupil) == 1
+            if has_pupil:
+                pupil_file_paths.append(
+                    (os.path.dirname(
+                        list_pupil[0]),
+                        (sub, ses, run_num, task_type, fnum))
                 )
-                has_log = len(log_list) == 1
-                if has_log:
-                    with open(log_list[0]) as f:
-                        lines = f.readlines()
-                        empty_log = len(lines) == 0
-                else:
-                    empty_log = True
 
-                list_pupil = glob.glob(f'{epfile}/pupil.pldata')
-                has_pupil = len(list_pupil) == 1
-                if has_pupil:
-                    pupil_file_paths.append(
-                        (os.path.dirname(
-                            list_pupil[0]),
-                            (sub, ses, run_num, task_type, fnum))
+            has_eyemv = len(glob.glob(f'{epfile}/eye0.mp4')) == 1
+            has_gaze = len(glob.glob(f'{epfile}/gaze.pldata')) == 1
+
+            run_data = [
+                sub_num,
+                ses_num,
+                run_num,
+                task_type,
+                fnum,
+                has_pupil,
+                has_gaze,
+                has_eyemv,
+                has_log,
+                empty_log,
+            ]
+            df_files = pd.concat(
+                [
+                    df_files,
+                    pd.DataFrame(
+                        np.array(run_data).reshape(1, -1),
+                        columns=df_files.columns,
                     )
-
-                has_eyemv = len(glob.glob(f'{epfile}/eye0.mp4')) == 1
-                has_gaze = len(glob.glob(f'{epfile}/gaze.pldata')) == 1
-
-                run_data = [
-                    sub_num,
-                    ses_num,
-                    run_num,
-                    task_type,
-                    fnum,
-                    has_pupil,
-                    has_gaze,
-                    has_eyemv,
-                    has_log,
-                    empty_log,
-                ]
-                df_files = pd.concat(
-                    [
-                        df_files,
-                        pd.DataFrame(
-                            np.array(run_data).reshape(1, -1),
-                            columns=df_files.columns,
-                        )
-                    ],
-                    ignore_index=True,
-                )
+                ],
+                ignore_index=True,
+            )
 
     return df_files, pupil_file_paths
 
@@ -257,7 +258,11 @@ def compile_file_list(
 
     task_root = in_path.split('/')[-2]
     # on elm, for triplets : in_path = '/unf/eyetracker/neuromod/triplets/sourcedata'
-    ses_list = sorted(glob.glob(f'{in_path}/sub-*/ses-*'))
+    ses_list = [
+        x for x in sorted(glob.glob(
+            f'{in_path}/sub-*/ses-*')
+        ) if x.split('-')[-1].isnumeric()
+    ]
 
     if task_root == 'friends':
         return process_friends(df_files, ses_list)
