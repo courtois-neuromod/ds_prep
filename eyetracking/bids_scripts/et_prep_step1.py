@@ -253,7 +253,7 @@ def compile_file_list(
 
     task_root = in_path.split('/')[-2]
     # on elm, for triplets : in_path = '/unf/eyetracker/neuromod/triplets/sourcedata'
-    ses_list = sorted(glob.glob(f'{in_path}/sub-*/ses-0*'))
+    ses_list = sorted(glob.glob(f'{in_path}/sub-*/ses-*'))
 
     if task_root == 'friends':
         return process_friends(df_files, ses_list)
