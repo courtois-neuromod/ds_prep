@@ -6,11 +6,9 @@ from pathlib import Path
 import assemblyai as aai
 from moviepy.editor import VideoFileClip
 
-# Find all files ending with .mkv in the directory
-
 
 def extract_wav(segment_file: Path, audio_dir: Path) -> Path:
-    """Converst mkv files to wav files.
+    """Converts mkv files to wav files.
 
     Args:
         segment_file: path to the mkv file
@@ -80,9 +78,8 @@ def audio_to_transcrip(
     return json_path
 
 
-# Function to parse command-line arguments
 def parse_arguments() -> Namespace:
-    """."""
+    """Function to parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Process video files, extract wav files, and word onsets.",
     )
@@ -94,7 +91,14 @@ def parse_arguments() -> Namespace:
 
 
 def main() -> None:
-    """."""
+    """Main function of the script.
+
+    Args:
+        --data_dir: path to the mkv files
+        --output_dir: path to the store outputs
+        --stimuli_name: name of the stimuli folder
+        --api_key: AssemblyAI API key.
+    """
     args = parse_arguments()
     mkv_dir = Path(args.data_dir) / args.stimuli_name
     mkv_files = sorted(mkv_dir.glob("*.mkv"))
@@ -106,7 +110,6 @@ def main() -> None:
     json_dir.mkdir(parents=True, exist_ok=True)
 
     # Iterate over the mkv files for conversion to wav files.
-
     for segment_file in mkv_files:
         # extract and save the corresponding wav file
         wav_path = extract_wav(

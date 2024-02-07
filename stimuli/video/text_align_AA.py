@@ -7,8 +7,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-tr = 1.49
-delay = 3.0
+tr = 1.49  # repetition time of the fMRI scan
+delay = 3.0  # 3 tr delay prior to the target TR to account for the HRF.
 
 
 def align_transcript(tr: float, json_path: str, tsv_dir: str) -> None:
@@ -30,11 +30,12 @@ def align_transcript(tr: float, json_path: str, tsv_dir: str) -> None:
         segment_path = Path(json_path)
         segment_name = segment_path.stem
 
-        #  list of word, onset, offset, and confidence
+        # list of word, onset, offset, and confidence from,
+        # the AssemblyAI output
         words = j_file["results"]["channels"][0]["alternatives"][0]["words"]
 
-        # lists the boundaries of tr windows that lasts until,
-        # the last stimuli offset + delay
+        # lists the boundaries of tr windows until the last,
+        # stimuli offset + delay
         tr_boundaries = list(np.arange(0, words[-1]["offset"] + delay, tr))
 
         # loops over the tr windows and find the words fall in
@@ -44,9 +45,7 @@ def align_transcript(tr: float, json_path: str, tsv_dir: str) -> None:
             tr_onsets = []
             tr_durations = []
 
-            while (
-                index < len(words) and words[index]["offset"] < tr_onset + tr
-            ):
+            while index < len(words) and words[index]["offset"] < tr_onset + tr:
                 tr_words.append(words[index]["word"])
                 tr_onsets.append(words[index]["onset"])
                 tr_durations.append(
@@ -62,7 +61,7 @@ def align_transcript(tr: float, json_path: str, tsv_dir: str) -> None:
 
         df_results_rec.insert(loc=0, column="segment", value=segment_name)
 
-        # for AssemblyAI speech-to-text output
+        # writes the tr-aligned words into a tsv file
         tsv_file = Path(tsv_dir) / f"{segment_name}.tsv"
         df_results_rec.to_csv(tsv_file, sep="\t", index=False)
 
@@ -78,7 +77,12 @@ def parse_arguments() -> Namespace:
 
 
 def main() -> None:
-    """."""
+    """Main function of the script.
+
+    Args:
+        --data_dir: path to the mkv files
+        --stimuli_name: name of the stimuli folder
+    """
     args = parse_arguments()
     json_dir = Path(args.data_dir) / "word_timestamps" / args.stimuli_name
     json_files = sorted(json_dir.glob("*.json"))
@@ -86,7 +90,7 @@ def main() -> None:
     tsv_dir = Path(args.data_dir) / "tr_alignment" / args.stimuli_name
     tsv_dir.mkdir(parents=True, exist_ok=True)
 
-    # Iterate over the json files for TR alignment
+    # Iterate over the json files for tr alignment
     for json_path in json_files:
         align_transcript(tr, json_path, tsv_dir)
 
