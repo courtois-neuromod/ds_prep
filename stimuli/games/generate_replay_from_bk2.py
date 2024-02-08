@@ -77,7 +77,7 @@ def process_events_file(event_path, out_dir, int_path):
                 out_subdir = os.path.join(out_dir, os.path.dirname(bk2_path))
                 os.makedirs(out_subdir, exist_ok=True)
                 video_path = os.path.join(out_dir, bk2_path[:-3] + "mp4")
-                annotations_path = os.path.join(out_dir, bk2_path[:-3])
+                annotations_path = os.path.join(out_dir, bk2_path[:-4])
                 if not os.path.exists(video_path):
                     save_replay_movie(
                         os.path.join(args.dataset_path, bk2_path),
