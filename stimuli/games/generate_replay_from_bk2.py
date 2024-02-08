@@ -42,7 +42,10 @@ def save_replay_movie(
     if skip_first_step:
         movie.step()
     emulator = retro.make(
-        movie.get_game(), inttype=retro.data.Integrations.CUSTOM_ONLY, render_mode=None
+        movie.get_game(),
+        inttype=retro.data.Integrations.CUSTOM_ONLY,
+        render_mode=None,
+        state=None,
     )
     emulator.initial_state = movie.get_state()
     emulator.reset()
