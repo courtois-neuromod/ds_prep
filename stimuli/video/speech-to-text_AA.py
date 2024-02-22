@@ -46,7 +46,8 @@ def audio_to_transcrip(
     json_path = json_dir / f"{segment_name}.json"
     print("Connecting to the Assembly AI...")
     aai.settings.api_key = f"{api_token}"
-    transcriber = aai.Transcriber()
+    config = aai.TranscriptionConfig(language_code="fr")  # change this to en_us or fr
+    transcriber = aai.Transcriber(config=config)
     print("Transcribing your audio file...")
     transcript = transcriber.transcribe(wav_path)
     json_results = {
@@ -83,8 +84,9 @@ def parse_arguments() -> Namespace:
     parser = argparse.ArgumentParser(
         description="Process video files, extract wav files, and word onsets.",
     )
-    parser.add_argument("--data_dir", help="where the mkv files are")
+    parser.add_argument("--data_dir", help="where the mkv/wav files are")
     parser.add_argument("--output_dir", help="where to store the outputs")
+    parser.add_argument("--file_type", help="the type of the audio file (mkv or wav)")
     parser.add_argument("--stimuli_name", help="name of the stimuli folder")
     parser.add_argument("--api_key", help="AssemblyAI API key.")
     return parser.parse_args()
@@ -96,32 +98,44 @@ def main() -> None:
     Args:
         --data_dir: path to the mkv files
         --output_dir: path to the store outputs
+        --file_type : type of the audio/movie file
         --stimuli_name: name of the stimuli folder
         --api_key: AssemblyAI API key.
     """
     args = parse_arguments()
-    mkv_dir = Path(args.data_dir) / args.stimuli_name
-    mkv_files = sorted(mkv_dir.glob("*.mkv"))
-    audio_dir = Path(args.output_dir) / "audio" / args.stimuli_name
-    audio_dir.mkdir(parents=True, exist_ok=True)
+    movie_dir = Path(args.data_dir)
     json_dir = (
         Path(args.output_dir) / "transcript" / "word_timestamps" / args.stimuli_name
     )
     json_dir.mkdir(parents=True, exist_ok=True)
 
-    # Iterate over the mkv files for conversion to wav files.
-    for segment_file in mkv_files:
-        # extract and save the corresponding wav file
-        wav_path = extract_wav(
-            segment_file,
-            audio_dir,
-        )
-        # extract and save the transcript file
-        audio_to_transcrip(
-            json_dir,
-            wav_path,
-            args.api_key,
-        )
+    if args.file_type == "mkv":
+        # If the mkv files exist, iterate over the mkv files for conversion
+        # to wav files.
+        wav_dir = Path(args.output_dir) / "audio" / args.stimuli_name
+        wav_dir.mkdir(parents=True, exist_ok=True)
+        mkv_files = sorted(movie_dir.glob("*.mkv"))
+
+        for segment_file in mkv_files:
+            # extract and save the corresponding wav file
+            wav_path = extract_wav(
+                segment_file,
+                wav_dir,
+            )
+            # extract and save the transcript file
+            audio_to_transcrip(
+                json_dir,
+                wav_path,
+                args.api_key,
+            )
+    elif args.file_type == "wav":
+        wav_files = sorted(movie_dir.glob("*.wav"))
+        for segment_file in wav_files:
+            audio_to_transcrip(
+                json_dir,
+                segment_file,
+                args.api_key,
+            )
 
 
 if __name__ == "__main__":
