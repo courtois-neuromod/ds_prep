@@ -54,6 +54,7 @@ def save_replay_movie(
         movie,
         video_file=video_path,
         npy_file=annotations_path,
+        info_file=True,
         lossless="mp4",
     )
 
