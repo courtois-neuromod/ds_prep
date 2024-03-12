@@ -15,23 +15,21 @@ script_dir = os.path.dirname(__file__)
 PYBIDS_CACHE_PATH = ".pybids_cache"
 SLURM_JOB_DIR = "code"
 
-FREESURFER_REQ = {"cpus": 4, "mem_per_cpu": 4096, "time": "24:00:00", "omp_nthreads": 8}
+FREESURFER_REQ = {"cpus": 4, "mem_per_cpu": 4096, "time": "18:00:00", "omp_nthreads": 8}
 
 SINGULARITY_CMD_BASE = " ".join(
     [
         "datalad containers-run "
         "-m 'freesurfer_{subject_session}'",
-        "-n containers/bids-freesurfer",
-    ] + [
-        "--output .",
+        "-n bids-freesurfer",
     ]
 )
 
 slurm_preamble = """#!/bin/bash
 #SBATCH --account={slurm_account}
 #SBATCH --job-name={jobname}.job
-#SBATCH --output={derivatives_path}/code/{jobname}.out
-#SBATCH --error={derivatives_path}/code/{jobname}.err
+#SBATCH --output=./code/{jobname}.out
+#SBATCH --error=./code/{jobname}.err
 #SBATCH --time={time}
 #SBATCH --cpus-per-task={cpus}
 #SBATCH --mem-per-cpu={mem_per_cpu}M
@@ -41,7 +39,7 @@ slurm_preamble = """#!/bin/bash
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user={email}
 
- 
+
 set -e -u -x
 
 """
@@ -52,10 +50,11 @@ export LOCAL_DATASET=$SLURM_TMPDIR/${{SLURM_JOB_NAME//-/}}/
 flock --verbose {ds_lockfile} datalad clone {output_repo} $LOCAL_DATASET
 cd $LOCAL_DATASET
 datalad get -s ria-beluga-storage -J 4 -n -r -R1 . # get sourcedata/* containers
-git submodule foreach --recursive git annex dead here
+git annex dead here
 git checkout -b $SLURM_JOB_NAME
 
-git submodule foreach  --recursive git-annex enableremote ria-beluga-storage
+git submodule foreach  --recursive bash -c "git-annex enableremote ria-beluga-storage || true"
+git submodule foreach  --recursive bash -c "git-annex enableremote ria-beluga-storage-local || true"
 
 """
 
@@ -70,7 +69,7 @@ def load_bidsignore(bids_root, mode="python"):
         if mode == 'python':
             import re
             import fnmatch
-            
+
             return tuple(
                 [
                     re.compile(fnmatch.translate(bi))
@@ -91,13 +90,14 @@ def write_freesurfer_job(layout, subject, session, args):
     derivatives_path = os.path.realpath(os.path.abspath(args.output_path))
 
     study = os.path.basename(layout.root)
-    
+
+    stage_jobname = '_'+'-'.join(args.stages) if args.stages else ''
     job_specs = dict(
         study=study,
         subject=subject,
         subject_session=f"sub-{subject}" + (f"/ses-{session}" if session else "/ses-*"),
         slurm_account=args.slurm_account,
-        jobname=f"freesurfer_{args.step}_sub-{subject}"+(f"_ses-{session}" if session else ""),
+        jobname=f"freesurfer_{args.step}{stage_jobname}_sub-{subject}"+(f"_ses-{session}" if session else ""),
         email=args.email,
         bids_root=layout.root,
         output_repo=args.output_repo,
@@ -111,46 +111,69 @@ def write_freesurfer_job(layout, subject, session, args):
 
     pybids_cache_path = os.path.join(layout.root, PYBIDS_CACHE_PATH)
 
+    has_T2w = layout.get(subject=subject, session=session, suffix='T2w')
+    has_FLAIR = layout.get(subject=subject, session=session, suffix='FLAIR')
+    
     if args.step == 'cross-sectional':
         inputs = [
             "--input 'sourcedata/{study}/{subject_session}/anat/*_T1w.nii.gz'".format(**job_specs),
-            "--input 'sourcedata/{study}/{subject_session}/anat/*_T2w.nii.gz'".format(**job_specs),
-            "--input 'sourcedata/{study}/{subject_session}/anat/*_FLAIR.nii.gz'".format(**job_specs),
+            "--input 'sourcedata/{study}/{subject_session}/anat/*_T2w.nii.gz'".format(**job_specs) if has_T2w  else "",
+            "--input 'sourcedata/{study}/{subject_session}/anat/*_FLAIR.nii.gz'".format(**job_specs) if has_FLAIR  else "",
+            f"--output 'sub-{subject}_ses-{session}/'", 
         ]
     else: #template or long
         inputs = ["--input 'sub-{subject}*/'".format(**job_specs)]
-        
         
 
     with open(job_path, "w") as f:
         f.write(slurm_preamble.format(**job_specs))
         f.write(datalad_pre.format(**job_specs))
 
-        
-        f.write(
-            " ".join(
-                [
-                    SINGULARITY_CMD_BASE.format(**job_specs),
-                    # too large scope, but only a few MB unnecessary pulled
-                    *inputs,
-                    "--",
-                    str(args.bids_path.relative_to(args.output_path)),
-                    "./",
-                    "participant",
-                    f"--steps {args.step}",
-                    "--refine_pial",
-#                    "--reconstruction_label norm",
-#                    "--refine_pial_reconstruction_label norm",
-                    "--hires_mode enable",
-                    f"--participant_label {subject}",
-                    f"--session_label {session}" if session else "",
-                    "--skip_bids_validator",
-                    "--license_file", 'code/freesurfer.license',
-                    f"--n_cpus {job_specs['cpus']}",
+        for stage in args.stages:
+            refine_surf_stages = stage in ["autorecon3", "autorecon-all", "all"]
+
+            if stage == 'smriprep_skullstrip':
+
+                f.write(f"datalad remove sub-{subject}_ses-{session}/mri/brainmask.* || true \n")
+                f.write(" ".join([
+                    "datalad containers-run",
+                    "--input 'sourcedata/{study}/{subject_session}/anat/*_T1w.nii.gz'".format(**job_specs),
+                    f"--input 'sub-{subject}_ses-{session}/mri/T1.mgz'",
+                    "-n brain_xtract",
+                    str(args.output_path),
+                    f"sub-{subject}_ses-{session}",
+                    f"{args.bids_path}/{job_specs['subject_session']}/anat/*_T1w.nii.gz",
                     "\n",
-                ]
+                ]))
+
+                continue
+            
+            f.write(
+                " ".join(
+                    [
+                        SINGULARITY_CMD_BASE.format(**job_specs),
+                        # too large scope, but only a few MB unnecessary pulled
+                        *inputs,
+                        f"--input 'sub-{subject}_ses-{session}/'" if session and not stage == 'autorecon1' else "",
+                        "--",
+                        str(args.bids_path.relative_to(args.output_path)),
+                        "./",
+                        "participant",
+                        f"--steps {args.step}",
+                        f"--stages {stage}",
+                        "--refine_pial T2" if refine_surf_stages else "",
+                        #                    "--reconstruction_label norm",
+                        #                    "--refine_pial_reconstruction_label norm",
+                        "--hires_mode enable",
+                        f"--participant_label {subject}",
+                        f"--session_label {session}" if session else "",
+                        "--skip_bids_validator",
+                        "--license_file", 'code/freesurfer.license',
+                        f"--n_cpus {job_specs['cpus']}",
+                        "\n",
+                    ]
+                )
             )
-        )
         f.write("freesurfer_exitcode=$?\n")
         f.write(datalad_post.format(**job_specs))
 
@@ -184,6 +207,12 @@ def parse_args():
         "step",
         choices=['cross-sectional', 'template', 'longitudinal'],
         help="which step of longitudinal pipeline to run")
+    parser.add_argument(
+        "--stages",
+        choices=["autorecon1", "smriprep_skullstrip", "autorecon2", "autorecon2-cp", "autorecon2-wm", "autorecon-pial", "autorecon3", "autorecon-all", "all"],
+        default=["autorecon-all"],
+        nargs="+",
+        help="which stage of cross-sectional pipeline to run")
     parser.add_argument(
         "--slurm-account",
         action="store",
