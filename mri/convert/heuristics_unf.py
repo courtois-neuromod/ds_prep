@@ -19,10 +19,16 @@ def load_example_dcm(seqinfo):
 def custom_seqinfo(wrapper, series_files):
     #print('calling custom_seqinfo', wrapper, series_files)
 
-    pedir_pos = None
+    image_history = ice_dims = pedir_pos = None
     if hasattr(wrapper, 'csa_header'):
         pedir_pos = wrapper.csa_header["tags"]["PhaseEncodingDirectionPositive"]["items"]
         pedir_pos = pedir_pos[0] if len(pedir_pos) else None
+        image_history = ';'.join(filter(len, wrapper.csa_header['tags']['ImageHistory']['items']))
+        ice_dims = wrapper.csa_header['tags']['ICE_Dims']['items'][0]
+
+    slice_orient = wrapper.dcm_data.get([0x0051,0x100e])
+    receive_coil = wrapper.dcm_data.get((0x0051,0x100f))
+
     custom_info = frozendict({
         'patient_name': wrapper.dcm_data.PatientName,
         'pe_dir': wrapper.dcm_data.get('InPlanePhaseEncodingDirection', None),
@@ -30,12 +36,12 @@ def custom_seqinfo(wrapper, series_files):
         'body_part': wrapper.dcm_data.get("BodyPartExamined", None),
         'scan_options': str(wrapper.dcm_data.get("ScanOptions", None)),
         'image_comments': wrapper.dcm_data.get("ImageComments", ""),
-        'slice_orient': str(wrapper.dcm_data.get([0x0051,0x100e]).value),
+        'slice_orient': str(slice_orient.value) if slice_orient else None,
         'echo_number': str(wrapper.dcm_data.get("EchoNumber", None)),
         'rescale_slope': wrapper.dcm_data.get("RescaleSlope", None),
-        'receive_coil': str(wrapper.dcm_data.get((0x0051,0x100f),None).value),
-        'image_history': ';'.join(filter(len,wrapper.csa_header['tags']['ImageHistory']['items'])),
-        'ice_dims': wrapper.csa_header['tags']['ICE_Dims']['items'][0],
+        'receive_coil': str(receive_coil.value) if slice_orient else None,
+        'image_history': image_history,
+        'ice_dims': ice_dims,
     })
     return custom_info
 
@@ -155,9 +161,8 @@ def get_seq_bids_info(s):
 
     # CMRR bold and dwi
     is_sbref = "Single-band reference" in image_comments
-    print(s, is_sbref)
 
-    if s.custom['ice_dims'][0] != 'X':
+    if s.custom['ice_dims'] and s.custom['ice_dims'][0] != 'X':
         seq['rec'] = 'uncombined'
     # Anats
     if "localizer" in s.protocol_name.lower():
@@ -259,6 +264,11 @@ def get_seq_bids_info(s):
     #        seq['bp'] = 'spine'
     elif "*me2d1r3" in s.sequence_name:
         seq["label"] = "T2starw"
+
+    ### GE hyperband
+    elif "hypermepi" in s.sequence_name:
+        seq["type"] = "func"
+        seq["label"] = "bold"
 
     # fix bug with tarred dicoms being indexed in the wrong order, resulting in phase tag
     if seq["label"] == "sbref" and "part" in seq_extra:
