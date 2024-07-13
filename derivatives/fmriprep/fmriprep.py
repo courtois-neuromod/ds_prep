@@ -74,7 +74,7 @@ if [ -d sourcedata/freesurfer ] ; then
   git -C sourcedata/freesurfer checkout -b $SLURM_JOB_NAME
 fi
 
-git submodule foreach  --recursive git-annex enableremote ria-beluga-storage
+git submodule foreach  --recursive bash -c 'git-annex enableremote ria-beluga-storage || true'
 
 """
 
