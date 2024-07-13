@@ -6,8 +6,21 @@ import datalad.api
 import pandas as pd
 from bids import BIDSLayout
 from datetime import datetime, timedelta
+from datalad.support.annexrepo import AnnexRepo
 
 PYBIDS_CACHE_PATH = ".pybids_cache"
+
+def update_sidecar(sidecar_path):
+    with open(sidecar_path, "r") as sidecar_file:
+        sidecar = json.load(sidecar_file)
+    sidecar["rel_acq_time"] = {
+        "LongName": "Relative acquisition time",
+        "Description": "Acquisition time of the particular scan, "
+        "relative to the first scan of the first session, in days.",
+    }
+    del sidecar["acq_time"]
+    with open(sidecar_path, "w") as sidecar_file:
+        json.dump(sidecar, sidecar_file, indent=2)
 
 
 def replace_dates(scans_list, first_date):
@@ -25,16 +38,8 @@ def replace_dates(scans_list, first_date):
             scans_df.to_csv(scans.path, sep="\t")
             modified_files.append(scans.path)
             sidecar_path = os.path.splitext(scans.path)[0] + ".json"
-            with open(sidecar_path, "r") as sidecar_file:
-                sidecar = json.load(sidecar_file)
-            sidecar["rel_acq_time"] = {
-                "LongName": "Relative acquisition time",
-                "Description": "Acquisition time of the particular scan, "
-                "relative to the first scan of the first session, in days.",
-            }
-            del sidecar["acq_time"]
-            with open(sidecar_path, "w") as sidecar_file:
-                json.dump(sidecar, sidecar_file, indent=2)
+            if os.path.exists(sidecar_path):
+                update_sidecar(sidecar_path)
     return modified_files
 
 
@@ -102,6 +107,11 @@ def main():
 
         modified_files += replace_dates(scans_list, first_date)
 
+    root_sidecar = os.path.join(bids_path,'scans.json')
+    if os.path.exists(root_sidecar):
+        update_sidecar(root_sidecar)
+        modified_files.append(root_sidecar)
+        
     if args.datalad and len(modified_files):
         logging.info("saving files and metadata changes in datalad")
         annex_repo.set_metadata(modified_files, remove={"distribution-restrictions": "sensitive"})
@@ -113,3 +123,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+ 
