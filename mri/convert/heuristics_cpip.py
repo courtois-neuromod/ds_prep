@@ -65,7 +65,8 @@ def custom_seqinfo(wrapper, series_files):
         if 'MRTimingAndRelatedParametersSequence' in wrapper.shared:
             flip_angle = wrapper.shared.MRTimingAndRelatedParametersSequence[0].get('FlipAngle')
         if (0x0021, 0x10fe) in wrapper.shared:
-            scan_options = tuple(wrapper.shared[(0x0021, 0x10fe)][0].get((0x0021, 0x105c)).value)
+            scan_options = wrapper.shared[(0x0021, 0x10fe)][0].get((0x0021, 0x105c))
+            scan_options = tuple(scan_options) if scan_options
             
             
     custom_info = {
@@ -141,7 +142,7 @@ def infotoids(seqinfos, outdir):
 def get_task(s):
     mtch = re.match(".*_task\-([^_]+).*", s.series_id)
     if mtch is None:
-        mtch = re.match(".*\-task_([^_]+).*", s.series_id)# for floc messup
+         mtch = re.match(".*\-task_([^_]+).*", s.series_id)# for floc messup
     if mtch is not None:
         task = mtch.group(1).split("-")
         if len(task) > 1:
@@ -215,7 +216,7 @@ def get_seq_bids_info(s):
     # CMRR bold and dwi
     is_sbref = "Single-band reference" in image_comments
 
-    if s.custom['ice_dims'] and s.custom['ice_dims'][0] != 'X':
+    if s.custom['ice_dims'] and s.custom['ice_dims'][0] != 'X' and not s.is_derived:
         seq['rec'] = 'uncombined'
     # Anats
     if "localizer" in s.protocol_name.lower():
@@ -312,7 +313,7 @@ def get_seq_bids_info(s):
         seq["label"] = "sbref" if is_sbref else "bold"
 
         seq["run"] = get_run(s)
-        seq_extra["dir"] = seq["dir"]
+        seq_extra["dir"] = seq.get("dir", None)
         if s.is_motion_corrected:
             seq["rec"] = "moco"
     elif 'fl3d5' in s.sequence_name:
@@ -320,6 +321,15 @@ def get_seq_bids_info(s):
         seq["acq"] = "stage"
         seq["type"] = "anat"
         seq_extra["flip"] = s.custom['flip_angle']
+    elif "tfi2d1" in s.sequence_name:
+        if "T1 MAP" in image_type:
+            seq["label"] = "T1map"
+        else:
+            seq["label"] = "IRT1"
+        if "MOCO" in image_type:
+            seq["rec"] = "moco"
+        seq["acq"] = "myomaps"
+        seq["type"] = "anat"
 
     ################## SPINAL CORD PROTOCOL #####################
     elif "spcR_100" in s.sequence_name:
@@ -390,7 +400,7 @@ def infotodict(seqinfo):
     current_run = 0
     run_label = None  # run-
     dcm_image_iod_spec = None
-    skip_derived = True
+    skip_derived = False
 
     outtype = ("nii.gz",)
     sbref_as_fieldmap = True  # duplicate sbref in fmap dir to be used by topup
@@ -401,7 +411,7 @@ def infotodict(seqinfo):
     all_bids_infos = {}
 
     for s in seqinfo:
-
+        
         #ex_dcm = load_example_dcm(s)
 
         bids_info, bids_extra = get_seq_bids_info(s)
@@ -418,7 +428,7 @@ def infotodict(seqinfo):
             and not "UNI" in image_type
         ):
             skipped.append(s.series_id)
-            lgr.debug("Ignoring derived data %s", s.series_id)
+            lgr.info("Ignoring derived data %s", s.series_id)
             continue
 
         seq_type = bids_info["type"]
@@ -512,7 +522,7 @@ def dedup_bids_extra(info, bids_infos, extra, dedup_val):
     
             bids_extra_values = [bids_infos[sid][1].get(extra) for sid in series_ids]
             lgr.info(f'{extra} values {bids_extra_values}')
-            if len(set(bids_extra_values)) < 2:
+            if len(set(filter(lambda x: x is None, bids_extra_values))) < 2:
                 continue #does not differentiate series
 
             lgr.info(f"dedup series using {extra}")
