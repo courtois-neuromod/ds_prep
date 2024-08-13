@@ -66,7 +66,7 @@ def custom_seqinfo(wrapper, series_files):
             flip_angle = wrapper.shared.MRTimingAndRelatedParametersSequence[0].get('FlipAngle')
         if (0x0021, 0x10fe) in wrapper.shared:
             scan_options = wrapper.shared[(0x0021, 0x10fe)][0].get((0x0021, 0x105c))
-            scan_options = tuple(scan_options) if scan_options
+            scan_options = tuple(scan_options) if scan_options else ()
             
             
     custom_info = {
@@ -189,20 +189,20 @@ def get_seq_bids_info(s):
             seq_extra["rec"] = it.lower()
     seq_extra["part"] = "mag" if "M" in image_type else ("phase" if "P" in image_type else None)
 
-    try:
-        pedir = s.custom['pe_dir']
-        if "COL" in pedir[:3]:
+    if s.custom.get('pe_dir') and s.custom.get('pedir_pos'):
+        pedir = s.custom['pe_dir'][:3]
+        if "COL" == pedir:
             pedir = "AP"
-        else:
+        elif "ROW" == pedir:
             pedir = "LR"
-        pedir_pos = bool(
-            int(s.custom['pedir_pos'])
-        )
-
-        seq["dir"] = pedir if pedir_pos else pedir[::-1]
-    except Exception as e:
-        print(s, e)
-        pass
+        else:
+            pedir = None
+        if pedir:
+            pedir_pos = bool(
+                int(s.custom['pedir_pos'])
+            )
+            seq["dir"] = seq_extra["dir"] = pedir if pedir_pos else pedir[::-1]
+        
 
     # label bodypart which are not brain, mainly for spine if we set the dicom fields at the console properly
     bodypart = s.custom['body_part'] #ex_dcm.dcm_data.get("BodyPartExamined", None)
@@ -391,16 +391,16 @@ def infotodict(seqinfo):
     subindex: sub index within group
     session: scan index for longitudinal acq
     """
-
-    #lgr.info("Processing %d seqinfo entries", len(seqinfo))
-    #lgr.info(seqinfo)
+    
+    lgr.info("Processing %d seqinfo entries", len(seqinfo))
+    lgr.info(seqinfo)
 
     info = OrderedDict()
     skipped, skipped_unknown = [], []
     current_run = 0
     run_label = None  # run-
     dcm_image_iod_spec = None
-    skip_derived = False
+    skip_derived = True
 
     outtype = ("nii.gz",)
     sbref_as_fieldmap = True  # duplicate sbref in fmap dir to be used by topup
@@ -434,8 +434,6 @@ def infotodict(seqinfo):
         seq_type = bids_info["type"]
         seq_label = bids_info["label"]
 
-        if not s.sequence_name:
-            s.sequence_name = s.custom_info['pulse_sequence_name']
             
         if (seq_type == "fmap" and seq_label == "epi" and bids_extra['part']=='phase' and seq_label=='bold'):
             continue
