@@ -16,7 +16,7 @@ PYBIDS_CACHE_PATH = ".pybids_cache"
 SLURM_JOB_DIR = "code"
 
 SMRIPREP_REQ = {"cpus": 8, "mem_per_cpu": 4096, "time": "24:00:00", "omp_nthreads": 8}
-FMRIPREP_REQ = {"cpus": 12, "mem_per_cpu": 4096, "time": "12:00:00", "omp_nthreads": 8}
+FMRIPREP_REQ = {"cpus": 12, "mem_per_cpu": 4096, "time": "18:00:00", "omp_nthreads": 8}
 
 BIDS_FILTERS_FILE = os.path.join(script_dir, "bids_filters.json")
 
@@ -57,7 +57,6 @@ set -e -u -x
 
 """
 
-
 datalad_pre = """
 export LOCAL_DATASET=$SLURM_TMPDIR/${{SLURM_JOB_NAME//-/}}/
 export SINGULARITYENV_TEMPLATEFLOW_HOME="${{LOCAL_DATASET}}/sourcedata/templateflow/"
@@ -65,16 +64,19 @@ flock --verbose {ds_lockfile} datalad clone {output_repo} $LOCAL_DATASET
 cd $LOCAL_DATASET
 datalad get -s ria-beluga-storage -J 4 -n -r -R1 . # get sourcedata/* containers
 datalad get -s ria-beluga-storage -J 4 -r sourcedata/templateflow/tpl-{{{templates}}}
-if [ -d sourcedata/smriprep ] ; then
-    datalad get -n sourcedata/smriprep sourcedata/smriprep/sourcedata/freesurfer
+if [ -d {smriprep_path} ] ; then
+    datalad get -n {smriprep_path} {freesurfer_path}
 fi
 git submodule foreach --recursive git annex dead here
 git checkout -b $SLURM_JOB_NAME
+# when freesurfer is ran in the meantime as s/fmriprep
 if [ -d sourcedata/freesurfer ] ; then
   git -C sourcedata/freesurfer checkout -b $SLURM_JOB_NAME
 fi
 
-git submodule foreach  --recursive bash -c 'git-annex enableremote ria-beluga-storage || true'
+git submodule foreach  --recursive bash -c "git-annex enableremote ria-beluga-storage || true"
+git submodule foreach  --recursive bash -c "git-annex enableremote ria-beluga-storage-local || true"
+
 
 """
 
@@ -138,6 +140,10 @@ def write_fmriprep_job(layout, subject, args, anat_only=True, longitudinal=False
         ds_lockfile=os.path.join(args.output_repo.replace('ria+file://','').replace('#~','/alias/').split('@')[0], '.datalad_lock'),
         TEMPLATEFLOW_HOME=TEMPLATEFLOW_HOME,
         templates=",".join(REQUIRED_TEMPLATES),
+        smriprep_path = args.smriprep_input,
+        freesurfer_path = (args.freesurfer_input
+           if args.freesurfer_input
+           else args.smriprep_input / 'sourcedata' / 'freesurfer'),
     )
     job_specs.update(SMRIPREP_REQ)
     if args.longitudinal:
@@ -168,6 +174,7 @@ def write_fmriprep_job(layout, subject, args, anat_only=True, longitudinal=False
                     "--input 'sourcedata/{study}/{subject_session}/anat/*_T1w.nii.gz'".format(**job_specs),
                     "--input 'sourcedata/{study}/{subject_session}/anat/*_T2w.nii.gz'".format(**job_specs),
                     "--input 'sourcedata/{study}/{subject_session}/anat/*_FLAIR.nii.gz'".format(**job_specs),
+                    f"--input {args.freesurfer_input}/sub-{subject}" if args.freesurfer_input else "",
                     "--",
                     "-w ./workdir",
                     f"--participant-label {subject}",
@@ -182,9 +189,11 @@ def write_fmriprep_job(layout, subject, args, anat_only=True, longitudinal=False
                     "--write-graph",
                     f"--omp-nthreads {job_specs['omp_nthreads']}",
                     f"--nprocs {job_specs['cpus']}",
-                    f"--mem_mb {job_specs['mem_per_cpu']*job_specs['cpus']}",
+                    f"--mem_mb {job_specs['mem_per_cpu']*max(1,job_specs['cpus']-1)}",
                     "--fs-license-file", 'code/freesurfer.license',
                     "--longitudinal" if longitudinal else "",
+                    f"--fs-subjects-dir {args.freesurfer_input}" if args.freesurfer_input else "",
+                    "--fs-reuse-base" if args.freesurfer_input else "",
                     str(args.bids_path.relative_to(args.output_path)),
                     "./",
                     "participant",
@@ -204,11 +213,6 @@ def write_func_job(layout, subject, session, args):
     study = os.path.basename(layout.root)
 
     derivatives_path = os.path.realpath(args.output_path)
-    anat_path = os.path.join(
-        derivatives_path,
-        "sourcedata",
-        "smriprep",
-    )
 
     bold_runs = layout.get(
         subject=subject,
@@ -299,6 +303,10 @@ def write_func_job(layout, subject, session, args):
         ds_lockfile=os.path.join(args.output_repo.replace('ria+file://','').replace('#~','/alias/').split('@')[0], '.datalad_lock'),
         TEMPLATEFLOW_HOME=TEMPLATEFLOW_HOME,
         templates=",".join(REQUIRED_TEMPLATES),
+        smriprep_path = args.smriprep_input,
+        freesurfer_path = (args.freesurfer_input
+           if args.freesurfer_input
+           else args.smriprep_input / 'sourcedata' / 'freesurfer'),
     )
     job_specs.update(FMRIPREP_REQ)
 
@@ -331,16 +339,16 @@ def write_func_job(layout, subject, session, args):
                     SINGULARITY_CMD_BASE.format(**job_specs),
                     f"--input 'sourcedata/{study}/{subject_session}/fmap/'",
                     f"--input 'sourcedata/{study}/{subject_session}/func/'",
-                    
-                    f"--input 'sourcedata/smriprep/sub-{subject}/anat/'",
-                    f"--input sourcedata/smriprep/sourcedata/freesurfer/fsaverage/",
-                    f"--input sourcedata/smriprep/sourcedata/freesurfer/sub-{subject}/",
+                    f"--input 'sourcedata/{study}/{subject_session}/anat/*T1w.nii.gz'" \
+                        if len(glob.glob(f"sourcedata/{study}/{subject_session}/anat/*T1w.nii.gz")) else "",
+                    f"--input '{job_specs['smriprep_path']}/sub-{subject}/anat/'",
+                    f"--input {job_specs['freesurfer_path']}/fsaverage/",
+                    f"--input {job_specs['freesurfer_path']}/sub-{subject}/",
                     "--",
                     "-w ./workdir",
                     f"--participant-label {subject}",
-                    "--anat-derivatives ./sourcedata/smriprep",
-                    "--fs-subjects-dir ./sourcedata/smriprep/sourcedata/freesurfer",
-#                    f"--bids-database-dir {pybids_cache_path}",
+                    f"--anat-derivatives {job_specs['smriprep_path']}",
+                    f"--fs-subjects-dir {job_specs['freesurfer_path']}",
                     f"--bids-filter-file {bids_filters_path}",
                     "--output-layout bids",
                     "--ignore slicetiming" if not args.slicetiming else "",
@@ -353,8 +361,9 @@ def write_func_job(layout, subject, session, args):
                     "--skip_bids_validation",
                     f"--omp-nthreads {job_specs['omp_nthreads']}",
                     f"--nprocs {job_specs['cpus']}",
-                    f"--mem_mb {job_specs['mem_per_cpu']*job_specs['cpus']}",
+                    f"--mem_mb {job_specs['mem_per_cpu']*max(1,job_specs['cpus']-1)}",
                     "--fs-license-file", 'code/freesurfer.license',
+                    args.fmriprep_args,
                     # monitor resources to design a heuristic for runtime/cpu/ram of func data
                     #"--resource-monitor",
                     str(args.bids_path.relative_to(args.output_path)),
@@ -432,6 +441,23 @@ def parse_args():
         help="Use smriprep longitudinal pipeline",
     )
 
+    parser.add_argument(
+        "--freesurfer-input",
+        type=pathlib.Path,
+        help="name of the input folder in precomputed freesurfer results.",
+    )
+    parser.add_argument(
+        "--smriprep-input",
+        type=pathlib.Path,
+        default='./sourcedata/smriprep',
+        help="name of the input folder in precomputed smriprep results.",
+    )
+
+    parser.add_argument(
+        "--fmriprep-args",
+        default="",
+        help="extra args to add to the fmriprep call",
+    )
     
     parser.add_argument(
         "--force-reindex",
