@@ -1,0 +1,18 @@
+{
+  "eye_timestamp": "pupil/gaze timestamp from run onset (time 0), in seconds",
+  "eye1_x_coordinate": "gaze position (x coordinate) normalized as a proportion of the screen width. Bound = [0, 1], 0 = left)",
+  "eye1_y_coordinate": "gaze position (y coordinate) normalized as a proportion of the screen height, y coordinate. Bound = [0, 1], 0 = bottom)",
+  "eye1_confidence": "Quality assessment of the pupil detection. 0.0 = pupil could not be detected. 1.0 = pupil detected with very high certainty",
+  "eye1_x_coordinate_driftCorr": "normalized gaze position after drift correction, x coordinate. Bound = [0, 1], 0 = left). Drift was estimated with a polynomial drawn through the distance between a centered fixation target and gaze positions during between-trial fixations",
+  "eye1_y_coordinate_driftCorr": "normalized gaze position after drift correction, y coordinate. Bound = [0, 1], 0 = bottom). Drift was estimated with a polynomial drawn through the distance between a centered fixation target and gaze positions during between-trial fixations",
+
+  "eye1_pupil_x_coordinate": "pupil position (x coordinate) normalized as a proportion of the width of the eye video frame. Bound = [0, 1], 0 = left)",
+  "eye1_pupil_y_coordinate": "pupil position (y coordinate) normalized as a proportion of the height of the eye video frame. Bound = [0, 1], 0 = bottom)",
+
+  "eye1_pupil_diameter": "TODO: what metric?",
+
+  "eye1_pupil_ellipse_axes": "TODO: do I need this?",
+
+  "eye1_pupil_ellipse_angle": "TODO: needed? insert metric, description",
+  "eye1_pupil_ellipse_center": "TODO: tupple; insert metric, description; seems to be in pixels"
+}
