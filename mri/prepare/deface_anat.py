@@ -334,7 +334,7 @@ def main():
         )
         datalad.api.save(
             modified_files + new_files,
-            message="deface %d series/images and update distribution-restrictions"
+            message="__deface__ %d series/images and update distribution-restrictions"
             % len(modified_files),
         )
 
