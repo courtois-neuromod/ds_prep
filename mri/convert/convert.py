@@ -48,18 +48,32 @@ def parse_args():
         action="store_true",
         help="fill new BIDS B0FieldIdentifier instead of IntendedFor",
     )
+
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="run heudiconv with overwrite",
+    )
+
     
     return parser.parse_args()
 
+def detect_sub_ses(ds, commit='HEAD'):
+    new_files = [(ds.pathobj / nf) for nf in ds.repo.call_git(['show','--name-only', commit,'--format=oneline']).split('\n')[1:]]
+    for f in new_files:
+        mtch = re.match(r".*/sub-([a-zA-Z0-9]+)/(ses-([a-zA-Z0-9]+))?.*", str(f))
+        if mtch:
+            grps = mtch.groups()
+            return grps[0], grps[2]
 
-def single_session_job(input_file, output_datalad, ria_storage_remote, b0_field_id=False):
+def single_session_job(input_file, output_datalad, ria_storage_remote, b0_field_id=False, overwrite=False,):
     session_name = input_file.stem.split('.')[0]
     remote_path = pathlib.Path(output_datalad.replace('ria+file://', '').replace('#~', '/alias/').split('@')[0])
     lock_path = remote_path / '.datalad_lock'
     file_lock = FileLock(lock_path)
 
     try:
-        with tempfile.TemporaryDirectory() as tmpdirname:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdirname:
             with file_lock:
                 ds = datalad.api.install(path=tmpdirname, source=output_datalad)
 
@@ -81,13 +95,14 @@ def single_session_job(input_file, output_datalad, ria_storage_remote, b0_field_
             print(heudiconv_params)
             heudiconv_workflow(**heudiconv_params)
 
+            subject, session = detect_sub_ses(ds)
             fix_fmap_phase(ds)
             fix_complex_events(ds)
             if b0_field_id:
-                fill_b0_meta(ds.pathobj)
+                fill_b0_meta(ds.pathobj, participant_label=subject, session_label=session)
                 ds.save(message='fill B0Field* tags')
             else:
-                fill_intended_for(ds.pathobj)
+                fill_intended_for(ds.pathobj, participant_label=subject, session_label=session)
                 ds.save(message='fill IntendedFor')
             fix_fmap_multiecho(ds, commit='HEAD~3')
                 
@@ -96,8 +111,8 @@ def single_session_job(input_file, output_datalad, ria_storage_remote, b0_field_
             with file_lock:
                 print('pushing')
                 ds.push(to='origin', data='anything')
-            ds.repo.call_annex(['unused'])
-            ds.repo.call_annex(['dropunused', '--force', 'all'])
+            #ds.repo.call_annex(['unused'])
+            #ds.repo.call_annex(['dropunused', '--force', 'all'])
             ds.drop('./.heudiconv/', reckless='kill', recursive=True)
             ds.drop('.', recursive=True)
         print(f"processed {input_file}")
@@ -195,7 +210,9 @@ def main():
         partial(single_session_job,
                 output_datalad=args.output_datalad,
                 ria_storage_remote=args.ria_storage_remote,
-                b0_field_id=args.b0_field_id),
+                b0_field_id=args.b0_field_id,
+                overwrite=args.overwrite,
+        ),
         args.files)
 
     print("SUMMARY " + "#"*40)

@@ -32,7 +32,7 @@ def _load_bidsignore_(bids_root):
         )
     return tuple()
 
-def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before', sloppy=False, **kwargs):
+def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before', sloppy=False, no_sbref=False, **kwargs):
     path = os.path.abspath(bids_path)
     pybids_cache_path = os.path.join(path, PYBIDS_CACHE_PATH)
 
@@ -77,16 +77,20 @@ def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_re
         epi_pedir = epi.entities["PhaseEncodingDirection"]
         opposite_pedir = epi_pedir[-1:] if '-' in epi_pedir else f"{epi_pedir}-"
 
-        sbref = layout.get(**{
-            **epi.get_entities(),
-            'suffix':'sbref',
-            'echo': 1 if epi.entities.get('echo', None) else None # 
-        })
-        assert len(sbref)==1, "There should be a single SBRef for each epi"
-        if not sbref:
-            logging.error(f"SBref not found for {epi.path}, something went wrong, check BIDS conversion.")
-            continue
-        sbref = sbref[0]
+        if no_sbref:
+            # the regular/accelerated epi is used instead of sbref to correct itself
+            sbref = epi
+        else:
+            sbref = layout.get(**{
+                **epi.get_entities(),
+                'suffix':'sbref',
+                'echo': 1 if epi.entities.get('echo', None) else None # 
+            })
+            assert len(sbref)==1, "There should be a single SBRef for each epi"
+            if not sbref:
+                logging.error(f"SBref not found for {epi.path}, something went wrong, check BIDS conversion.")
+                continue
+            sbref = sbref[0]
         
         #if epi_series_id in sbref.entities.get('B0FieldIdentifier',[]):
             # that series was already assigned a fieldmap
@@ -96,7 +100,7 @@ def fill_b0_meta(bids_path, participant_label=None, session_label=None, force_re
         fmap_query_base = dict(
             suffix=["epi", "sbref"],
             extension=".nii.gz",
-            acquisition=["sbref", "sbrefEcho1"], # get first echo
+            acquisition=["sbref", "sbrefEcho1", Query.NONE], # get first echo
             subject=epi.entities["subject"],
             session=epi.entities.get("session", None),
 #            echo=1 if epi.entities.get("echo", None) else None, # get first echo
@@ -240,11 +244,16 @@ def get_candidate_fmaps(layout, epi, match_shim=True, sloppy=0, non_fmap=True):
 
     dtype_suffix_acq_part_comb = [
         ('fmap', 'epi', 'sbref', None),
-        ('fmap', 'epi', Query.NONE, None)]
+        ('fmap', 'epi', Query.NONE, None),
+        ('fmap', 'epi', Query.ANY, None)]
     if non_fmap:
         dtype_suffix_acq_part_comb.extend([
-        (epi.entities['datatype'], 'sbref', None, Query.NONE),
-        (epi.entities['datatype'], 'sbref', None, 'mag')])
+            (epi.entities['datatype'], 'sbref', None, Query.NONE),
+            (epi.entities['datatype'], 'sbref', None, 'mag'),
+            # no sbref, product sequence
+            (epi.entities['datatype'], Query.NONE, None, Query.NONE),
+            (epi.entities['datatype'], Query.NONE, None, 'mag'),
+        ])
     
     fmaps = sum([
         layout.get(
@@ -256,7 +265,7 @@ def get_candidate_fmaps(layout, epi, match_shim=True, sloppy=0, non_fmap=True):
             ShimSetting=str(epi.entities['ShimSetting']) if match_shim else Query.ANY,
             ImageOrientationPatientDICOM=str(epi.entities['ImageOrientationPatientDICOM']) if not sloppy else Query.ANY,
         ) for dtype, suffix, acq, part in dtype_suffix_acq_part_comb ],[])
-    
+
     if sloppy > 0:
         # find fmaps with close enough patient position
         fmaps = [fmap for fmap in fmaps
@@ -277,7 +286,7 @@ def get_candidate_fmaps(layout, epi, match_shim=True, sloppy=0, non_fmap=True):
 
     return fmaps_match_pe_pos, fmaps_match_pe_neg
 
-def fill_intended_for(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before', sloppy=False, **kwargs):
+def fill_intended_for(bids_path, participant_label=None, session_label=None, force_reindex=False, match_strategy='before', sloppy=False, no_sbref=False, **kwargs):
     path = os.path.abspath(bids_path)
     pybids_cache_path = os.path.join(path, PYBIDS_CACHE_PATH)
 
@@ -447,6 +456,11 @@ def parse_args():
         "--b0-field-id",
         action="store_true",
         help="fill new BIDS B0FieldIdentifier instead of IntendedFor",
+    )
+    parser.add_argument(
+        "--no-sbref",
+        action="store_true",
+        help="if no sbref, use accelerated/regular sequence for b0-ref",
     )
 
 
