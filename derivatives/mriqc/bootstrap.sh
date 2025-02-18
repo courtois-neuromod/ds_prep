@@ -10,7 +10,7 @@ SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 datalad install -d . -s ${ria_store}#~repronim/containers ./containers
 git -C containers remote rename origin ria-beluga #rename to ria-beluga to be more explicit
-datalad run -m "Freeze mriqc container version" containers/scripts/freeze_versions bids-mriqc=22.0.1
+datalad run -m "Freeze mriqc container version" containers/scripts/freeze_versions --save-dataset=. bids-mriqc=24.0.2
 datalad push -d containers --to ria-beluga # push changes to the RIA for the freeze commit to exists there
 
 mkdir code
@@ -23,5 +23,6 @@ datalad save -m 'setup dataset gitattribute gitignore and install freesurfer lic
 datalad install -d . -s $source_ds sourcedata/$ds_name
 
 datalad create-sibling-ria  --alias cneuromod.$ds_name.mriqc -s $ria_name $ria_store --shared 640
+git-annex enableremote ${ria_name}-storage autoenable=false
 datalad push --to $ria_name
 git -C $(git remote get-url $ria_name) symbolic-ref HEAD refs/heads/$(git branch --show-current)

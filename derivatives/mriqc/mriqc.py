@@ -14,9 +14,9 @@ script_dir = os.path.dirname(__file__)
 PYBIDS_CACHE_PATH = ".pybids_cache"
 SLURM_JOB_DIR = "code"
 
-MRIQC_REQ = {"cpus": 8, "mem_per_cpu": 4, "time": "8:00:00", "omp_nthreads": 8}
+MRIQC_REQ = {"cpus": 8, "mem_per_cpu": 4, "time": "2:00:00", "omp_nthreads": 8}
 
-MRIQC_DEFAULT_VERSION = "mriqc-22.0.1"
+MRIQC_DEFAULT_VERSION = "mriqc-24.0.2"
 
 SINGULARITY_CMD_BASE = " ".join(
     [
@@ -31,7 +31,7 @@ SINGULARITY_CMD_BASE = " ".join(
     [
         "datalad containers-run "
         "-m 'mriqc_{subject_session}'",
-        "-n containers/bids-mriqc",
+        "-n bids-mriqc",
         "--input sourcedata/{study}/{subject_session}/fmap/",
         "--input sourcedata/{study}/{subject_session}/func/",
         "--output .",
@@ -137,6 +137,8 @@ def write_mriqc_job(layout, subject, session, args, type='func'):
                     f"--nprocs {job_specs['cpus']}",
                     f"-m {' '.join(acqs)}",
                     f"--mem_gb {job_specs['mem_per_cpu']*job_specs['cpus']}",
+                    "--no-datalad-get",
+                    "--bids-filter-file code/bids_filters.json" if os.path.exists("code/bids_filters.json") else "",
                     "--no-sub", # no internet on compute nodes
                     str(args.bids_path.relative_to(args.output_path)),
                     './',
