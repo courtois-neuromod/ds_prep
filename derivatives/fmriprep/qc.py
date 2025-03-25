@@ -25,7 +25,7 @@ def build_app(derivatives_path):
             [
                 os.path.basename(p)
                 for p in glob.glob(
-                    f"{derivatives_path}/sub-{subject}/figures/*desc-sdc_bold.svg"
+                    f"{derivatives_path}/sub-{subject}/figures/*desc-sdc*_bold.svg"
                 )
             ]
         )
