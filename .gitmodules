@@ -1,0 +1,4 @@
+[submodule "eyetracking/pupil"]
+	path = eyetracking/pupil
+	url = git@github.com:courtois-neuromod/pupil.git
+	branch = gigevision_rebase
