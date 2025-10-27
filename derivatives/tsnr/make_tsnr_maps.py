@@ -9,7 +9,7 @@ from nipype.algorithms.confounds import TSNR
 
 
 @click.command()
-@click.argument('ds_name', type=string)
+@click.argument('ds_name', type=str)
 @click.argument('ds_path', type=click.Path())
 @click.argument('output_filepath', type=click.Path())
 def main(ds_name, ds_path, output_filepath):

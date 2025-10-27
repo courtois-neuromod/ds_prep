@@ -1,4 +1,4 @@
-import glob
+import os, glob
 from pathlib import Path
 
 import click
@@ -6,11 +6,11 @@ from nilearn.image import mean_img
 
 
 @click.command()
-@click.argument('ds_name', type=string)
+@click.argument('ds_name', type=str)
 @click.argument('ds_path', type=click.Path())
 def main(ds_name, ds_path):
 
-    for sub_path in glob.glob(ds_path):
+    for sub_path in glob.glob(f"{ds_path}/sub*"):
         sub_num = os.path.basename(sub_path)
 
         sub_list_MNI = sorted(glob.glob(f"{ds_path}/{sub_num}/ses*/func/*MNI152NLin2009cAsym*stat-tsnr*nii.gz"))
