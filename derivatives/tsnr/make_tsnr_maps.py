@@ -26,17 +26,18 @@ def tsnr_maps(ds_name, ds_path, output_filepath):
     for bold in bolds:
         tsnr_path = bold.path.replace(ds_path,output_filepath).replace('_part-mag','').replace('desc-preproc','stat-tsnr').replace('bold','statmap')
         Path(tsnr_path).parent.mkdir(parents=True, exist_ok=True)
-        try:
-            tsnr_if = TSNR(
-                in_file=bold.path,
-                tsnr_file=tsnr_path,
-                stddev_file=tsnr_path.replace('stat-tsnr', 'stat-stdev'),
-                mean_file=tsnr_path.replace('stat-tsnr', 'stat-mean'),
-            )
-            tsnr_if.run()
-            del tsnr_if
-        except:
-            logger.info(f"could not process {os.path.basename(bold.path)}")
+        if not Path(tsnr_path).exists():
+            try:
+                tsnr_if = TSNR(
+                    in_file=bold.path,
+                    tsnr_file=tsnr_path,
+                    stddev_file=tsnr_path.replace('stat-tsnr', 'stat-stdev'),
+                    mean_file=tsnr_path.replace('stat-tsnr', 'stat-mean'),
+                )
+                tsnr_if.run()
+                del tsnr_if
+            except:
+                logger.info(f"could not process {os.path.basename(bold.path)}")
 
     
 if __name__ == '__main__':
