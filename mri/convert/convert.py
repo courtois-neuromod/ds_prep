@@ -7,7 +7,7 @@ import multiprocessing
 from functools import partial
 from filelock import FileLock
 import fileinput
-from ..prepare.fill_intended_for import fill_intended_for, fill_b0_meta
+from ..prepare.fill_intended_for import fill_b0_meta
 import re
 
 HEURISTICS_PATH = pathlib.Path(__file__).parent.resolve() / 'heuristics_unf.py'
@@ -99,7 +99,7 @@ def single_session_job(input_file, output_datalad, ria_storage_remote, b0_field_
             fix_fmap_phase(ds)
             fix_complex_events(ds)
             if b0_field_id:
-                fill_b0_meta(ds.pathobj, participant_label=subject, session_label=session)
+                fill_b0_meta(ds.pathobj, subject=subject, session=session)
                 ds.save(message='fill B0Field* tags')
             else:
                 fill_intended_for(ds.pathobj, participant_label=subject, session_label=session)
