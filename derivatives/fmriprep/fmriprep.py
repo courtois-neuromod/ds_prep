@@ -190,6 +190,7 @@ def write_fmriprep_job(layout, subject, args, anat_only=True, longitudinal=False
                     f"--omp-nthreads {job_specs['omp_nthreads']}",
                     f"--nprocs {job_specs['cpus']}",
                     f"--mem_mb {job_specs['mem_per_cpu']*max(1,job_specs['cpus']-1)}",
+                    "--track-carbon",
                     "--fs-license-file", 'code/freesurfer.license',
                     "--longitudinal" if longitudinal else "",
                     f"--fs-subjects-dir {args.freesurfer_input}" if args.freesurfer_input else "",
@@ -366,6 +367,7 @@ def write_func_job(layout, subject, session, args):
                     args.fmriprep_args,
                     # monitor resources to design a heuristic for runtime/cpu/ram of func data
                     #"--resource-monitor",
+                    "--track-carbon",
                     str(args.bids_path.relative_to(args.output_path)),
                     "./",
                     "participant",
@@ -531,11 +533,7 @@ def main():
         )
     """
 
-    layout = bids.BIDSLayout(
-        args.bids_path,
-        database_path=pybids_cache_path,
-        reset_database=args.force_reindex,
-        validate=False,
+    indexer = bids.BIDSLayoutIndexer(
         ignore=(
             "code",
             "stimuli",
@@ -544,6 +542,14 @@ def main():
             re.compile(r"^\."),
         )
         + load_bidsignore(args.bids_path),
+    )
+
+    layout = bids.BIDSLayout(
+        args.bids_path,
+        database_path=pybids_cache_path,
+        reset_database=args.force_reindex,
+        validate=False,
+        indexer=indexer,
     )
 
     job_path = os.path.join(args.output_path, SLURM_JOB_DIR)
