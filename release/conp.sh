@@ -7,7 +7,7 @@ ssh -fN -L  4722:sftp.conp.ca:6806 bpinsard@login.acelab.ca
 datalad create-sibling-ria --existing skip  -r -R 2 -s conp-ria ria+ssh://cneuromod@localhost:4722/data/proftpd/users/cneuromod/ria-conp --shared 0644
 
 # apply filters for the subset of data to be pushed to conp for datasets containing subject data
-git submodule foreach --recursive bash -c "git-annex groupwanted conp 'not metadata=distribution-restrictions=* and include=sub-0[135]/** and exclude=sub-0[246]/**' || true"
+git submodule foreach --recursive bash -c "git-annex groupwanted conp 'not metadata=distribution-restrictions=* and include=sub-0[12356]/** and exclude=sub-0[4]/**' || true"
 git submodule foreach --recursive bash -c "git-annex group conp-ria-storage conp || true"
 git submodule foreach --recursive bash -c "git-annex wanted conp-ria-storage groupwanted || true"
 
