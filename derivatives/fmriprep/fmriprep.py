@@ -353,6 +353,7 @@ def write_func_job(layout, subject, session, args):
                     "--",
                     "-w ./workdir",
                     f"--participant-label {subject}",
+                    f"--session-label {session}",
                     f"--derivatives {job_specs['smriprep_path']}",
                     f"--fs-subjects-dir {job_specs['freesurfer_path']}",
                     f"--bids-filter-file {bids_filters_path}",
