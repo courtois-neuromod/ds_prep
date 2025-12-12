@@ -31,6 +31,7 @@ SINGULARITY_CMD_BASE = " ".join(
         "datalad containers-run "
         "-m 'fMRIPrep_{subject_session}'",
         "-n bids-fmriprep",
+        "--expand both",
     ] + [
         "--input sourcedata/templateflow/tpl-%s/"% tpl for tpl in REQUIRED_TEMPLATES
     ] + [
@@ -63,7 +64,7 @@ export SINGULARITYENV_TEMPLATEFLOW_HOME="${{LOCAL_DATASET}}/sourcedata/templatef
 flock --verbose {ds_lockfile} datalad clone {output_repo} $LOCAL_DATASET
 cd $LOCAL_DATASET
 datalad get -s ria-beluga-storage -J 4 -n -r -R1 . # get sourcedata/* containers
-datalad get -s ria-beluga-storage -J 4 -r sourcedata/templateflow/tpl-{{{templates}}}
+datalad get -s ria-beluga-storage -J 4 -n -r sourcedata/templateflow/tpl-{{{templates}}}
 if [ -d {smriprep_path} ] ; then
     datalad get -n {smriprep_path} {freesurfer_path}
 fi
@@ -75,8 +76,9 @@ if [ -d sourcedata/freesurfer ] ; then
 fi
 
 git submodule foreach  --recursive bash -c "git-annex enableremote ria-beluga-storage || true"
+git submodule foreach  --recursive bash -c "git-annex enableremote ria-rorqual-storage || true"
 git submodule foreach  --recursive bash -c "git-annex enableremote ria-beluga-storage-local || true"
-
+datalad get -J 4 -r sourcedata/templateflow/tpl-{{{templates}}}
 
 """
 
@@ -190,7 +192,7 @@ def write_fmriprep_job(layout, subject, args, anat_only=True, longitudinal=False
                     f"--omp-nthreads {job_specs['omp_nthreads']}",
                     f"--nprocs {job_specs['cpus']}",
                     f"--mem_mb {job_specs['mem_per_cpu']*max(1,job_specs['cpus']-1)}",
-                    "--track-carbon",
+                    "--track-carbon" if args.track_carbon else "",
                     "--fs-license-file", 'code/freesurfer.license',
                     "--longitudinal" if longitudinal else "",
                     f"--fs-subjects-dir {args.freesurfer_input}" if args.freesurfer_input else "",
@@ -232,6 +234,8 @@ def write_func_job(layout, subject, session, args):
             suffix="bold",
             part='mag',
         )
+    is_multi_echo = any([b.entities.get('echo') for b in bold_runs])
+        
     if len(bold_runs) == 0:
         print(f"No bold runs found for {subject} {session}")
 
@@ -339,7 +343,8 @@ def write_func_job(layout, subject, session, args):
                 [
                     SINGULARITY_CMD_BASE.format(**job_specs),
                     f"--input 'sourcedata/{study}/{subject_session}/fmap/'",
-                    f"--input 'sourcedata/{study}/{subject_session}/func/'",
+                    f"--input 'sourcedata/{study}/{subject_session}/func/*part-mag*'" if contains_phase_data else
+                    f"--input 'sourcedata/{study}/{subject_session}/func/*'",
                     f"--input 'sourcedata/{study}/{subject_session}/anat/*T1w.nii.gz'" \
                         if len(glob.glob(f"sourcedata/{study}/{subject_session}/anat/*T1w.nii.gz")) else "",
                     f"--input '{job_specs['smriprep_path']}/sub-{subject}/anat/'",
@@ -348,12 +353,13 @@ def write_func_job(layout, subject, session, args):
                     "--",
                     "-w ./workdir",
                     f"--participant-label {subject}",
-                    f"--anat-derivatives {job_specs['smriprep_path']}",
+                    f"--derivatives {job_specs['smriprep_path']}",
                     f"--fs-subjects-dir {job_specs['freesurfer_path']}",
                     f"--bids-filter-file {bids_filters_path}",
                     "--output-layout bids",
                     "--ignore slicetiming" if not args.slicetiming else "",
-                    "--use-syn-sdc",
+                    "--use-syn-sdc", "warn",
+                    "--me-output-echos" if is_multi_echo else "",
                     "--output-spaces",
                     *OUTPUT_TEMPLATES,
                     "--cifti-output 91k",
@@ -367,7 +373,7 @@ def write_func_job(layout, subject, session, args):
                     args.fmriprep_args,
                     # monitor resources to design a heuristic for runtime/cpu/ram of func data
                     #"--resource-monitor",
-                    "--track-carbon",
+                    "--track-carbon" if args.track_carbon else "",
                     str(args.bids_path.relative_to(args.output_path)),
                     "./",
                     "participant",
@@ -430,6 +436,11 @@ def parse_args():
         nargs="+",
         help="a space delimited list of session identifiers or a single "
         "identifier (the ses- prefix can be removed)",
+    )
+    parser.add_argument(
+        "--track-carbon",
+        action="store_true",
+        help="Track carbon, require fmriprep 22.x+ ",
     )
 
     parser.add_argument(
@@ -551,6 +562,7 @@ def main():
         validate=False,
         indexer=indexer,
     )
+    
 
     job_path = os.path.join(args.output_path, SLURM_JOB_DIR)
     if not os.path.exists(job_path):
