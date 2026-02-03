@@ -33,20 +33,14 @@ def tsnr_maps(ds_name, ds_path, output_filepath, echo=None, me=False):
 
     for bold in bolds:
         entities = bold.get_entities()
-        entities_tsnr = {
-            'datatype': entities['datatype'],
-            'subject': entities['subject'],
-            'session': entities['session'],
-            'task': entities['task'],
-            'run': entities['run'],
+        entities.update({
             'echo': echo,
             'stat': 'tsnr',
-            'desc': entities['desc'],
-            'suffix': 'statmap',
-            'extension': '.nii.gz'
-        }
-        pattern="sub-{subject}/ses-{session}/{datatype}/sub-{subject}_ses-{session}_task-{task}_run-{run}[_echo-{echo}]_stat-tsnr_desc-{desc}_statmap.nii.gz"
-        tsnr_path = layout.build_path(entities_tsnr, pattern, validate=False).replace(ds_path, output_filepath)
+            'suffix': 'statmap'
+        })
+
+        pattern="sub-{subject}/ses-{session}/{datatype}/sub-{subject}_ses-{session}_task-{task}_run-{run}[_echo-{echo}]_stat-{stat}_desc-{desc}_{suffix}.nii.gz"
+        tsnr_path = layout.build_path(entities, pattern, validate=False).replace(ds_path, output_filepath)
 
         Path(tsnr_path).parent.mkdir(parents=True, exist_ok=True)
         if not Path(tsnr_path).exists():
@@ -60,7 +54,7 @@ def tsnr_maps(ds_name, ds_path, output_filepath, echo=None, me=False):
                 tsnr_if.run()
                 del tsnr_if
             except:
-                logger.info(f"could not process {os.path.basename(bold.path)}")
+                logger.info(f"could not process {bold.filename}")
 
     
 if __name__ == '__main__':

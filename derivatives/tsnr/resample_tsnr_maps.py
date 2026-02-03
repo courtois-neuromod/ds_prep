@@ -24,12 +24,18 @@ def resample_to_T1w(ds_name, tsnr_path, fmriprep_path):
     logger.info(f"loading fMRIPrep data: {fmriprep_path}")
     layout_fmriprep = bids.BIDSLayout(fmriprep_path, validate=False, is_derivative=True)
     
-    tsnr_maps = [f for f in layout_tsnr.get(suffix='statmap') if 'stat-tsnr' in f.filename and 'space-T1w' not in f.filename]
+    tsnr_maps = [f for f in layout_tsnr.get(suffix='statmap', extension='.nii.gz') if 'stat-tsnr' in f.filename]
 
     for tsnr_map in tsnr_maps:
         entities = tsnr_map.get_entities()
-        out_file = tsnr_map.path.replace(f'run-{entities["run"]}', f'run-{entities["run"]}_space-T1w')
-        
+        entities.update({
+            'space': 'T1w',
+            'stat': 'tsnr',
+        })
+
+        pattern = pattern="sub-{subject}/ses-{session}/{datatype}/sub-{subject}_ses-{session}_task-{task}_run-{run}_space-{space}[_echo-{echo}]_stat-{stat}_desc-{desc}_{suffix}.nii.gz"
+        out_file = layout_tsnr.build_path(entities, pattern, validate=False)
+
         Path(out_file).parent.mkdir(parents=True, exist_ok=True)
         if not Path(out_file).exists():
             # Get reference images from fMRIPrep directory
@@ -43,9 +49,9 @@ def resample_to_T1w(ds_name, tsnr_path, fmriprep_path):
             )
             # Validate input
             if len(t1w) == 0:
-                raise IOError(f"No T1w file associated with {tsnr_map.filename}")
+                raise IOError(f"No T1w boldref file associated with {tsnr_map.filename}")
             elif len(t1w) > 1:
-                raise IOError(f"More than one T1w file associated with {tsnr_map.filename}")
+                raise IOError(f"More than one T1w boldref file associated with {tsnr_map.filename}")
             else:
                 t1w = t1w[0]
             
@@ -80,7 +86,7 @@ def resample_to_T1w(ds_name, tsnr_path, fmriprep_path):
                     out_file
                 )
             except:
-                logger.info(f"Could not resample {os.path.basename(tsnr_map.path)}")
+                logger.info(f"Could not resample {tsnr_map.filename}")
 
 if __name__ == '__main__':
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
