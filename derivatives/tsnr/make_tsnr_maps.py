@@ -19,7 +19,7 @@ def main(ds_name, ds_path, output_filepath, echo, me):
 
 def tsnr_maps(ds_name, ds_path, output_filepath, echo=None, me=False):
     logger = logging.getLogger(__name__)
-    logger.info(f'generating tsnr maps from fmriprep data for the {ds_name} dataset')
+    logger.info(f'generating tsnr maps from {Path(ds_path).name.split('.')[-1]} data for the {ds_name} dataset')
     logger.info(f"loading BIDS: {ds_name}")
 
     layout = bids.BIDSLayout(ds_path, validate=False)
