@@ -15,7 +15,7 @@ from nipype.algorithms.confounds import TSNR
 @click.option('--echo', type=str, default=None, help='Specify the echo value to compute tSNR maps from fMRIPrep outputs')
 @click.option('--me', is_flag=True, help='Flag to specify if working with tedana outputs. If specified, will compute tSNR maps for optcom and denoised images')
 def main(ds_name, ds_path, output_filepath, echo, me):
-    tsnr_maps(ds_name, ds_path, output_filepath, echo, me)
+    tsnr_maps(ds_name, str(Path(ds_path)), str(Path(output_filepath)), echo, me)
 
 def tsnr_maps(ds_name, ds_path, output_filepath, echo=None, me=False):
     logger = logging.getLogger(__name__)
@@ -32,7 +32,21 @@ def tsnr_maps(ds_name, ds_path, output_filepath, echo=None, me=False):
         bolds = layout.get(suffix='bold', extension='.nii.gz', desc='preproc', echo=echo)
 
     for bold in bolds:
-        tsnr_path = bold.path.replace(ds_path,output_filepath).replace('_part-mag','').replace(f'desc-{bold.get_entities()["desc"]}',f'stat-tsnr_desc-{bold.get_entities()["desc"]}').replace('bold','statmap')
+        entities = bold.get_entities()
+        entities_tsnr = {
+            'datatype': entities['datatype'],
+            'subject': entities['subject'],
+            'session': entities['session'],
+            'task': entities['task'],
+            'run': entities['run'],
+            'echo': echo,
+            'stat': 'tsnr',
+            'desc': entities['desc'],
+            'suffix': 'statmap',
+            'extension': '.nii.gz'
+        }
+        pattern="sub-{subject}/ses-{session}/{datatype}/sub-{subject}_ses-{session}_task-{task}_run-{run}[_echo-{echo}]_stat-tsnr_desc-{desc}_statmap.nii.gz"
+        tsnr_path = layout.build_path(entities_tsnr, pattern, validate=False).replace(ds_path, output_filepath)
 
         Path(tsnr_path).parent.mkdir(parents=True, exist_ok=True)
         if not Path(tsnr_path).exists():
