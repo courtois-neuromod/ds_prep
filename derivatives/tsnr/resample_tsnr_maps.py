@@ -48,9 +48,9 @@ def resample_to_T1w(ds_name, tsnr_path, fmriprep_path):
             )
             # Validate input
             if len(t1w) == 0:
-                raise IOError(f"No T1w boldref file associated with {tsnr_map.filename}")
+                raise FileNotFoundError(f"No T1w boldref file associated with {tsnr_map.filename}")
             elif len(t1w) > 1:
-                raise IOError(f"More than one T1w boldref file associated with {tsnr_map.filename}")
+                raise ValueError(f"More than one T1w boldref file associated with {tsnr_map.filename}")
             else:
                 t1w = t1w[0]
             
@@ -65,9 +65,9 @@ def resample_to_T1w(ds_name, tsnr_path, fmriprep_path):
             )
             # Validate input
             if len(transform) == 0:
-                raise IOError(f"No transform file associated with {tsnr_map.filename}")
+                raise FileNotFoundError(f"No transform file associated with {tsnr_map.filename}")
             elif len(transform) > 1:
-                raise IOError(f"More than one transform file associated with {tsnr_map.filename}")
+                raise ValueError(f"More than one transform file associated with {tsnr_map.filename}")
             else:
                 transform = transform[0]
             

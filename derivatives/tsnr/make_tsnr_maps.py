@@ -12,17 +12,17 @@ from nipype.algorithms.confounds import TSNR
 @click.argument('ds_path', type=click.Path())
 @click.argument('output_filepath', type=click.Path())
 @click.option('--echo', type=str, default=None, help='Specify the echo value to compute tSNR maps from fMRIPrep outputs')
-@click.option('--me', is_flag=True, help='Flag to specify if working with tedana outputs. If specified, will compute tSNR maps for optcom and denoised images')
-def main(ds_name, ds_path, output_filepath, echo, me):
-    tsnr_maps(ds_name, str(Path(ds_path)), str(Path(output_filepath)), echo, me)
+@click.option('--tedana', is_flag=True, help='Flag to specify if working with tedana outputs. If specified, will compute tSNR maps for optcom and denoised images')
+def main(ds_name, ds_path, output_filepath, echo, tedana):
+    tsnr_maps(ds_name, str(Path(ds_path)), str(Path(output_filepath)), echo, tedana)
 
-def tsnr_maps(ds_name, ds_path, output_filepath, echo=None, me=False):
+def tsnr_maps(ds_name, ds_path, output_filepath, echo=None, tedana=False):
     logger = logging.getLogger(__name__)
     logger.info(f'generating tsnr maps from {Path(ds_path).name.split('.')[-1]} data for the {ds_name} dataset')
     logger.info(f"loading BIDS: {ds_name}")
 
     layout = bids.BIDSLayout(ds_path, validate=False)
-    if me:
+    if tedana:
         # Get optimally combined and denoised images
         bolds_optcom = layout.get(suffix='bold', extension='.nii.gz', desc='optcom')
         bolds_denoised = layout.get(suffix='bold', extension='.nii.gz', desc='denoised')

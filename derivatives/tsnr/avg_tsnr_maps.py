@@ -12,8 +12,8 @@ from nilearn.image import mean_img
 @click.option('--avg_mni', is_flag=True)
 @click.option('--avg_t1w', is_flag=True)
 @click.option('--echo', type=str, default=None, help='Specify the echo value on which the tSNR maps were computed')
-@click.option('--me', is_flag=True, help='Flag to specify if working with tedana outputs. If specified, will compute tSNR maps for optcom and denoised images')
-def main(ds_name, ds_path, avg_mni, avg_t1w, echo, me):
+@click.option('--tedana', is_flag=True, help='Flag to specify if working with tedana outputs. If specified, will compute tSNR maps for optcom and denoised images')
+def main(ds_name, ds_path, avg_mni, avg_t1w, echo, tedana):
     logger = logging.getLogger(__name__)
     logger.info(f'averaging tsnr maps from {Path(ds_path).name} data for the {ds_name} dataset')
     logger.info(f"loading tSNR maps: {ds_name}")
@@ -38,7 +38,7 @@ def main(ds_name, ds_path, avg_mni, avg_t1w, echo, me):
             tmp_entities = entities.copy()
             tmp_entities.update({'echo': echo, 'desc': 'preproc'})
             list_entities.append(tmp_entities)
-        if me:
+        if tedana:
             # Add optcom descriptor
             tmp_entities = entities.copy()
             tmp_entities.update({'desc': 'optcom'})
@@ -47,7 +47,7 @@ def main(ds_name, ds_path, avg_mni, avg_t1w, echo, me):
             tmp_entities = entities.copy()
             tmp_entities.update({'desc': 'denoised'})
             list_entities.append(tmp_entities)
-        if not me and echo is None:
+        if not tedana and echo is None:
             list_entities.append(entities)
         
         if avg_mni:
