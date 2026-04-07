@@ -148,6 +148,7 @@ def fix_fmap_phase(ds, commit=None):
     for f in mag_fmaps:
         ds.repo.call_git(['mv', str(f), str(f).replace('_part-mag','')])
 
+    ds.get(scans_tsvs)
     ds.unlock(scans_tsvs, on_failure='ignore')
     with fileinput.input(files=scans_tsvs, inplace=True) as f:
         for line in f:
