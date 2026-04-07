@@ -145,7 +145,7 @@ def write_fmriprep_job(layout, subject, args, anat_only=True, longitudinal=False
         smriprep_path = args.smriprep_input,
         freesurfer_path = (args.freesurfer_input
            if args.freesurfer_input
-           else args.smriprep_input / 'sourcedata' / 'freesurfer'),
+           else args.smriprep_input / 'sourcedata' / '*freesurfer*'),
     )
     job_specs.update(SMRIPREP_REQ)
     if args.longitudinal:
@@ -192,7 +192,7 @@ def write_fmriprep_job(layout, subject, args, anat_only=True, longitudinal=False
                     f"--omp-nthreads {job_specs['omp_nthreads']}",
                     f"--nprocs {job_specs['cpus']}",
                     f"--mem_mb {job_specs['mem_per_cpu']*max(1,job_specs['cpus']-1)}",
-                    "--track-carbon" if args.track_carbon else "",
+                    args.additional_options if args.additional_options else "",
                     "--fs-license-file", 'code/freesurfer.license',
                     "--longitudinal" if longitudinal else "",
                     f"--fs-subjects-dir {args.freesurfer_input}" if args.freesurfer_input else "",
@@ -311,7 +311,7 @@ def write_func_job(layout, subject, session, args):
         smriprep_path = args.smriprep_input,
         freesurfer_path = (args.freesurfer_input
            if args.freesurfer_input
-           else args.smriprep_input / 'sourcedata' / 'freesurfer'),
+           else args.smriprep_input / 'sourcedata' / '*freesurfer*'),
     )
     job_specs.update(FMRIPREP_REQ)
 
@@ -374,7 +374,8 @@ def write_func_job(layout, subject, session, args):
                     args.fmriprep_args,
                     # monitor resources to design a heuristic for runtime/cpu/ram of func data
                     #"--resource-monitor",
-                    "--track-carbon" if args.track_carbon else "",
+                    args.additional_options if args.additional_options else "",
+                    "--stop-on-first-crash",
                     str(args.bids_path.relative_to(args.output_path)),
                     "./",
                     "participant",
@@ -439,9 +440,8 @@ def parse_args():
         "identifier (the ses- prefix can be removed)",
     )
     parser.add_argument(
-        "--track-carbon",
-        action="store_true",
-        help="Track carbon, require fmriprep 22.x+ ",
+        "--additional-options",
+        help="pass additional fMRIPrep options",
     )
 
     parser.add_argument(
