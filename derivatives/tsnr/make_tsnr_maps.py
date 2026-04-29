@@ -44,6 +44,7 @@ def tsnr_maps(ds_name, ds_path, output_filepath, echo=None, tedana=False):
         Path(tsnr_path).parent.mkdir(parents=True, exist_ok=True)
         if not Path(tsnr_path).exists():
             try:
+                logger.info(f'Computing tSNR maps for: {bold.filename}')
                 tsnr_if = TSNR(
                     in_file=bold.path,
                     tsnr_file=tsnr_path,
