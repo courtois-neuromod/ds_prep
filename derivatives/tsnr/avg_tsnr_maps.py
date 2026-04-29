@@ -69,10 +69,12 @@ def main(ds_name, ds_path, avg_mni, avg_t1w, echo, me):
                     sub_list = [f.get_image() for f in layout.get(**elem_entities) if 'stat-tsnr' in f.filename]
                     # Compute mean only if `sub_list` not empty
                     if len(sub_list)>0:
-                        sub_mean = mean_img(sub_list, copy_header=True)
+                        logger.info(f'Computing averaged tSNR map for {elem_entities["subject"]}')
+                        sub_mean = mean_img(sub_list)
                         # Save averaged map
                         sub_mean.to_filename(out_file)
                         logger.info(f'Average computed for files with entities: \n{elem_entities}')
+                        logger.info(f'Average maps saved : \n{out_file}')
                     else:
                         logger.info(f'Cannot compute average tsnr maps for files with entities: \n{elem_entities}')
 
